@@ -38,10 +38,11 @@ function MainWorkspace() {
   const [loadingQuery, setLoadingQuery] = useState(false);
   const [loadingSchema, setLoadingSchema] = useState(false);
   const [activeView, setActiveView] = useState<"editor" | "diagram" | "ai" | "or">("editor");
+  const [activeOrModule, setActiveOrModule] = useState<any>("transportation-assignment");
+  const [aiInitialPrompt, setAiInitialPrompt] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-
   // Keyboard shortcut ⌘+B / Ctrl+B to toggle sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -315,6 +316,10 @@ function MainWorkspace() {
           <Sidebar
             schema={schema}
             onSelectTable={handleSelectTable}
+            onSelectOrModule={(mod) => {
+              setActiveOrModule(mod as any);
+              setActiveView("or");
+            }}
             onToggle={() => setIsSidebarOpen(false)}
             loading={loadingSchema}
           />
@@ -331,6 +336,10 @@ function MainWorkspace() {
                   onChangeSql={setSql}
                   onExecute={() => handleExecuteQuery()}
                   onGenerateFromPrompt={handleInlineAiConvert}
+                  onOpenOptimizationSuite={(mod) => {
+                    if (mod) setActiveOrModule(mod as any);
+                    setActiveView("or");
+                  }}
                   schema={schema}
                   loading={loadingQuery}
                 />
@@ -351,19 +360,29 @@ function MainWorkspace() {
             <AiAssistant
               schema={schema}
               onApplySql={handleApplyAiSql}
-              onNavigateToOr={() => setActiveView("or")}
+              onNavigateToOr={(mod) => {
+                if (mod) setActiveOrModule(mod as any);
+                setActiveView("or");
+              }}
+              initialPrompt={aiInitialPrompt}
             />
           ) : (
-            <OrSuiteView onOpenInSql={(querySql) => {
-              setSql(querySql + "\n");
-              setActiveView("editor");
-              handleExecuteQuery(undefined, querySql);
-            }} />
+            <OrSuiteView
+              activeModule={activeOrModule}
+              onSelectModule={setActiveOrModule}
+              onAskAi={(promptText) => {
+                setAiInitialPrompt(promptText);
+                setActiveView("ai");
+              }}
+              onOpenInSql={(querySql) => {
+                setSql(querySql + "\n");
+                setActiveView("editor");
+                handleExecuteQuery(undefined, querySql);
+              }}
+            />
           )}
         </main>
       </div>
-
-      {/* New Connection Modal */}
       <ConnectionModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

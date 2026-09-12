@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
-import { Play, RotateCcw, Sparkles, Plus, X, Terminal } from "lucide-react";
+import { Play, RotateCcw, Sparkles, Plus, X, Terminal, Calculator, FileCode } from "lucide-react";
 import { DatabaseSchema } from "../types";
 
 export interface WorksheetTab {
@@ -17,6 +17,7 @@ interface SqlEditorProps {
   onChangeSql: (val: string) => void;
   onExecute: () => void;
   onGenerateFromPrompt?: (prompt: string) => Promise<void>;
+  onOpenOptimizationSuite?: (module?: string) => void;
   schema?: DatabaseSchema | null;
   loading: boolean;
 }
@@ -26,11 +27,13 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   onChangeSql,
   onExecute,
   onGenerateFromPrompt,
+  onOpenOptimizationSuite,
   schema,
   loading,
 }) => {
   const [aiPrompt, setAiPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [tabs, setTabs] = useState<WorksheetTab[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_WORKSHEETS_KEY);
@@ -83,7 +86,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
 
   const closeTab = (e: React.MouseEvent, tabId: string) => {
     e.stopPropagation();
-    if (tabs.length === 1) return; // Keep at least one tab
+    if (tabs.length === 1) return;
     const nextTabs = tabs.filter((t) => t.id !== tabId);
     setTabs(nextTabs);
     if (activeTabId === tabId) {
@@ -107,7 +110,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     setEditingTabId(null);
   };
 
-  // Register Dynamic Monaco Schema Autocomplete (IntelliSense)
+  // Register Dynamic Monaco Schema Autocomplete
   useEffect(() => {
     if (!monacoRef.current) return;
     const monaco = monacoRef.current;
@@ -128,7 +131,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
 
         const suggestions: Monaco.languages.CompletionItem[] = [];
 
-        // 1. Table Suggestions from Active Schema
+        // 1. Table Suggestions
         if (schema && schema.tables) {
           for (const table of schema.tables) {
             suggestions.push({
@@ -143,10 +146,11 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
             // 2. Column Suggestions
             for (const col of table.columns) {
               suggestions.push({
-                label: `${col.name} (${table.name})`,
+                label: `${table.name}.${col.name}`,
                 kind: monaco.languages.CompletionItemKind.Field,
-                insertText: `"${col.name}"`,
-                detail: `${col.data_type} • ${table.name}`,
+                insertText: col.name,
+                detail: `${col.data_type} (from ${table.name})`,
+                documentation: `Column "${col.name}" of table "${table.name}"`,
                 range,
               });
             }
@@ -155,11 +159,10 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
 
         // 3. SQL Keywords
         const keywords = [
-          "SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "ON",
-          "GROUP BY", "ORDER BY", "HAVING", "LIMIT", "OFFSET", "DISTINCT", "AS",
-          "INSERT INTO", "VALUES", "UPDATE", "SET", "DELETE FROM", "CREATE TABLE", "DROP TABLE",
-          "WITH RECURSIVE", "UNION ALL", "UNION", "AND", "OR", "NOT", "IN", "IS NULL", "IS NOT NULL",
-          "LIKE", "BETWEEN", "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "ROUND", "COUNT", "SUM", "AVG", "MIN", "MAX"
+          "SELECT", "FROM", "WHERE", "JOIN", "LEFT JOIN", "INNER JOIN", "GROUP BY", "ORDER BY",
+          "HAVING", "LIMIT", "INSERT INTO", "UPDATE", "DELETE FROM", "CREATE TABLE", "DROP TABLE",
+          "ALTER TABLE", "DISTINCT", "AS", "COUNT", "SUM", "AVG", "MIN", "MAX", "CASE", "WHEN",
+          "THEN", "ELSE", "END", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS NULL", "IS NOT NULL"
         ];
 
         for (const kw of keywords) {
@@ -186,61 +189,67 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Register Claude Warm-Dark Navy Theme for Monaco
-    monaco.editor.defineTheme("claude-dark", {
+    // Custom dark product syntax theme
+    monaco.editor.defineTheme("torsz-dark", {
       base: "vs-dark",
       inherit: true,
       rules: [
         { token: "keyword", foreground: "cc785c", fontStyle: "bold" },
-        { token: "type", foreground: "5db8a6" },
-        { token: "number", foreground: "5db8a6" },
-        { token: "string", foreground: "e8a55a" },
-        { token: "comment", foreground: "8e8b82", fontStyle: "italic" },
-        { token: "operator", foreground: "e6dfd8" },
+        { token: "string", foreground: "5db8a6" },
+        { token: "number", foreground: "e8a55a" },
+        { token: "comment", foreground: "6c6a64", fontStyle: "italic" },
+        { token: "operator", foreground: "cc785c" },
         { token: "identifier", foreground: "faf9f5" },
+        { token: "type", foreground: "5db872" },
       ],
       colors: {
         "editor.background": "#181715",
         "editor.foreground": "#faf9f5",
-        "editorLineNumber.foreground": "#6c6a64",
-        "editorLineNumber.activeForeground": "#cc785c",
-        "editorGutter.background": "#1f1e1b",
-        "editorCursor.foreground": "#cc785c",
-        "editor.selectionBackground": "#3a2820",
-        "editor.inactiveSelectionBackground": "#252320",
         "editor.lineHighlightBackground": "#252320",
+        "editorCursor.foreground": "#cc785c",
+        "editorWhitespace.foreground": "#3d3d3a",
+        "editorIndentGuide.background": "#252320",
+        "editorIndentGuide.activeBackground": "#6c6a64",
+        "editorLineNumber.foreground": "#6c6a64",
+        "editorLineNumber.activeForeground": "#a09d96",
       },
     });
 
-    monaco.editor.setTheme("claude-dark");
+    monaco.editor.setTheme("torsz-dark");
 
-    // Add ⌘+Enter / Ctrl+Enter execution shortcut
+    // Shortcut Cmd+Enter / Ctrl+Enter to execute
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onExecute();
     });
   };
 
+  const insertTemplate = (templateSql: string) => {
+    onChangeSql(templateSql + "\n");
+    setShowTemplates(false);
+  };
+
   return (
     <div className="flex flex-col h-full bg-surface-dark border border-surface-dark-elevated rounded-2xl overflow-hidden shadow-sm">
-      {/* Worksheets Sub-Tabs Bar */}
+      {/* Worksheet Tabs Bar */}
       <div className="h-9 bg-[#141312] border-b border-surface-dark-elevated px-2 flex items-center justify-between select-none overflow-x-auto">
         <div className="flex items-center gap-1">
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
-            const isEditing = editingTabId === tab.id;
+            const isEditing = tab.id === editingTabId;
 
             return (
               <div
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
                 onDoubleClick={() => startRenameTab(tab)}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs rounded-t-lg transition-colors cursor-pointer border-t-2 ${
+                className={`group flex items-center gap-1.5 px-3 py-1 text-xs rounded-t-lg transition-colors cursor-pointer border-t-2 ${
                   isActive
-                    ? "bg-surface-dark-soft text-on-dark border-primary font-semibold shadow-xs"
-                    : "bg-transparent text-on-dark-soft border-transparent hover:bg-surface-dark hover:text-on-dark"
+                    ? "bg-surface-dark text-on-dark border-primary font-semibold shadow-xs"
+                    : "text-muted-soft hover:text-on-dark hover:bg-surface-dark-soft border-transparent"
                 }`}
               >
                 <Terminal className={`w-3 h-3 ${isActive ? "text-primary" : "text-muted-soft"}`} />
+
                 {isEditing ? (
                   <input
                     type="text"
@@ -252,7 +261,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
                       if (e.key === "Enter") commitRenameTab();
                       if (e.key === "Escape") setEditingTabId(null);
                     }}
-                    className="bg-surface-dark border border-primary text-xs text-on-dark px-1 py-0.2 rounded outline-none w-24"
+                    className="bg-surface-dark-elevated text-on-dark text-xs px-1 rounded outline-none border border-primary w-24"
                   />
                 ) : (
                   <span className="truncate max-w-[120px]">{tab.name}</span>
@@ -307,7 +316,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
                   }
                 }
               }}
-              placeholder="Ask in plain English (e.g. 'top 10 movies by year', 'count orders per customer')..."
+              placeholder="Ask AI in plain English (e.g. 'top 10 products', 'linear programming model')..."
               className="w-full bg-surface-dark border border-surface-dark-elevated text-xs text-on-dark placeholder:text-muted-soft rounded-xl pl-8 pr-3 py-1.5 outline-none focus:border-primary transition-colors font-sans"
             />
           </div>
@@ -330,8 +339,147 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
           </button>
         </div>
 
-        {/* Right Execution Actions */}
-        <div className="flex items-center gap-2">
+        {/* Right Actions Cluster */}
+        <div className="flex items-center gap-2 relative">
+          {/* Templates Dropdown Button */}
+          <button
+            onClick={() => setShowTemplates(!showTemplates)}
+            className="flex items-center gap-1 text-[11px] text-on-dark-soft hover:text-on-dark bg-surface-dark hover:bg-surface-dark-elevated px-2.5 py-1.5 rounded-xl border border-surface-dark-elevated transition-colors"
+            title="Load SQL & Optimization Templates"
+          >
+            <FileCode className="w-3.5 h-3.5 text-accent-teal" />
+            <span>Templates</span>
+          </button>
+
+          {/* Templates Menu Popover */}
+          {showTemplates && (
+            <div className="absolute right-24 top-9 z-30 w-72 bg-surface-dark border border-surface-dark-elevated rounded-xl shadow-xl p-2 space-y-1 text-xs animate-in fade-in duration-100">
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-soft">
+                TORA Optimization Models
+              </div>
+              <button
+                onClick={() =>
+                  insertTemplate(`-- Linear Programming Formulation (Maximize Profit)
+CREATE TABLE IF NOT EXISTS lp_variables (
+  variable_name VARCHAR(10) PRIMARY KEY,
+  optimal_units DOUBLE PRECISION,
+  unit_profit DOUBLE PRECISION
+);
+
+INSERT OR REPLACE INTO lp_variables VALUES
+  ('x1 (Product A)', 3.0, 5.0),
+  ('x2 (Product B)', 1.5, 4.0);
+
+SELECT 
+  variable_name,
+  optimal_units,
+  unit_profit,
+  (optimal_units * unit_profit) AS total_revenue,
+  (SELECT SUM(optimal_units * unit_profit) FROM lp_variables) AS optimal_Z
+FROM lp_variables;`)
+                }
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-surface-dark-soft text-on-dark transition-colors flex items-center justify-between"
+              >
+                <span>📈 Linear Programming (LP)</span>
+              </button>
+
+              <button
+                onClick={() =>
+                  insertTemplate(`-- Transportation Shipping Problem Matrix
+CREATE TABLE IF NOT EXISTS transportation_costs (
+  source_plant VARCHAR(50),
+  dest_market VARCHAR(50),
+  unit_cost DOUBLE PRECISION,
+  allocated_qty INTEGER,
+  PRIMARY KEY (source_plant, dest_market)
+);
+
+INSERT OR REPLACE INTO transportation_costs VALUES
+  ('Plant 1', 'Market 1', 10.0, 0),
+  ('Plant 1', 'Market 2', 2.0, 15),
+  ('Plant 2', 'Market 3', 9.0, 15),
+  ('Plant 3', 'Market 1', 4.0, 5);
+
+SELECT 
+  source_plant, 
+  dest_market, 
+  allocated_qty, 
+  unit_cost, 
+  (allocated_qty * unit_cost) AS lane_cost 
+FROM transportation_costs 
+WHERE allocated_qty > 0;`)
+                }
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-surface-dark-soft text-on-dark transition-colors flex items-center justify-between"
+              >
+                <span>🚚 Transportation Cost Matrix</span>
+              </button>
+
+              <button
+                onClick={() =>
+                  insertTemplate(`-- Project Critical Path Activities & Float Schedule
+CREATE TABLE IF NOT EXISTS project_cpm (
+  activity_id VARCHAR(5) PRIMARY KEY,
+  name VARCHAR(50),
+  duration_weeks INTEGER,
+  early_start INTEGER,
+  late_start INTEGER,
+  slack_weeks INTEGER,
+  is_critical BOOLEAN
+);
+
+INSERT OR REPLACE INTO project_cpm VALUES
+  ('A', 'Site Prep', 2, 0, 0, 0, 1),
+  ('B', 'Foundation', 4, 2, 2, 0, 1),
+  ('C', 'Framing', 10, 6, 6, 0, 1),
+  ('D', 'Roofing', 6, 16, 16, 0, 1),
+  ('E', 'Electrical', 4, 16, 18, 2, 0),
+  ('G', 'Finish', 7, 22, 22, 0, 1);
+
+SELECT * FROM project_cpm ORDER BY early_start ASC;`)
+                }
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-surface-dark-soft text-on-dark transition-colors flex items-center justify-between"
+              >
+                <span>📅 Project CPM Schedule</span>
+              </button>
+
+              <div className="border-t border-surface-dark-elevated my-1" />
+
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-soft">
+                Database Analytics
+              </div>
+              <button
+                onClick={() =>
+                  insertTemplate(`-- Top 5 Products by Profitability & Category
+SELECT 
+  p.name AS product_name,
+  c.name AS category_name,
+  p.price,
+  p.stock,
+  (p.price * p.stock) AS total_inventory_value
+FROM products p
+JOIN categories c ON p.category_id = c.id
+ORDER BY total_inventory_value DESC
+LIMIT 5;`)
+                }
+                className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-surface-dark-soft text-on-dark transition-colors"
+              >
+                <span>📊 Product Inventory Value</span>
+              </button>
+            </div>
+          )}
+
+          {/* Quick Jump to TORA Suite */}
+          {onOpenOptimizationSuite && (
+            <button
+              onClick={() => onOpenOptimizationSuite()}
+              className="flex items-center gap-1 text-[11px] text-accent-teal hover:text-on-dark bg-accent-teal/10 hover:bg-accent-teal/20 px-2.5 py-1.5 rounded-xl border border-accent-teal/30 transition-colors"
+              title="Open TORA Operations Research Suite"
+            >
+              <Calculator className="w-3.5 h-3.5" />
+              <span>TORA Solvers</span>
+            </button>
+          )}
+
           <button
             onClick={() => onChangeSql("")}
             className="flex items-center gap-1 text-[11px] text-on-dark-soft hover:text-on-dark px-2.5 py-1.5 rounded-xl transition-colors"
@@ -342,35 +490,40 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
 
           <button
             onClick={onExecute}
-            disabled={loading}
+            disabled={loading || !sql.trim()}
             className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-2xs"
           >
-            <Play className={`w-3.5 h-3.5 fill-current ${loading ? "animate-pulse" : ""}`} />
-            {loading ? "Running..." : "Run Query"}
+            <Play className={`w-3.5 h-3.5 fill-current ${loading ? "animate-spin" : ""}`} />
+            <span>{loading ? "Running..." : "Run (⌘↵)"}</span>
           </button>
         </div>
       </div>
 
-      {/* Code Window */}
-      <div className="flex-1 w-full min-h-[160px]">
+      {/* Monaco Code Editor Canvas */}
+      <div className="flex-1 w-full h-full relative">
         <Editor
           height="100%"
           defaultLanguage="sql"
           value={sql}
           onChange={(val) => onChangeSql(val || "")}
           onMount={handleEditorDidMount}
-          theme="claude-dark"
           options={{
-            fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', monospace",
-            fontSize: 15.5,
-            lineHeight: 24,
             minimap: { enabled: false },
+            fontSize: 13,
+            fontFamily: "'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
+            lineNumbers: "on",
+            roundedSelection: true,
             scrollBeyondLastLine: false,
             automaticLayout: true,
-            padding: { top: 8, bottom: 8 },
             tabSize: 2,
-            suggestOnTriggerCharacters: true,
+            wordWrap: "on",
+            lineDecorationsWidth: 4,
             lineNumbersMinChars: 3,
+            padding: { top: 12, bottom: 12 },
+            renderLineHighlight: "all",
+            overviewRulerBorder: false,
+            hideCursorInOverviewRuler: true,
+            suggestOnTriggerCharacters: true,
             quickSuggestions: {
               other: true,
               comments: false,

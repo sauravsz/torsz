@@ -27,14 +27,16 @@ interface AiAssistantProps {
   schema: DatabaseSchema | null;
   onApplySql: (sql: string, autoRun?: boolean) => void;
   onNavigateToOr?: (module?: string) => void;
+  initialPrompt?: string;
 }
 
 export const AiAssistant: React.FC<AiAssistantProps> = ({
   schema,
   onApplySql,
   onNavigateToOr,
+  initialPrompt,
 }) => {
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt || "");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiGeneratedSql | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,13 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
   useEffect(() => {
     setSuggestions(generateSmartSuggestions(schema));
   }, [schema]);
+
+  useEffect(() => {
+    if (initialPrompt) {
+      setPrompt(initialPrompt);
+      handleGenerate(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   const handleUpdateSettings = (updated: Partial<AiSettings>) => {
     const next = { ...aiSettings, ...updated };

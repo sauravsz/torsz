@@ -13,6 +13,7 @@ import {
   Plus,
   Trash2,
   FileText,
+  Sparkles,
 } from "lucide-react";
 import {
   OrModule,
@@ -54,10 +55,20 @@ import { SimplexTableauViewer } from "./SimplexTableauViewer";
 
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
+  onAskAi?: (prompt: string) => void;
+  activeModule?: OrModule;
+  onSelectModule?: (module: OrModule) => void;
 }
 
-export const OrSuiteView: React.FC<OrSuiteViewProps> = ({ onOpenInSql }) => {
-  const [activeModule, setActiveModule] = useState<OrModule>("transportation-assignment");
+export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
+  onOpenInSql,
+  onAskAi,
+  activeModule: controlledModule,
+  onSelectModule,
+}) => {
+  const [internalModule, setInternalModule] = useState<OrModule>("transportation-assignment");
+  const activeModule = controlledModule || internalModule;
+  const setActiveModule = onSelectModule || setInternalModule;
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
@@ -512,6 +523,25 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({ onOpenInSql }) => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {onAskAi && (
+                        <button
+                          onClick={() =>
+                            onAskAi(
+                              `Analyze this Transportation Shipping Matrix: 3 Plants with supply [${transProblem.supply.join(
+                                ", "
+                              )}] and 4 Markets with demand [${transProblem.demand.join(
+                                ", "
+                              )}]. Total optimal shipping cost is $${
+                                transSol?.totalCost || 455
+                              }. How can we reduce bottleneck lane costs or improve throughput?`
+                            )
+                          }
+                          className="flex items-center gap-1 bg-surface-card hover:bg-surface-cream text-primary text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Ask AI Advisor</span>
+                        </button>
+                      )}
                       <button
                         onClick={() =>
                           onOpenInSql(`-- Transportation Model
@@ -539,7 +569,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                         className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
                       >
                         <FileText className="w-3.5 h-3.5 text-primary" />
-                        <span>Open in SQL</span>
+                        <span>Save to SQL</span>
                       </button>
                       <button
                         onClick={addTransSource}
@@ -876,6 +906,49 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                     Model Formulation (Editable)
                   </h4>
                   <div className="flex items-center gap-2">
+                    {onAskAi && (
+                      <button
+                        onClick={() =>
+                          onAskAi(
+                            `Analyze this Linear Program: Maximize Z = ${lpProblem.objectiveCoefficients[0]}*x1 + ${
+                              lpProblem.objectiveCoefficients[1]
+                            }*x2 subject to constraints. Current optimal objective Z* = ${
+                              lpSol?.objectiveValue || 21
+                            }. Explain binding constraints, shadow prices, and capacity investments.`
+                          )
+                        }
+                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-primary text-xs font-semibold px-3 py-2 rounded-xl border border-hairline transition-colors shadow-2xs"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Ask AI Advisor</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() =>
+                        onOpenInSql(`-- Linear Programming Formulation (Maximize Profit)
+CREATE TABLE IF NOT EXISTS lp_variables (
+  variable_name VARCHAR(10) PRIMARY KEY,
+  optimal_units DOUBLE PRECISION,
+  unit_profit DOUBLE PRECISION
+);
+
+INSERT OR REPLACE INTO lp_variables VALUES
+  ('x1', ${lpSol?.variableValues.find((v) => v.name === "x1")?.value || 3.0}, ${lpProblem.objectiveCoefficients[0]}),
+  ('x2', ${lpSol?.variableValues.find((v) => v.name === "x2")?.value || 1.5}, ${lpProblem.objectiveCoefficients[1]});
+
+SELECT 
+  variable_name,
+  optimal_units,
+  unit_profit,
+  (optimal_units * unit_profit) AS total_revenue,
+  (SELECT SUM(optimal_units * unit_profit) FROM lp_variables) AS optimal_Z
+FROM lp_variables;`)
+                      }
+                      className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-3 py-2 rounded-xl border border-hairline transition-colors shadow-2xs"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-primary" />
+                      <span>Save to SQL</span>
+                    </button>
                     <button
                       onClick={handleSolveLp}
                       className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"
@@ -899,7 +972,6 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                     <option value="max">Maximize Z =</option>
                     <option value="min">Minimize Z =</option>
                   </select>
-
                   <div className="flex items-center gap-2 font-mono">
                     <input
                       type="number"
