@@ -174,7 +174,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 className="w-full bg-canvas border border-hairline rounded-md px-3 py-1.5 text-xs text-ink focus:border-primary outline-none"
               >
                 <option value="groq">Groq (Ultra-Fast & Free)</option>
-                <option value="custom">Custom (OpenAI / Ollama / OpenRouter)</option>
+                <option value="custom">Custom (OpenAI / Ollama / Local LLM)</option>
                 <option value="claude">Anthropic Claude</option>
                 <option value="local">Offline Built-in Engine</option>
               </select>

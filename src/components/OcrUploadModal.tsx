@@ -250,17 +250,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                     rel="noreferrer"
                     className="flex items-center gap-0.5 text-[11px] text-primary hover:underline font-semibold"
                   >
-                    <span>Free Groq Key (llama-3.2-vision)</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <span>•</span>
-                  <a
-                    href="https://openrouter.ai/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-0.5 text-[11px] text-accent-teal hover:underline font-semibold"
-                  >
-                    <span>Free OpenRouter Key (gemini-flash)</span>
+                    <span>Get Free Groq API Key</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -279,12 +269,6 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                           baseUrl: "https://api.groq.com/openai/v1",
                           model: "qwen/qwen3.8-27b",
                         });
-                      } else if (p === "custom") {
-                        handleUpdateSettings({
-                          provider: "custom",
-                          baseUrl: "https://openrouter.ai/api/v1",
-                          model: "qwen/qwen3.8-27b",
-                        });
                       } else if (p === "claude") {
                         handleUpdateSettings({
                           provider: "claude",
@@ -297,8 +281,8 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                     className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink focus:border-primary outline-none"
                   >
                     <option value="groq">Groq (qwen/qwen3.8-27b)</option>
-                    <option value="custom">OpenRouter (qwen/qwen3.8-27b)</option>
                     <option value="claude">Anthropic Claude (Sonnet 3.5)</option>
+                    <option value="custom">Custom Endpoint</option>
                     <option value="local">In-Browser OCR (Offline)</option>
                   </select>
                 </div>
