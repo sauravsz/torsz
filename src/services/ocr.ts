@@ -108,6 +108,89 @@ export async function processOrQuestionWithVisionAi(
   const rawText = await performInBrowserOcr(preprocessed);
   return classifyOrProblemFromText(rawText);
 }
+export async function parseOrQuestionTextWithAi(
+  questionText: string,
+  customSettings?: Partial<AiSettings>
+): Promise<OcrProblemClassification> {
+  const settings = { ...getStoredAiSettings(), ...customSettings };
+
+  if (settings.apiKey && settings.provider !== "local") {
+    try {
+      const prompt = `Analyze this Operations Research problem statement, table data, or markdown:
+"""
+${questionText}
+"""
+
+Extract all exact parameters into the JSON schema:
+1. "detectedModule": one of ["linear-programming", "transportation-assignment", "network-models", "project-planning", "inventory-control", "queuing-models", "zero-sum-games", "linear-equations"]
+2. "networkSubtype": "shortest-route" | "minimum-spanning-tree" | "maximal-flow"
+3. "transSubtype": "transportation" | "hungarian-assignment"
+4. "confidence": number (e.g. 0.95)
+5. "reason": explanation
+6. "parsedData":
+   - If network: { "edges": [{ "from": "1", "to": "2", "cost": 4000 }], "startNode": "1", "endNode": "5" }
+   - If transportation: { "sources": ["P1","P2"], "destinations": ["M1","M2"], "supply": [15,25], "demand": [20,20], "costs": [[10,2],[12,7]] }
+   - If LP: { "objective": "max", "objectiveCoefficients": [5,4], "constraints": [{ "coefficients": [6,4], "operator": "<=", "rhs": 24 }] }
+   - If CPM: { "cpm": [{ "id": "A", "name": "Task A", "predecessors": [], "duration": 4 }] }
+   - If inventory: { "annualDemandD": 1000, "orderingCostK": 100, "holdingCostH": 2 }
+   - If queuing: { "arrivalRateLambda": 2, "serviceRateMu": 3 }`;
+
+      if (settings.provider === "claude") {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": settings.apiKey,
+            "anthropic-version": "2023-06-01",
+            "anthropic-dangerous-direct-browser-access": "true",
+          },
+          body: JSON.stringify({
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 2500,
+            system: VISION_SYSTEM_PROMPT,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        });
+
+        const data = await response.json();
+        const content = data.content?.[0]?.text || "";
+        return parseVisionJson(content);
+      } else {
+        const baseUrl = (
+          settings.baseUrl ||
+          (settings.provider === "groq" ? "https://api.groq.com/openai/v1" : "https://api.openai.com/v1")
+        ).replace(/\/$/, "");
+        const modelName =
+          settings.model || (settings.provider === "groq" ? "qwen/qwen3.8-27b" : "gpt-4o-mini");
+
+        const response = await fetch(`${baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${settings.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              { role: "system", content: VISION_SYSTEM_PROMPT },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.1,
+            response_format: { type: "json_object" },
+          }),
+        });
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        return parseVisionJson(content);
+      }
+    } catch (err) {
+      console.warn("AI Text parsing failed, falling back to heuristic parser:", err);
+    }
+  }
+
+  return classifyOrProblemFromText(questionText);
+}
 
 const VISION_SYSTEM_PROMPT = `You are torsz's Operations Research Multimodal Question Solver.
 Examine this image of an Operations Research exam problem, handwritten worksheet, cost matrix, or network graph.

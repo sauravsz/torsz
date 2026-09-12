@@ -46,7 +46,7 @@ import {
 } from "../services/or/solvers";
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
-import { extractNetworkEdges, classifyOrProblemFromText } from "../services/ocr";
+import { extractNetworkEdges, parseOrQuestionTextWithAi } from "../services/ocr";
 
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
@@ -72,6 +72,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const activeModule = controlledModule || "transportation-assignment";
   const [quickQuestionText, setQuickQuestionText] = useState("");
   const [isQuestionBoxExpanded, setIsQuestionBoxExpanded] = useState(false);
+  const [isParsingText, setIsParsingText] = useState(false);
   const questionBoxRef = useRef<HTMLDivElement | null>(null);
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
@@ -316,90 +317,113 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [quickQuestionText]);
 
-  const handleQuickQuestionSubmit = (e?: React.FormEvent) => {
+  const handleQuickQuestionSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!quickQuestionText.trim()) return;
+    if (!quickQuestionText.trim() || isParsingText) return;
 
-    const classification = classifyOrProblemFromText(quickQuestionText);
-    const { detectedModule, networkSubtype: netSub, transSubtype: trSub, parsedData } = classification;
+    setIsParsingText(true);
+    try {
+      const classification = await parseOrQuestionTextWithAi(quickQuestionText);
+      const { detectedModule, networkSubtype: netSub, transSubtype: trSub, parsedData } = classification;
 
-    if (netSub) setNetworkSubtype(netSub);
-    if (trSub) setTransSubtype(trSub);
+      if (netSub) setNetworkSubtype(netSub);
+      if (trSub) setTransSubtype(trSub);
 
-    if (detectedModule === "network-models") {
-      let edges = parsedData?.edges;
-      let start = parsedData?.startNode || "1";
-      let end = parsedData?.endNode || "5";
+      if (detectedModule === "network-models" || netSub) {
+        let edges = parsedData?.edges;
+        let start = parsedData?.startNode || "1";
+        let end = parsedData?.endNode || "5";
 
-      if (!edges || edges.length === 0) {
-        const extracted = extractNetworkEdges(quickQuestionText);
-        edges = extracted.edges;
-        start = extracted.startNode;
-        end = extracted.endNode;
+        if (!edges || edges.length === 0) {
+          const extracted = extractNetworkEdges(quickQuestionText);
+          edges = extracted.edges;
+          start = extracted.startNode;
+          end = extracted.endNode;
+        }
+
+        setNetworkEdges(edges);
+        setNetStartNode(start);
+        setNetEndNode(end);
+
+        if (netSub === "minimum-spanning-tree") {
+          const sol = solveNetworkMst(edges);
+          setNetworkSol(sol);
+        } else if (netSub === "maximal-flow") {
+          const sol = solveNetworkMaxFlow(edges, start, end);
+          setNetworkSol(sol);
+        } else {
+          const sol = solveNetworkShortestRoute(edges, start, end);
+          setNetworkSol(sol);
+        }
       }
 
-      setNetworkEdges(edges);
-      setNetStartNode(start);
-      setNetEndNode(end);
-
-      if (netSub === "minimum-spanning-tree") {
-        const sol = solveNetworkMst(edges);
-        setNetworkSol(sol);
-      } else if (netSub === "maximal-flow") {
-        const sol = solveNetworkMaxFlow(edges, start, end);
-        setNetworkSol(sol);
-      } else {
-        const sol = solveNetworkShortestRoute(edges, start, end);
-        setNetworkSol(sol);
+      if (detectedModule === "transportation-assignment") {
+        if (trSub === "hungarian-assignment") {
+          const nextAssign = parsedData?.assign ? { ...assignProblem, ...parsedData.assign } : assignProblem;
+          setAssignProblem(nextAssign);
+          try {
+            const sol = solveHungarianAssignment(nextAssign);
+            setAssignSol(sol);
+          } catch {}
+        } else {
+          const nextTrans = parsedData?.trans ? { ...transProblem, ...parsedData.trans } : transProblem;
+          setTransProblem(nextTrans);
+          try {
+            const sol = solveTransportation(nextTrans);
+            setTransSol(sol);
+          } catch {}
+        }
       }
-    }
 
-    if (detectedModule === "transportation-assignment") {
-      if (trSub === "hungarian-assignment") {
-        const nextAssign = parsedData?.assign ? { ...assignProblem, ...parsedData.assign } : assignProblem;
-        setAssignProblem(nextAssign);
+      if (detectedModule === "linear-programming") {
+        const nextLp = parsedData?.lp ? { ...lpProblem, ...parsedData.lp } : lpProblem;
+        setLpProblem(nextLp);
         try {
-          const sol = solveHungarianAssignment(nextAssign);
-          setAssignSol(sol);
-        } catch {}
-      } else {
-        const nextTrans = parsedData?.trans ? { ...transProblem, ...parsedData.trans } : transProblem;
-        setTransProblem(nextTrans);
-        try {
-          const sol = solveTransportation(nextTrans);
-          setTransSol(sol);
+          const sol = solveLinearProgramming(nextLp);
+          setLpSol(sol);
         } catch {}
       }
-    }
 
-    if (detectedModule === "linear-programming") {
-      const nextLp = parsedData?.lp ? { ...lpProblem, ...parsedData.lp } : lpProblem;
-      setLpProblem(nextLp);
-      try {
-        const sol = solveLinearProgramming(nextLp);
-        setLpSol(sol);
-      } catch {}
-    }
+      if (detectedModule === "project-planning") {
+        const nextCpm = parsedData?.cpm && parsedData.cpm.length > 0 ? parsedData.cpm : cpmActivities;
+        setCpmActivities(nextCpm);
+        try {
+          const sol = solveCpmPert(nextCpm);
+          setCpmSol(sol);
+        } catch {}
+      }
 
-    if (detectedModule === "project-planning") {
-      const nextCpm = parsedData?.cpm && parsedData.cpm.length > 0 ? parsedData.cpm : cpmActivities;
-      setCpmActivities(nextCpm);
-      try {
-        const sol = solveCpmPert(nextCpm);
-        setCpmSol(sol);
-      } catch {}
-    }
+      if (detectedModule === "inventory-control") {
+        const nextInv = parsedData?.inventory ? { ...inventoryProblem, ...parsedData.inventory } : inventoryProblem;
+        setInventoryProblem(nextInv);
+        try {
+          const sol = solveInventoryControl(nextInv);
+          setInventorySol(sol);
+        } catch {}
+      }
 
-    if (detectedModule === "inventory-control") {
-      const nextInv = parsedData?.inventory ? { ...inventoryProblem, ...parsedData.inventory } : inventoryProblem;
-      setInventoryProblem(nextInv);
-      try {
-        const sol = solveInventoryControl(nextInv);
-        setInventorySol(sol);
-      } catch {}
-    }
+      if (detectedModule === "queuing-models") {
+        const nextQ = parsedData?.queuing ? { ...queuingProblem, ...parsedData.queuing } : queuingProblem;
+        setQueuingProblem(nextQ);
+        try {
+          const sol = solveQueuing(nextQ);
+          setQueuingSol(sol);
+        } catch {}
+      }
 
-    setQuickQuestionText("");
+      if (detectedModule === "zero-sum-games") {
+        const nextG = parsedData?.game ? { ...gameProblem, ...parsedData.game } : gameProblem;
+        setGameProblem(nextG);
+        try {
+          const sol = solveZeroSumGame(nextG);
+          setGameSol(sol);
+        } catch {}
+      }
+
+      setQuickQuestionText("");
+    } finally {
+      setIsParsingText(false);
+    }
   };
   const updateTransCost = (r: number, c: number, val: number) => {
     const nextCosts = transProblem.costs.map((row, ri) =>
@@ -706,11 +730,11 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   )}
                   <button
                     type="submit"
-                    disabled={!quickQuestionText.trim()}
+                    disabled={!quickQuestionText.trim() || isParsingText}
                     className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-xs"
                   >
-                    <Play className="w-3 h-3 fill-current" />
-                    <span>Parse & Solve</span>
+                    <Play className={`w-3 h-3 fill-current ${isParsingText ? "animate-spin" : ""}`} />
+                    <span>{isParsingText ? "AI Parsing..." : "Parse & Solve ✨"}</span>
                   </button>
                 </div>
               </div>
