@@ -471,7 +471,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
   };
 }
 
-function extractNetworkEdges(text: string): { edges: NetworkEdge[]; startNode: string; endNode: string } {
+export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; startNode: string; endNode: string } {
   const lower = text.toLowerCase();
   const edges: NetworkEdge[] = [];
 

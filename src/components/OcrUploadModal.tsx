@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import {
   processOrQuestionWithVisionAi,
+  classifyOrProblemFromText,
   OcrProblemClassification,
 } from "../services/ocr";
 import { OrModule, NetworkSubtype, TransSubtype } from "../services/or/types";
@@ -101,13 +102,19 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   };
 
   const handleConfirmAndSolve = () => {
+    let finalParsedData = classification?.parsedData;
+    if (!finalParsedData || Object.keys(finalParsedData).length === 0) {
+      const fallback = classifyOrProblemFromText(ocrText);
+      finalParsedData = fallback.parsedData;
+    }
+
     onSelectAndSolve(
       selectedModule,
       {
         network: selectedNetworkSubtype,
         trans: selectedTransSubtype,
       },
-      classification?.parsedData,
+      finalParsedData,
       ocrText
     );
     onClose();

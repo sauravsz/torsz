@@ -45,7 +45,7 @@ import {
 } from "../services/or/solvers";
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
-
+import { extractNetworkEdges } from "../services/ocr";
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
   onAskAi?: (prompt: string) => void;
@@ -203,81 +203,97 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   // Auto-populate & Auto-solve on OCR Data Import
   useEffect(() => {
     if (importedOcrData) {
-      const { networkSubtype: netSub, transSubtype: trSub, data } = importedOcrData;
+      const { module, networkSubtype: netSub, transSubtype: trSub, data, rawText } = importedOcrData;
       if (netSub) setNetworkSubtype(netSub);
       if (trSub) setTransSubtype(trSub);
 
-      if (data?.edges && data.edges.length > 0) {
-        setNetworkEdges(data.edges);
-        const start = data.startNode || String(data.edges[0].from);
-        const end = data.endNode || String(data.edges[data.edges.length - 1].to);
+      if (module === "network-models" || netSub) {
+        let edges = data?.edges;
+        let start = data?.startNode || "1";
+        let end = data?.endNode || "5";
+
+        if (!edges || edges.length === 0) {
+          const extracted = extractNetworkEdges(rawText || "");
+          edges = extracted.edges;
+          start = extracted.startNode;
+          end = extracted.endNode;
+        }
+
+        setNetworkEdges(edges);
         setNetStartNode(start);
         setNetEndNode(end);
 
         if (netSub === "minimum-spanning-tree") {
-          const sol = solveNetworkMst(data.edges);
+          const sol = solveNetworkMst(edges);
           setNetworkSol(sol);
         } else if (netSub === "maximal-flow") {
-          const sol = solveNetworkMaxFlow(data.edges, start, end);
+          const sol = solveNetworkMaxFlow(edges, start, end);
           setNetworkSol(sol);
         } else {
-          const sol = solveNetworkShortestRoute(data.edges, start, end);
+          const sol = solveNetworkShortestRoute(edges, start, end);
           setNetworkSol(sol);
         }
       }
 
-      if (data?.trans) {
-        setTransProblem((prev) => ({ ...prev, ...data.trans }));
-        try {
-          const sol = solveTransportation({ ...transProblem, ...data.trans });
-          setTransSol(sol);
-        } catch {}
+      if (module === "transportation-assignment") {
+        if (trSub === "hungarian-assignment") {
+          const nextAssign = data?.assign ? { ...assignProblem, ...data.assign } : assignProblem;
+          setAssignProblem(nextAssign);
+          try {
+            const sol = solveHungarianAssignment(nextAssign);
+            setAssignSol(sol);
+          } catch {}
+        } else {
+          const nextTrans = data?.trans ? { ...transProblem, ...data.trans } : transProblem;
+          setTransProblem(nextTrans);
+          try {
+            const sol = solveTransportation(nextTrans);
+            setTransSol(sol);
+          } catch {}
+        }
       }
 
-      if (data?.assign) {
-        setAssignProblem((prev) => ({ ...prev, ...data.assign }));
+      if (module === "linear-programming") {
+        const nextLp = data?.lp ? { ...lpProblem, ...data.lp } : lpProblem;
+        setLpProblem(nextLp);
         try {
-          const sol = solveHungarianAssignment({ ...assignProblem, ...data.assign });
-          setAssignSol(sol);
-        } catch {}
-      }
-
-      if (data?.lp) {
-        setLpProblem((prev) => ({ ...prev, ...data.lp }));
-        try {
-          const sol = solveLinearProgramming({ ...lpProblem, ...data.lp });
+          const sol = solveLinearProgramming(nextLp);
           setLpSol(sol);
         } catch {}
       }
 
-      if (data?.cpm) {
-        setCpmActivities(data.cpm);
+      if (module === "project-planning") {
+        const nextCpm = data?.cpm && data.cpm.length > 0 ? data.cpm : cpmActivities;
+        setCpmActivities(nextCpm);
         try {
-          const sol = solveCpmPert(data.cpm);
+          const sol = solveCpmPert(nextCpm);
           setCpmSol(sol);
         } catch {}
       }
 
-      if (data?.inventory) {
-        setInventoryProblem((prev) => ({ ...prev, ...data.inventory }));
+      if (module === "inventory-control") {
+        const nextInv = data?.inventory ? { ...inventoryProblem, ...data.inventory } : inventoryProblem;
+        setInventoryProblem(nextInv);
         try {
-          const sol = solveInventoryControl({ ...inventoryProblem, ...data.inventory });
+          const sol = solveInventoryControl(nextInv);
           setInventorySol(sol);
         } catch {}
       }
 
-      if (data?.queuing) {
-        setQueuingProblem((prev) => ({ ...prev, ...data.queuing }));
+      if (module === "queuing-models") {
+        const nextQ = data?.queuing ? { ...queuingProblem, ...data.queuing } : queuingProblem;
+        setQueuingProblem(nextQ);
         try {
-          const sol = solveQueuing({ ...queuingProblem, ...data.queuing });
+          const sol = solveQueuing(nextQ);
           setQueuingSol(sol);
         } catch {}
       }
 
-      if (data?.game) {
-        setGameProblem((prev) => ({ ...prev, ...data.game }));
+      if (module === "zero-sum-games") {
+        const nextG = data?.game ? { ...gameProblem, ...data.game } : gameProblem;
+        setGameProblem(nextG);
         try {
-          const sol = solveZeroSumGame({ ...gameProblem, ...data.game });
+          const sol = solveZeroSumGame(nextG);
           setGameSol(sol);
         } catch {}
       }
