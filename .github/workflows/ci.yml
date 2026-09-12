@@ -1,0 +1,32 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build & Verify Web Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Dependencies
+        run: |
+          bun install
+
+      - name: Build Production Bundle
+        run: |
+          bun run build
+
+      - name: Verify Web Dist
+        run: |
+          test -f dist/index.html
+          echo "Web production bundle verified successfully."
