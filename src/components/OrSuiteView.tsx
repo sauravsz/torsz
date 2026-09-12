@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Play,
   CheckCircle2,
@@ -7,6 +7,7 @@ import {
   FileText,
   Sparkles,
   Camera,
+  X,
 } from "lucide-react";
 import {
   OrModule,
@@ -70,6 +71,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 }) => {
   const activeModule = controlledModule || "transportation-assignment";
   const [quickQuestionText, setQuickQuestionText] = useState("");
+  const [isQuestionBoxExpanded, setIsQuestionBoxExpanded] = useState(false);
+  const questionBoxRef = useRef<HTMLDivElement | null>(null);
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
@@ -299,6 +302,19 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
     }
   }, [importedOcrData]);
+
+  // Handle click outside to collapse expanded question box when empty
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (questionBoxRef.current && !questionBoxRef.current.contains(e.target as Node)) {
+        if (!quickQuestionText.trim()) {
+          setIsQuestionBoxExpanded(false);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [quickQuestionText]);
 
   const handleQuickQuestionSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -614,30 +630,93 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           </span>
         </div>
 
-        {/* Inline Question Chatbox / Markdown Bar */}
-        <form
-          onSubmit={handleQuickQuestionSubmit}
-          className="flex-1 max-w-xl flex items-center gap-1.5"
-        >
-          <div className="relative flex-1">
-            <Sparkles className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-primary" />
-            <input
-              type="text"
-              value={quickQuestionText}
-              onChange={(e) => setQuickQuestionText(e.target.value)}
-              placeholder="Enter question in plain text / markdown (e.g. 'A company named Rent Car is developing a replacement policy...')"
-              className="w-full bg-canvas border border-hairline text-xs text-ink placeholder:text-muted rounded-xl pl-8 pr-3 py-1.5 outline-none focus:border-primary transition-colors font-sans"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={!quickQuestionText.trim()}
-            className="flex items-center gap-1 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors shadow-2xs shrink-0"
-          >
-            <Play className="w-3 h-3 fill-current" />
-            <span>Parse & Solve</span>
-          </button>
-        </form>
+        {/* Auto-Expanding Question Chatbox / Markdown Bar */}
+        <div ref={questionBoxRef} className="relative flex-1 max-w-xl z-30">
+          {!isQuestionBoxExpanded ? (
+            <div
+              onClick={() => setIsQuestionBoxExpanded(true)}
+              className="w-full bg-canvas hover:bg-surface-cream/70 border border-hairline hover:border-primary/40 text-xs text-muted rounded-xl pl-3 pr-2.5 py-1.5 cursor-pointer flex items-center justify-between transition-all shadow-2xs group"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="truncate text-ink">
+                  {quickQuestionText || "Enter question in plain text or markdown..."}
+                </span>
+              </div>
+              <span className="text-[10px] text-primary font-semibold shrink-0 bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                Type / Paste
+              </span>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                handleQuickQuestionSubmit(e);
+                setIsQuestionBoxExpanded(false);
+              }}
+              className="absolute left-0 top-0 w-full bg-surface-card border border-primary/40 rounded-2xl shadow-2xl p-3 space-y-2.5 animate-in fade-in duration-100 ring-2 ring-primary/20"
+            >
+              <div className="flex items-center justify-between text-[11px] font-semibold text-muted uppercase tracking-wider pb-1 border-b border-hairline">
+                <div className="flex items-center gap-1.5 text-primary">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Problem Question / Markdown Input</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsQuestionBoxExpanded(false)}
+                  className="text-muted hover:text-ink p-0.5 rounded hover:bg-surface-soft"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <textarea
+                autoFocus
+                rows={4}
+                value={quickQuestionText}
+                onChange={(e) => setQuickQuestionText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleQuickQuestionSubmit();
+                    setIsQuestionBoxExpanded(false);
+                  }
+                  if (e.key === "Escape") {
+                    setIsQuestionBoxExpanded(false);
+                  }
+                }}
+                placeholder="Paste or type complete problem statement, table data, or markdown here (e.g. 'A company named Rent Car is developing a replacement policy...'). Press ⌘+Enter to solve."
+                className="w-full bg-canvas border border-hairline rounded-xl p-2.5 text-xs text-ink placeholder:text-muted focus:border-primary outline-none transition-colors font-sans leading-relaxed resize-y max-h-60"
+              />
+
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2 text-[10px] text-muted-soft">
+                  <kbd className="font-mono bg-canvas px-1.5 py-0.5 rounded border border-hairline text-ink">⌘ + Enter</kbd>
+                  <span>to Parse & Solve</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {quickQuestionText && (
+                    <button
+                      type="button"
+                      onClick={() => setQuickQuestionText("")}
+                      className="text-[11px] text-muted hover:text-ink px-2 py-1 rounded transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!quickQuestionText.trim()}
+                    className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-xs"
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Parse & Solve</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </div>
 
         {/* OCR Scan Button */}
         {onOpenOcr && (
