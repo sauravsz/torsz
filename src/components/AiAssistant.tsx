@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from "react";
-import { Sparkles, Play, Copy, Check, Key, HelpCircle, ArrowRight, Settings, ExternalLink, Upload } from "lucide-react";
+import {
+  Sparkles,
+  Play,
+  Copy,
+  Check,
+  Key,
+  HelpCircle,
+  ArrowRight,
+  Settings,
+  ExternalLink,
+  Upload,
+  Calculator,
+} from "lucide-react";
 import { DatabaseSchema } from "../types";
 import {
   convertTextToSql,
   generateSmartSuggestions,
+  generateOptimizationSuggestions,
   AiGeneratedSql,
   getStoredAiSettings,
   saveStoredAiSettings,
@@ -13,9 +26,14 @@ import {
 interface AiAssistantProps {
   schema: DatabaseSchema | null;
   onApplySql: (sql: string, autoRun?: boolean) => void;
+  onNavigateToOr?: (module?: string) => void;
 }
 
-export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) => {
+export const AiAssistant: React.FC<AiAssistantProps> = ({
+  schema,
+  onApplySql,
+  onNavigateToOr,
+}) => {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiGeneratedSql | null>(null);
@@ -25,6 +43,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [aiSettings, setAiSettings] = useState<AiSettings>(getStoredAiSettings);
   const fileUploadRef = React.useRef<HTMLInputElement | null>(null);
+
+  const optimizationSuggestions = generateOptimizationSuggestions();
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -79,11 +100,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
               <Sparkles className="w-5 h-5" />
             </div>
             <h2 className="font-editorial-serif text-3xl font-medium text-ink">
-              AI SQL Assistant
+              AI Database & Optimization Assistant
             </h2>
           </div>
           <p className="text-sm text-body leading-relaxed">
-            Ask questions in plain English. <span className="font-semibold text-ink">torsz</span> translates your request into accurate SQL.
+            Ask questions in plain English or formulate operations research models. <span className="font-semibold text-ink">torsz</span> translates your request into accurate SQL and mathematical formulations.
           </p>
         </div>
 
@@ -96,7 +117,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
         </button>
       </div>
 
-      {/* Groq / LLM Configuration Panel */}
+      {/* Configuration Panel */}
       {showConfig && (
         <div className="bg-surface-card border border-hairline rounded-xl p-5 mb-6 shadow-sm space-y-4 animate-in fade-in duration-150">
           <div className="flex items-center justify-between border-b border-hairline pb-2.5">
@@ -195,7 +216,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
           </div>
 
           <p className="text-[11px] text-muted-soft">
-            API keys are stored strictly in your local browser storage. Groq runs fast inference with {aiSettings.model}.
+            API keys are stored strictly in your local browser storage.
           </p>
         </div>
       )}
@@ -205,7 +226,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Ask in Plain English
+              Ask in Plain English or Formulate Optimization Models
             </label>
             <span className="text-[11px] text-muted font-mono bg-canvas px-2 py-0.5 rounded border border-hairline">
               Provider: {aiSettings.provider.toUpperCase()} ({aiSettings.model})
@@ -222,17 +243,40 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
                   handleGenerate();
                 }
               }}
-              placeholder="Type or paste your problem statement, business question, or network optimization problem here... (e.g., 'A company named Rent Car is developing a replacement policy... Find the shortest path'). Press ⌘+Enter to generate."
+              placeholder="Ask a SQL question or describe an Operations Research problem (e.g., 'Maximize product profit with 2 raw materials', 'Solve transportation shipping problem for 3 plants and 4 markets', 'Find critical path duration for project activities'). Press ⌘+Enter to generate."
               className="w-full bg-canvas border border-hairline rounded-lg p-3.5 text-sm text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors leading-relaxed font-sans"
             />
           </div>
         </div>
 
-        {/* Quick Suggestion Chips */}
+        {/* TORA Optimization Quick Chips */}
+        <div className="space-y-1.5">
+          <span className="text-[11px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1">
+            <Calculator className="w-3.5 h-3.5" />
+            <span>TORA Optimization Solvers & Models:</span>
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {optimizationSuggestions.map((opt, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setPrompt(opt.prompt);
+                  handleGenerate(opt.prompt);
+                }}
+                className="text-xs bg-canvas hover:bg-surface-cream text-ink border border-hairline px-3 py-1.5 rounded-pill transition-colors flex items-center gap-1.5 shadow-2xs group text-left"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="font-medium">{opt.title}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Database Query Suggestion Chips */}
         {suggestions.length > 0 && (
           <div className="space-y-1.5">
             <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-              Suggested queries for your data:
+              Suggested database queries:
             </span>
             <div className="flex flex-wrap gap-2">
               {suggestions.map((sug, idx) => (
@@ -281,7 +325,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
             className="flex items-center gap-2 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-5 py-2.5 rounded-lg transition-colors shadow-sm"
           >
             <Sparkles className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            <span>{loading ? "Generating SQL..." : "Generate SQL ✨"}</span>
+            <span>{loading ? "Generating Formulation..." : "Generate SQL & Models ✨"}</span>
           </button>
         </div>
       </div>
@@ -300,7 +344,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
           <div className="flex items-center justify-between text-xs text-on-dark-soft border-b border-surface-dark-elevated pb-3">
             <span className="font-semibold text-on-dark uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              Generated SQL Statement
+              {result.isOptimizationModel
+                ? "Generated Optimization Model & SQL Analysis"
+                : "Generated SQL Statement"}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -310,6 +356,16 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
                 {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
                 <span>{copied ? "Copied" : "Copy SQL"}</span>
               </button>
+
+              {result.isOptimizationModel && onNavigateToOr && (
+                <button
+                  onClick={() => onNavigateToOr(result.orModule)}
+                  className="flex items-center gap-1.5 bg-accent-teal/20 text-accent-teal hover:bg-accent-teal/30 border border-accent-teal/40 font-semibold px-3 py-1 rounded text-xs transition-colors"
+                >
+                  <Calculator className="w-3.5 h-3.5" />
+                  <span>Open in TORA Solvers</span>
+                </button>
+              )}
 
               <button
                 onClick={() => onApplySql(result.sql, true)}
@@ -328,9 +384,32 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({ schema, onApplySql }) 
 
           {/* Explanation */}
           {result.explanation && (
-            <div className="text-xs text-on-dark-soft flex items-start gap-2 bg-surface-dark-elevated/40 p-3 rounded-lg">
+            <div className="text-xs text-on-dark-soft flex items-start gap-2 bg-surface-dark-elevated/40 p-3 rounded-lg leading-relaxed whitespace-pre-line">
               <ArrowRight className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
               <span>{result.explanation}</span>
+            </div>
+          )}
+
+          {/* Follow-up Question Suggestions */}
+          {result.suggestedQuestions && result.suggestedQuestions.length > 0 && (
+            <div className="pt-2 border-t border-surface-dark-elevated space-y-1.5">
+              <span className="text-[11px] text-on-dark-soft font-semibold uppercase tracking-wider">
+                Follow-up Questions:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {result.suggestedQuestions.map((q, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setPrompt(q);
+                      handleGenerate(q);
+                    }}
+                    className="text-xs bg-surface-dark-soft hover:bg-surface-dark-elevated text-on-dark px-2.5 py-1 rounded border border-surface-dark-elevated transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>

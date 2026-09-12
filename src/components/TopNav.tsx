@@ -13,7 +13,6 @@ interface TopNavProps {
   onSelectView: (view: "editor" | "diagram" | "ai" | "or") => void;
   onImportSpreadsheet: (file: File) => void;
   onOpenHistory: () => void;
-  historyCount?: number;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onExportDatabase?: () => void;
@@ -31,7 +30,6 @@ export const TopNav: React.FC<TopNavProps> = ({
   onSelectView,
   onImportSpreadsheet,
   onOpenHistory,
-  historyCount = 0,
   isSidebarOpen = true,
   onToggleSidebar,
   onExportDatabase,
@@ -185,15 +183,10 @@ export const TopNav: React.FC<TopNavProps> = ({
         {/* Query History Icon-Only Button */}
         <button
           onClick={onOpenHistory}
-          className="p-2 text-muted hover:text-ink hover:bg-surface-cream rounded-md border border-hairline transition-colors relative shadow-2xs"
+          className="p-2 text-muted hover:text-ink hover:bg-surface-cream rounded-md border border-hairline transition-colors shadow-2xs"
           title="Query History"
         >
           <History className="w-4 h-4 text-primary" />
-          {historyCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 text-[9px] font-mono font-semibold text-on-primary bg-primary px-1.5 py-0.2 rounded-full border border-canvas min-w-[16px] text-center shadow-2xs">
-              {historyCount}
-            </span>
-          )}
         </button>
         {/* Import CSV / Excel Icon-Only Button */}
         <label

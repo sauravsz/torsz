@@ -22,7 +22,7 @@ import {
 } from "./services/db";
 import { importSpreadsheetToDb } from "./services/spreadsheet";
 import { convertTextToSql } from "./services/aiAssistant";
-import { addHistoryItem, getQueryHistory } from "./services/history";
+import { addHistoryItem } from "./services/history";
 
 const LOCAL_STORAGE_SAVED_CONNS = "torsz_saved_connections";
 
@@ -41,7 +41,6 @@ function MainWorkspace() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [historyCount, setHistoryCount] = useState(() => getQueryHistory().length);
 
   // Keyboard shortcut ⌘+B / Ctrl+B to toggle sidebar
   useEffect(() => {
@@ -200,7 +199,6 @@ function MainWorkspace() {
         status: res.error ? "error" : "success",
         errorMessage: res.error || undefined,
       });
-      setHistoryCount(getQueryHistory().length);
 
       // Refresh schema in case of DDL modifications
       if (
@@ -225,7 +223,6 @@ function MainWorkspace() {
         status: "error",
         errorMessage: errMsg,
       });
-      setHistoryCount(getQueryHistory().length);
     } finally {
       setLoadingQuery(false);
     }
@@ -306,7 +303,6 @@ function MainWorkspace() {
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
-        historyCount={historyCount}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         loading={loadingSchema}
@@ -352,7 +348,11 @@ function MainWorkspace() {
           ) : activeView === "diagram" ? (
             <ErDiagram schema={schema} onSelectTable={handleSelectTable} />
           ) : activeView === "ai" ? (
-            <AiAssistant schema={schema} onApplySql={handleApplyAiSql} />
+            <AiAssistant
+              schema={schema}
+              onApplySql={handleApplyAiSql}
+              onNavigateToOr={() => setActiveView("or")}
+            />
           ) : (
             <OrSuiteView onOpenInSql={(querySql) => {
               setSql(querySql + "\n");

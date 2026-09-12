@@ -90,8 +90,8 @@ Ask questions about your data in plain English. `torsz` inspects your live datab
    - *Heritage*: Created by Henrik Johnson, Petr Vaněk, Mike Johnson, Alexey Danilchenko, Ivan Březina, and open-source contributors over 20+ years as a C++/Qt database management workstation.
    - *Evolution*: `torsz` honors TOra's developer-first database heritage while modernizing it into a zero-install web application powered by WebAssembly, TypeScript, and a warm-editorial design system.
 
-2. **[TORA Operations Research Software](https://www.pearson.com/)** (Dr. Hamdy A. Taha, *Operations Research: An Introduction*):
-   - *Heritage*: The classic educational optimization software package accompanying Professor Hamdy A. Taha's Operations Research textbook.
+2. **[TORA Operations Research Software](https://www.pearson.com/)**:
+   - *Heritage*: The classic educational optimization software package for linear programming, network routing, and decision science.
    - *Evolution*: Reconstructed as a modern, reactive TypeScript optimization suite with interactive SVG constraint graphing, step-by-step Simplex tableaus, and direct SQL export integration.
 
 3. **[RouteIQ Network Optimization Engine](https://github.com/sauravsz/RouteIQ)**:

@@ -324,48 +324,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({ onOpenInSql }) => {
     });
   };
 
-  // Preset Loaders from Taha Textbook
-  const loadRentCarPreset = () => {
-    setActiveModule("network-models");
-    setNetworkSubtype("shortest-route");
-    const edges: NetworkEdge[] = [
-      { from: 1, to: 2, cost: 4000 },
-      { from: 1, to: 3, cost: 5400 },
-      { from: 1, to: 4, cost: 9800 },
-      { from: 2, to: 3, cost: 4300 },
-      { from: 2, to: 4, cost: 6200 },
-      { from: 2, to: 5, cost: 8700 },
-      { from: 3, to: 4, cost: 4800 },
-      { from: 3, to: 5, cost: 7100 },
-      { from: 4, to: 5, cost: 4900 },
-    ];
-    setNetworkEdges(edges);
-    setNetStartNode("1");
-    setNetEndNode("5");
-    const sol = solveNetworkShortestRoute(edges, "1", "5");
-    setNetworkSol(sol);
-  };
-
-  const loadMidwestMstPreset = () => {
-    setActiveModule("network-models");
-    setNetworkSubtype("minimum-spanning-tree");
-    const edges: NetworkEdge[] = [
-      { from: 1, to: 2, cost: 1 },
-      { from: 1, to: 3, cost: 5 },
-      { from: 1, to: 4, cost: 7 },
-      { from: 1, to: 5, cost: 9 },
-      { from: 2, to: 3, cost: 6 },
-      { from: 2, to: 4, cost: 4 },
-      { from: 2, to: 5, cost: 3 },
-      { from: 3, to: 4, cost: 5 },
-      { from: 3, to: 6, cost: 10 },
-      { from: 4, to: 5, cost: 8 },
-      { from: 4, to: 6, cost: 3 },
-    ];
-    setNetworkEdges(edges);
-    const sol = solveNetworkMst(edges);
-    setNetworkSol(sol);
-  };
 
   // Execution Triggers
   const handleSolveLp = () => {
@@ -457,29 +415,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({ onOpenInSql }) => {
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Module Header Bar */}
       <div className="h-14 bg-surface-card border-b border-hairline px-6 flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span className="font-editorial-serif text-2xl font-normal text-ink">
             TORA Optimization Suite
           </span>
-          <span className="text-xs font-semibold text-primary uppercase bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 ml-2">
-            Hamdy A. Taha Models
+          <span className="text-xs font-semibold text-muted bg-surface-soft px-2.5 py-0.5 rounded-full border border-hairline">
+            Operations Research & Mathematical Solvers
           </span>
-        </div>
-        {/* Quick Textbook Problem Presets */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted mr-1">Textbook Presets:</span>
-          <button
-            onClick={loadRentCarPreset}
-            className="text-xs bg-canvas hover:bg-surface-cream text-ink font-medium px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
-          >
-            🚗 Rent Car Replacement
-          </button>
-          <button
-            onClick={loadMidwestMstPreset}
-            className="text-xs bg-canvas hover:bg-surface-cream text-ink font-medium px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
-          >
-            🌐 Midwest Cable MST
-          </button>
         </div>
       </div>
 
@@ -523,7 +465,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({ onOpenInSql }) => {
         {/* Right Module Solver Content */}
         <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6">
           {/* ========================================== */}
-          {/* 1. TRANSPORTATION & ASSIGNMENT (Taha Ch. 5) */}
+          {/* 1. TRANSPORTATION & ASSIGNMENT             */}
           {/* ========================================== */}
           {activeModule === "transportation-assignment" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -572,7 +514,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({ onOpenInSql }) => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>
-                          onOpenInSql(`-- Transportation Model (Hamdy A. Taha Ch. 5)
+                          onOpenInSql(`-- Transportation Model
 -- Total Supply: ${transProblem.supply.reduce((a, b) => a + b, 0)} | Total Demand: ${transProblem.demand.reduce((a, b) => a + b, 0)}
 
 CREATE TABLE IF NOT EXISTS transportation_costs (
@@ -893,7 +835,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 2. LINEAR PROGRAMMING (Taha Ch. 2 & 3)     */}
+          {/* 2. LINEAR PROGRAMMING                     */}
           {/* ========================================== */}
           {activeModule === "linear-programming" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -1088,7 +1030,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 3. NETWORK MODELS (Taha Ch. 6)             */}
+          {/* 3. NETWORK MODELS                         */}
           {/* ========================================== */}
           {activeModule === "network-models" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -1261,7 +1203,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 4. PROJECT PLANNING (CPM / PERT, Taha Ch. 6)*/}
+          {/* 4. PROJECT PLANNING (CPM / PERT)          */}
           {/* ========================================== */}
           {activeModule === "project-planning" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -1445,7 +1387,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 5. INVENTORY CONTROL (Taha Ch. 11 & 12)    */}
+          {/* 5. INVENTORY CONTROL (EOQ)                */}
           {/* ========================================== */}
           {activeModule === "inventory-control" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -1559,7 +1501,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 6. QUEUING ANALYSIS (Taha Ch. 18)          */}
+          {/* 6. QUEUING ANALYSIS (M/M/1 & M/M/c)       */}
           {/* ========================================== */}
           {activeModule === "queuing-models" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -1658,7 +1600,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 7. ZERO-SUM GAMES (Taha Ch. 15)            */}
+          {/* 7. ZERO-SUM GAMES                         */}
           {/* ========================================== */}
           {activeModule === "zero-sum-games" && (
             <div className="space-y-6 animate-in fade-in duration-150">
@@ -1747,7 +1689,7 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
           )}
 
           {/* ========================================== */}
-          {/* 8. LINEAR EQUATIONS (Taha App. A)          */}
+          {/* 8. LINEAR EQUATIONS (Gauss-Jordan)        */}
           {/* ========================================== */}
           {activeModule === "linear-equations" && (
             <div className="space-y-6 animate-in fade-in duration-150">

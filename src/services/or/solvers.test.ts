@@ -23,7 +23,7 @@ import {
   ZeroSumGameProblem,
 } from "./types";
 
-describe("TORA Operations Research Solvers (Hamdy A. Taha Models)", () => {
+describe("TORA Operations Research Solvers", () => {
   // 1. Linear Programming
   it("solves 2-variable Linear Programming problem with Simplex & 2D Graphical", () => {
     const problem: LpProblem = {
