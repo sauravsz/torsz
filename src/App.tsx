@@ -46,6 +46,13 @@ function MainWorkspace() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(false);
+  const [importedOcrData, setImportedOcrData] = useState<{
+    module: OrModule;
+    networkSubtype?: NetworkSubtype;
+    transSubtype?: TransSubtype;
+    data?: any;
+    rawText?: string;
+  } | null>(null);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
@@ -293,10 +300,17 @@ function MainWorkspace() {
 
   const handleOcrSelectAndSolve = (
     module: OrModule,
-    _subtypes?: { network?: NetworkSubtype; trans?: TransSubtype },
-    _parsedData?: any,
-    _rawText?: string
+    subtypes?: { network?: NetworkSubtype; trans?: TransSubtype },
+    parsedData?: any,
+    rawText?: string
   ) => {
+    setImportedOcrData({
+      module,
+      networkSubtype: subtypes?.network,
+      transSubtype: subtypes?.trans,
+      data: parsedData,
+      rawText,
+    });
     setActiveOrModule(module);
     setActiveView("or");
     showToast(`Loaded ${module} problem from OCR scan!`, "success");
@@ -382,6 +396,7 @@ function MainWorkspace() {
           ) : (
             <OrSuiteView
               activeModule={activeOrModule}
+              importedOcrData={importedOcrData}
               onAskAi={(promptText) => {
                 setAiInitialPrompt(promptText);
                 setActiveView("ai");

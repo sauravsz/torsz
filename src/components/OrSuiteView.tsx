@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Play,
   CheckCircle2,
@@ -51,6 +51,13 @@ interface OrSuiteViewProps {
   onAskAi?: (prompt: string) => void;
   onOpenOcr?: () => void;
   activeModule?: OrModule;
+  importedOcrData?: {
+    module: OrModule;
+    networkSubtype?: NetworkSubtype;
+    transSubtype?: TransSubtype;
+    data?: any;
+    rawText?: string;
+  } | null;
 }
 
 export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
@@ -58,6 +65,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   onAskAi,
   onOpenOcr,
   activeModule: controlledModule,
+  importedOcrData,
 }) => {
   const activeModule = controlledModule || "transportation-assignment";
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
@@ -191,6 +199,90 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const [inventorySol, setInventorySol] = useState<InventorySolution | null>(null);
   const [linearEqSol, setLinearEqSol] = useState<number[] | null>(null);
 
+
+  // Auto-populate & Auto-solve on OCR Data Import
+  useEffect(() => {
+    if (importedOcrData) {
+      const { networkSubtype: netSub, transSubtype: trSub, data } = importedOcrData;
+      if (netSub) setNetworkSubtype(netSub);
+      if (trSub) setTransSubtype(trSub);
+
+      if (data?.edges && data.edges.length > 0) {
+        setNetworkEdges(data.edges);
+        const start = data.startNode || String(data.edges[0].from);
+        const end = data.endNode || String(data.edges[data.edges.length - 1].to);
+        setNetStartNode(start);
+        setNetEndNode(end);
+
+        if (netSub === "minimum-spanning-tree") {
+          const sol = solveNetworkMst(data.edges);
+          setNetworkSol(sol);
+        } else if (netSub === "maximal-flow") {
+          const sol = solveNetworkMaxFlow(data.edges, start, end);
+          setNetworkSol(sol);
+        } else {
+          const sol = solveNetworkShortestRoute(data.edges, start, end);
+          setNetworkSol(sol);
+        }
+      }
+
+      if (data?.trans) {
+        setTransProblem((prev) => ({ ...prev, ...data.trans }));
+        try {
+          const sol = solveTransportation({ ...transProblem, ...data.trans });
+          setTransSol(sol);
+        } catch {}
+      }
+
+      if (data?.assign) {
+        setAssignProblem((prev) => ({ ...prev, ...data.assign }));
+        try {
+          const sol = solveHungarianAssignment({ ...assignProblem, ...data.assign });
+          setAssignSol(sol);
+        } catch {}
+      }
+
+      if (data?.lp) {
+        setLpProblem((prev) => ({ ...prev, ...data.lp }));
+        try {
+          const sol = solveLinearProgramming({ ...lpProblem, ...data.lp });
+          setLpSol(sol);
+        } catch {}
+      }
+
+      if (data?.cpm) {
+        setCpmActivities(data.cpm);
+        try {
+          const sol = solveCpmPert(data.cpm);
+          setCpmSol(sol);
+        } catch {}
+      }
+
+      if (data?.inventory) {
+        setInventoryProblem((prev) => ({ ...prev, ...data.inventory }));
+        try {
+          const sol = solveInventoryControl({ ...inventoryProblem, ...data.inventory });
+          setInventorySol(sol);
+        } catch {}
+      }
+
+      if (data?.queuing) {
+        setQueuingProblem((prev) => ({ ...prev, ...data.queuing }));
+        try {
+          const sol = solveQueuing({ ...queuingProblem, ...data.queuing });
+          setQueuingSol(sol);
+        } catch {}
+      }
+
+      if (data?.game) {
+        setGameProblem((prev) => ({ ...prev, ...data.game }));
+        try {
+          const sol = solveZeroSumGame({ ...gameProblem, ...data.game });
+          setGameSol(sol);
+        } catch {}
+      }
+    }
+  }, [importedOcrData]);
   // ==========================================
   // Transportation Helper Modifiers
   // ==========================================
