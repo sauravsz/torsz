@@ -20,6 +20,7 @@ export interface OcrProblemClassification {
   reason: string;
   networkSubtype?: NetworkSubtype;
   transSubtype?: TransSubtype;
+  transcription?: string;
   parsedData?: {
     lp?: Partial<LpProblem>;
     trans?: Partial<TransportationProblem>;
@@ -38,16 +39,227 @@ export async function performInBrowserOcr(
   imageFile: File,
   _onProgress?: (progress: number, status: string) => void
 ): Promise<string> {
-  const worker = await createWorker("eng");
-
   try {
+    const worker = await createWorker("eng");
     const imageUrl = URL.createObjectURL(imageFile);
     const ret = await worker.recognize(imageUrl);
     URL.revokeObjectURL(imageUrl);
-    return ret.data.text;
-  } finally {
     await worker.terminate();
+    return ret.data.text;
+  } catch (e) {
+    console.warn("In-browser Tesseract OCR failed:", e);
+    return "";
   }
+}
+
+export async function processOrQuestionWithVisionAi(
+  imageFile: File,
+  customSettings?: Partial<AiSettings>
+): Promise<OcrProblemClassification> {
+  const settings = { ...getStoredAiSettings(), ...customSettings };
+  const base64DataUrl = await fileToBase64(imageFile);
+
+  // If user has API key, call Multimodal AI Vision directly (Groq Vision / Claude / OpenAI)
+  if (settings.apiKey && settings.provider !== "local") {
+    try {
+      if (settings.provider === "claude") {
+        return await callClaudeVision(imageFile, base64DataUrl, settings.apiKey);
+      } else if (settings.provider === "groq") {
+        return await callGroqVision(base64DataUrl, settings);
+      } else {
+        return await callOpenAiVision(base64DataUrl, settings);
+      }
+    } catch (err) {
+      console.warn("Vision AI call failed, trying in-browser fallback:", err);
+    }
+  }
+
+  // Fallback: In-browser Tesseract OCR + Heuristic classification
+  const rawText = await performInBrowserOcr(imageFile);
+  return classifyOrProblemFromText(rawText);
+}
+
+const VISION_SYSTEM_PROMPT = `You are torsz's Operations Research Multimodal Question Solver.
+Examine this image of an Operations Research exam problem, handwritten worksheet, cost matrix, or network graph.
+
+Tasks:
+1. Identify the exact problem category:
+   - "network-models" (subtypes: "shortest-route", "minimum-spanning-tree", "maximal-flow")
+   - "transportation-assignment" (subtypes: "transportation", "hungarian-assignment")
+   - "linear-programming" (Simplex / Graphical)
+   - "project-planning" (CPM / PERT)
+   - "inventory-control" (EOQ)
+   - "queuing-models" (M/M/1)
+   - "zero-sum-games"
+   - "linear-equations" (Ax = b)
+2. Transcribe the full problem text clearly into "transcription".
+3. Extract structured numeric data into "parsedData":
+   - For network models: edges array: [{ "from": "1", "to": "2", "cost": 4000 }]
+   - For transportation: { "sources": ["P1","P2"], "destinations": ["M1","M2"], "supply": [15,25], "demand": [20,20], "costs": [[10,2],[12,7]] }
+   - For LP: { "objective": "max", "objectiveCoefficients": [5,4], "constraints": [{ "coefficients": [6,4], "operator": "<=", "rhs": 24 }] }
+   - For CPM: cpm array: [{ "id": "A", "name": "Task", "predecessors": [], "duration": 4 }]
+   - For Inventory: { "annualDemandD": 1000, "orderingCostK": 100, "holdingCostH": 2 }
+   - For Queuing: { "arrivalRateLambda": 2, "serviceRateMu": 3 }
+
+Output strictly valid JSON with keys: "detectedModule", "networkSubtype", "transSubtype", "confidence", "reason", "transcription", "parsedData".`;
+
+async function callGroqVision(
+  base64DataUrl: string,
+  settings: AiSettings
+): Promise<OcrProblemClassification> {
+  const modelName =
+    settings.model.includes("vision") || settings.model.includes("llama-3.2")
+      ? settings.model
+      : "llama-3.2-11b-vision-preview";
+
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${settings.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: "system", content: VISION_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze and extract all Operations Research problem parameters from this question image." },
+            { type: "image_url", image_url: { url: base64DataUrl } },
+          ],
+        },
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Groq Vision API Error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  return parseVisionJson(content);
+}
+
+async function callOpenAiVision(
+  base64DataUrl: string,
+  settings: AiSettings
+): Promise<OcrProblemClassification> {
+  const modelName = settings.model || "gpt-4o-mini";
+  const baseUrl = (settings.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${settings.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: "system", content: VISION_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze and extract all Operations Research problem parameters from this question image." },
+            { type: "image_url", image_url: { url: base64DataUrl } },
+          ],
+        },
+      ],
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI Vision API Error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "";
+  return parseVisionJson(content);
+}
+
+async function callClaudeVision(
+  imageFile: File,
+  base64DataUrl: string,
+  apiKey: string
+): Promise<OcrProblemClassification> {
+  const mediaType = imageFile.type || "image/jpeg";
+  const rawBase64 = base64DataUrl.includes(",") ? base64DataUrl.split(",")[1] : base64DataUrl;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 2500,
+      system: VISION_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mediaType,
+                data: rawBase64,
+              },
+            },
+            { type: "text", text: "Extract all Operations Research parameters and formulate the solution." },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude Vision API Error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const content = data.content?.[0]?.text || "";
+  return parseVisionJson(content);
+}
+
+function parseVisionJson(text: string): OcrProblemClassification {
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        detectedModule: parsed.detectedModule || "network-models",
+        networkSubtype: parsed.networkSubtype || "shortest-route",
+        transSubtype: parsed.transSubtype || "transportation",
+        confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.95,
+        reason: parsed.reason || "Extracted via Multimodal AI Vision model.",
+        transcription: parsed.transcription || "",
+        parsedData: parsed.parsedData || {},
+      };
+    }
+  } catch (e) {
+    console.warn("Failed to parse vision JSON:", e);
+  }
+
+  return {
+    detectedModule: "network-models",
+    networkSubtype: "shortest-route",
+    confidence: 0.8,
+    reason: "Parsed via Vision model fallback.",
+    transcription: text,
+  };
 }
 
 export function classifyOrProblemFromText(text: string): OcrProblemClassification {
@@ -67,6 +279,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       networkSubtype: "shortest-route",
       confidence: 0.95,
       reason: "Detected shortest route / Dijkstra path problem statements.",
+      transcription: text,
       parsedData: { edges },
     };
   }
@@ -86,6 +299,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       networkSubtype: "minimum-spanning-tree",
       confidence: 0.95,
       reason: "Detected Minimum Spanning Tree (Kruskal / Prim) keywords.",
+      transcription: text,
       parsedData: { edges },
     };
   }
@@ -103,6 +317,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       networkSubtype: "maximal-flow",
       confidence: 0.9,
       reason: "Detected network flow / bottleneck capacity statements.",
+      transcription: text,
       parsedData: { edges },
     };
   }
@@ -120,6 +335,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       transSubtype: "transportation",
       confidence: 0.9,
       reason: "Detected supply/demand shipping cost matrix structure.",
+      transcription: text,
     };
   }
 
@@ -136,6 +352,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       transSubtype: "hungarian-assignment",
       confidence: 0.92,
       reason: "Detected worker-to-job Hungarian assignment formulation.",
+      transcription: text,
     };
   }
 
@@ -152,6 +369,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       detectedModule: "project-planning",
       confidence: 0.92,
       reason: "Detected project planning activity network and predecessor tables.",
+      transcription: text,
     };
   }
 
@@ -169,6 +387,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       detectedModule: "inventory-control",
       confidence: 0.88,
       reason: "Detected inventory parameters (demand, setup cost, holding cost).",
+      transcription: text,
       parsedData: {
         inventory: {
           annualDemandD: numbers[0] || 1000,
@@ -192,6 +411,7 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       detectedModule: "queuing-models",
       confidence: 0.88,
       reason: "Detected queue waiting line characteristics (arrival/service rates).",
+      transcription: text,
     };
   }
 
@@ -209,20 +429,21 @@ export function classifyOrProblemFromText(text: string): OcrProblemClassificatio
       detectedModule: "zero-sum-games",
       confidence: 0.9,
       reason: "Detected 2-player zero-sum payoff matrix and strategy game.",
+      transcription: text,
     };
   }
 
-  // 10. Linear Programming (Default fallback for algebraic models)
+  // 10. Linear Programming (Default)
   return {
     detectedModule: "linear-programming",
     confidence: 0.75,
     reason: "Detected linear constraints, variables, and optimization goal.",
+    transcription: text,
   };
 }
 
 function extractNetworkEdges(text: string): NetworkEdge[] {
   const edges: NetworkEdge[] = [];
-  // Match patterns like "1-2: 4000", "(1, 2) = 4000", "1 to 2 cost 4000", "Node 1 -> Node 2: 4000"
   const edgeRegex = /(?:node\s*)?([A-Za-z0-9]+)\s*(?:->|-|to|,)\s*(?:node\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|\s+)\s*([0-9,]+)/gi;
   let match;
 
@@ -236,7 +457,6 @@ function extractNetworkEdges(text: string): NetworkEdge[] {
   }
 
   if (edges.length === 0) {
-    // Default fallback network if parsing extracted plain numbers
     return [
       { from: 1, to: 2, cost: 4000 },
       { from: 1, to: 3, cost: 5400 },
@@ -251,96 +471,6 @@ function extractNetworkEdges(text: string): NetworkEdge[] {
   }
 
   return edges;
-}
-
-export async function parseProblemWithAiVision(
-  imageFile: File,
-  rawOcrText: string,
-  customSettings?: Partial<AiSettings>
-): Promise<OcrProblemClassification> {
-  const settings = { ...getStoredAiSettings(), ...customSettings };
-
-  // If no API key configured, use client-side heuristic classification
-  if (!settings.apiKey || settings.provider === "local") {
-    return classifyOrProblemFromText(rawOcrText);
-  }
-
-  try {
-    const base64Image = await fileToBase64(imageFile);
-
-    const prompt = `You are an expert Operations Research Exam & Problem Solver.
-Analyze this image of an Operations Research / Management Science question and the OCR extracted text:
-
-OCR Extracted Text:
-"""
-${rawOcrText}
-"""
-
-Identify:
-1. Which exact Operations Research problem type this is:
-   Options:
-   - "linear-programming"
-   - "transportation-assignment" (with transSubtype: "transportation" or "hungarian-assignment")
-   - "network-models" (with networkSubtype: "shortest-route", "minimum-spanning-tree", or "maximal-flow")
-   - "project-planning"
-   - "inventory-control"
-   - "queuing-models"
-   - "zero-sum-games"
-   - "linear-equations"
-2. Extract the numbers, nodes, matrix, and parameters.
-
-Output strictly a JSON object:
-{
-  "detectedModule": "network-models",
-  "networkSubtype": "shortest-route",
-  "transSubtype": "transportation",
-  "confidence": 0.95,
-  "reason": "Clear Dijkstra shortest route problem finding minimum replacement cost."
-}`;
-
-    if (settings.provider === "claude") {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": settings.apiKey,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
-          max_tokens: 1000,
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "image",
-                  source: {
-                    type: "base64",
-                    media_type: imageFile.type || "image/png",
-                    data: base64Image.split(",")[1],
-                  },
-                },
-                { type: "text", text: prompt },
-              ],
-            },
-          ],
-        }),
-      });
-
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-    }
-  } catch (err) {
-    console.warn("Vision API parsing failed, falling back to heuristic classification:", err);
-  }
-
-  return classifyOrProblemFromText(rawOcrText);
 }
 
 function fileToBase64(file: File): Promise<string> {

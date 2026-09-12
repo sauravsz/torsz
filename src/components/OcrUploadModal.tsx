@@ -15,13 +15,16 @@ import {
   Swords,
   Calculator,
   HelpCircle,
+  Key,
+  ExternalLink,
+  Settings,
 } from "lucide-react";
 import {
-  performInBrowserOcr,
-  parseProblemWithAiVision,
+  processOrQuestionWithVisionAi,
   OcrProblemClassification,
 } from "../services/ocr";
 import { OrModule, NetworkSubtype, TransSubtype } from "../services/or/types";
+import { AiSettings, getStoredAiSettings, saveStoredAiSettings } from "../services/aiAssistant";
 
 interface OcrUploadModalProps {
   isOpen: boolean;
@@ -42,7 +45,6 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [scanProgress, setScanProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState("");
   const [ocrText, setOcrText] = useState<string>("");
   const [classification, setClassification] = useState<OcrProblemClassification | null>(null);
@@ -50,29 +52,30 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const [selectedNetworkSubtype, setSelectedNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [selectedTransSubtype, setSelectedTransSubtype] = useState<TransSubtype>("transportation");
   const [error, setError] = useState<string | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
+  const [aiSettings, setAiSettings] = useState<AiSettings>(getStoredAiSettings);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
+
+  const handleUpdateSettings = (updated: Partial<AiSettings>) => {
+    const next = { ...aiSettings, ...updated };
+    setAiSettings(next);
+    saveStoredAiSettings(updated);
+  };
 
   const handleFileChange = async (file: File) => {
     setSelectedFile(file);
     setImagePreview(URL.createObjectURL(file));
     setError(null);
     setScanning(true);
-    setScanProgress(10);
-    setScanStatus("Initializing OCR engine...");
+    setScanStatus("Analyzing image with Multimodal AI Vision...");
 
     try {
-      const text = await performInBrowserOcr(file, (p, status) => {
-        setScanProgress(Math.round(p * 100));
-        setScanStatus(status);
-      });
-
-      setOcrText(text);
-      setScanStatus("Classifying problem structure...");
-      const result = await parseProblemWithAiVision(file, text);
+      const result = await processOrQuestionWithVisionAi(file, aiSettings);
       setClassification(result);
+      setOcrText(result.transcription || result.reason);
       setSelectedModule(result.detectedModule);
       if (result.networkSubtype) setSelectedNetworkSubtype(result.networkSubtype);
       if (result.transSubtype) setSelectedTransSubtype(result.transSubtype);
@@ -205,7 +208,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
             </div>
             <div>
               <h3 className="font-editorial-serif text-xl font-medium text-ink">
-                OCR Scan Operations Research Question
+                Multimodal AI Vision Question Solver
               </h3>
               <p className="text-xs text-muted">
                 Upload or paste a photo of your paper question, graph diagram, or cost matrix.
@@ -213,16 +216,113 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 text-muted hover:text-ink hover:bg-surface-cream rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowConfig(!showConfig)}
+              className="flex items-center gap-1 text-xs text-primary font-medium bg-canvas hover:bg-surface-cream px-2.5 py-1 rounded-lg border border-hairline transition-colors shadow-2xs"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Vision API</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-muted hover:text-ink hover:bg-surface-cream rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-6 overflow-y-auto space-y-5 flex-1">
+          {/* Vision API Key Configuration Drawer */}
+          {showConfig && (
+            <div className="bg-surface-soft border border-hairline rounded-xl p-4 space-y-3 animate-in fade-in duration-100 text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-semibold text-ink">
+                  <Key className="w-3.5 h-3.5 text-accent-amber" />
+                  <span>Free Vision AI Models:</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="https://console.groq.com/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-0.5 text-[11px] text-primary hover:underline font-semibold"
+                  >
+                    <span>Free Groq Key (llama-3.2-vision)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <span>•</span>
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-0.5 text-[11px] text-accent-teal hover:underline font-semibold"
+                  >
+                    <span>Free OpenRouter Key (gemini-flash)</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted mb-1">Provider</label>
+                  <select
+                    value={aiSettings.provider}
+                    onChange={(e) => {
+                      const p = e.target.value as AiSettings["provider"];
+                      if (p === "groq") {
+                        handleUpdateSettings({
+                          provider: "groq",
+                          baseUrl: "https://api.groq.com/openai/v1",
+                          model: "llama-3.2-11b-vision-preview",
+                        });
+                      } else if (p === "custom") {
+                        handleUpdateSettings({
+                          provider: "custom",
+                          baseUrl: "https://openrouter.ai/api/v1",
+                          model: "google/gemini-2.0-flash-exp:free",
+                        });
+                      } else if (p === "claude") {
+                        handleUpdateSettings({
+                          provider: "claude",
+                          model: "claude-3-5-sonnet-20241022",
+                        });
+                      } else {
+                        handleUpdateSettings({ provider: p });
+                      }
+                    }}
+                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink focus:border-primary outline-none"
+                  >
+                    <option value="groq">Groq Vision (100% Free)</option>
+                    <option value="custom">OpenRouter Free (Gemini Flash)</option>
+                    <option value="claude">Anthropic Claude (Sonnet 3.5)</option>
+                    <option value="local">In-Browser OCR (Offline)</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-muted mb-1">
+                    {aiSettings.provider === "groq"
+                      ? "Groq API Key (gsk_...)"
+                      : aiSettings.provider === "custom"
+                      ? "OpenRouter Key (sk-or-...)"
+                      : "API Key"}
+                  </label>
+                  <input
+                    type="password"
+                    value={aiSettings.apiKey}
+                    onChange={(e) => handleUpdateSettings({ apiKey: e.target.value.trim() })}
+                    placeholder={aiSettings.provider === "groq" ? "gsk_..." : "sk-..."}
+                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink font-mono focus:border-primary outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Upload Dropzone */}
           {!imagePreview ? (
             <div
@@ -244,7 +344,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
               </div>
               <div>
                 <p className="text-sm font-semibold text-ink">
-                  Click to upload or drag & drop image
+                  Click to upload or drag & drop question photo
                 </p>
                 <p className="text-xs text-muted-soft mt-1">
                   Supports PNG, JPG, WebP, or paste directly with{" "}
@@ -261,7 +361,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                 <img
                   src={imagePreview}
                   alt="Scanned Question"
-                  className="w-24 h-24 object-cover rounded-lg border border-hairline shrink-0"
+                  className="w-24 h-24 object-cover rounded-lg border border-hairline shrink-0 shadow-2xs"
                 />
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center justify-between">
@@ -283,21 +383,18 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
 
                   {scanning ? (
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs text-muted">
+                      <div className="flex items-center gap-2 text-xs text-primary font-medium animate-pulse">
+                        <Sparkles className="w-3.5 h-3.5 animate-spin" />
                         <span>{scanStatus}</span>
-                        <span>{scanProgress}%</span>
                       </div>
                       <div className="w-full h-1.5 bg-surface-soft rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary transition-all duration-300"
-                          style={{ width: `${scanProgress}%` }}
-                        />
+                        <div className="h-full bg-primary w-2/3 animate-pulse rounded-full" />
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 text-xs text-success font-semibold">
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>OCR Text Extracted Successfully</span>
+                      <span>Question & Parameters Extracted Successfully</span>
                     </div>
                   )}
                 </div>
@@ -307,7 +404,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
               {ocrText && (
                 <div className="space-y-1.5">
                   <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-                    Extracted Question Text:
+                    Extracted Question Transcription:
                   </span>
                   <div className="p-3 bg-canvas border border-hairline rounded-xl text-xs font-mono text-body max-h-28 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                     {ocrText}
@@ -320,10 +417,10 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-ink uppercase tracking-wider flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-primary" />
-                    <span>Which problem type is this?</span>
+                    <span>Confirm Problem Type:</span>
                   </span>
                   {classification && (
-                    <span className="text-[11px] text-primary font-medium bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                    <span className="text-[11px] text-primary font-medium bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
                       Auto-detected: {Math.round(classification.confidence * 100)}% match
                     </span>
                   )}
