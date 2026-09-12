@@ -246,4 +246,37 @@ describe("TORA Operations Research Solvers", () => {
     expect(sol.assignments.length).toBe(2);
     expect(sol.totalCost).toBeLessThanOrEqual(20);
   });
+
+  // 14. Real-world 11-Station MST (Trans-Continental Data Grid Corporation)
+  it("solves 11-station TCDG Minimum Spanning Tree problem with float weights", () => {
+    const edges: NetworkEdge[] = [
+      { from: "S1", to: "S2", cost: 24.6 },
+      { from: "S1", to: "S3", cost: 31.2 },
+      { from: "S1", to: "S4", cost: 19.8 },
+      { from: "S2", to: "S3", cost: 14.5 },
+      { from: "S2", to: "S5", cost: 27.9 },
+      { from: "S2", to: "S6", cost: 33.4 },
+      { from: "S3", to: "S4", cost: 22.1 },
+      { from: "S3", to: "S6", cost: 18.7 },
+      { from: "S3", to: "S7", cost: 29.3 },
+      { from: "S4", to: "S7", cost: 26.5 },
+      { from: "S4", to: "S8", cost: 35.9 },
+      { from: "S5", to: "S6", cost: 12.8 },
+      { from: "S5", to: "S9", cost: 21.4 },
+      { from: "S6", to: "S7", cost: 16.3 },
+      { from: "S6", to: "S9", cost: 23.7 },
+      { from: "S6", to: "S10", cost: 30.6 },
+      { from: "S7", to: "S8", cost: 20.2 },
+      { from: "S7", to: "S10", cost: 17.9 },
+      { from: "S8", to: "S10", cost: 28.4 },
+      { from: "S8", to: "S11", cost: 25.1 },
+      { from: "S9", to: "S10", cost: 15.6 },
+      { from: "S9", to: "S11", cost: 34.8 },
+      { from: "S10", to: "S11", cost: 13.9 },
+    ];
+
+    const sol = solveNetworkMst(edges);
+    expect(sol.totalMetric).toBe(171.8);
+    expect(sol.selectedEdges.length).toBe(10);
+  });
 });

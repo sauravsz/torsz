@@ -716,7 +716,7 @@ export function solveNetworkMst(edges: NetworkEdge[]): NetworkSolution {
   return {
     type: "minimum-spanning-tree",
     selectedEdges,
-    totalMetric: totalWeight,
+    totalMetric: Math.round(totalWeight * 100) / 100,
     pathString: selectedEdges.map((e) => `${e.from}-${e.to}`).join(", "),
   };
 }

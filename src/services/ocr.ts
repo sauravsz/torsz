@@ -582,19 +582,17 @@ export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; start
       endNode: "5",
     };
   }
-
-  const edgeRegex = /(?:node\s*)?([A-Za-z0-9]+)\s*(?:->|-|to|,)\s*(?:node\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|\s+)\s*([0-9,]+)/gi;
+  const edgeRegex = /(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?:->|–|—|-|to|,|\t)\s*(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|\s+)\s*([0-9,.]+)/gi;
   let match;
 
   while ((match = edgeRegex.exec(text)) !== null) {
     const from = match[1];
     const to = match[2];
-    const cost = parseFloat(match[3].replace(/,/g, "")) || 10;
-    if (from !== to) {
+    const cost = parseFloat(match[3].replace(/,/g, ""));
+    if (from !== to && !isNaN(cost)) {
       edges.push({ from, to, cost });
     }
   }
-
   if (edges.length > 0) {
     return {
       edges,
