@@ -46,12 +46,12 @@ import {
 } from "../services/or/solvers";
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
-import { extractNetworkEdges, parseOrQuestionTextWithAi } from "../services/ocr";
+import { extractNetworkEdges } from "../services/ocr";
 
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
   onAskAi?: (prompt: string) => void;
-  onOpenOcr?: () => void;
+  onOpenOcr?: (initialText?: string, initialMode?: "image" | "text") => void;
   activeModule?: OrModule;
   importedOcrData?: {
     module: OrModule;
@@ -72,7 +72,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const activeModule = controlledModule || "transportation-assignment";
   const [quickQuestionText, setQuickQuestionText] = useState("");
   const [isQuestionBoxExpanded, setIsQuestionBoxExpanded] = useState(false);
-  const [isParsingText, setIsParsingText] = useState(false);
   const questionBoxRef = useRef<HTMLDivElement | null>(null);
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
@@ -316,122 +315,19 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [quickQuestionText]);
-
-  const handleQuickQuestionSubmit = async (e?: React.FormEvent) => {
+  const handleQuickQuestionSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!quickQuestionText.trim() || isParsingText) return;
-
-    setIsParsingText(true);
-    try {
-      const classification = await parseOrQuestionTextWithAi(quickQuestionText);
-      const { detectedModule, networkSubtype: netSub, transSubtype: trSub, parsedData } = classification;
-
-      if (netSub) setNetworkSubtype(netSub);
-      if (trSub) setTransSubtype(trSub);
-
-      if (detectedModule === "network-models" || netSub) {
-        let edges = parsedData?.edges;
-        let start = parsedData?.startNode || "1";
-        let end = parsedData?.endNode || "5";
-
-        if (!edges || edges.length === 0) {
-          const extracted = extractNetworkEdges(quickQuestionText);
-          edges = extracted.edges;
-          start = extracted.startNode;
-          end = extracted.endNode;
-        }
-
-        setNetworkEdges(edges);
-        setNetStartNode(start);
-        setNetEndNode(end);
-
-        if (netSub === "minimum-spanning-tree") {
-          const sol = solveNetworkMst(edges);
-          setNetworkSol(sol);
-        } else if (netSub === "maximal-flow") {
-          const sol = solveNetworkMaxFlow(edges, start, end);
-          setNetworkSol(sol);
-        } else {
-          const sol = solveNetworkShortestRoute(edges, start, end);
-          setNetworkSol(sol);
-        }
-      }
-
-      if (detectedModule === "transportation-assignment") {
-        if (trSub === "hungarian-assignment") {
-          const nextAssign = parsedData?.assign ? { ...assignProblem, ...parsedData.assign } : assignProblem;
-          setAssignProblem(nextAssign);
-          try {
-            const sol = solveHungarianAssignment(nextAssign);
-            setAssignSol(sol);
-          } catch {}
-        } else {
-          const nextTrans = parsedData?.trans ? { ...transProblem, ...parsedData.trans } : transProblem;
-          setTransProblem(nextTrans);
-          try {
-            const sol = solveTransportation(nextTrans);
-            setTransSol(sol);
-          } catch {}
-        }
-      }
-
-      if (detectedModule === "linear-programming") {
-        const nextLp = parsedData?.lp ? { ...lpProblem, ...parsedData.lp } : lpProblem;
-        setLpProblem(nextLp);
-        try {
-          const sol = solveLinearProgramming(nextLp);
-          setLpSol(sol);
-        } catch {}
-      }
-
-      if (detectedModule === "project-planning") {
-        const nextCpm = parsedData?.cpm && parsedData.cpm.length > 0 ? parsedData.cpm : cpmActivities;
-        setCpmActivities(nextCpm);
-        try {
-          const sol = solveCpmPert(nextCpm);
-          setCpmSol(sol);
-        } catch {}
-      }
-
-      if (detectedModule === "inventory-control") {
-        const nextInv = parsedData?.inventory ? { ...inventoryProblem, ...parsedData.inventory } : inventoryProblem;
-        setInventoryProblem(nextInv);
-        try {
-          const sol = solveInventoryControl(nextInv);
-          setInventorySol(sol);
-        } catch {}
-      }
-
-      if (detectedModule === "queuing-models") {
-        const nextQ = parsedData?.queuing ? { ...queuingProblem, ...parsedData.queuing } : queuingProblem;
-        setQueuingProblem(nextQ);
-        try {
-          const sol = solveQueuing(nextQ);
-          setQueuingSol(sol);
-        } catch {}
-      }
-
-      if (detectedModule === "zero-sum-games") {
-        const nextG = parsedData?.game ? { ...gameProblem, ...parsedData.game } : gameProblem;
-        setGameProblem(nextG);
-        try {
-          const sol = solveZeroSumGame(nextG);
-          setGameSol(sol);
-        } catch {}
-      }
-
-      setQuickQuestionText("");
-    } finally {
-      setIsParsingText(false);
+    if (onOpenOcr) {
+      onOpenOcr(quickQuestionText, "text");
     }
   };
+
   const updateTransCost = (r: number, c: number, val: number) => {
     const nextCosts = transProblem.costs.map((row, ri) =>
       row.map((cell, ci) => (ri === r && ci === c ? val : cell))
     );
     setTransProblem({ ...transProblem, costs: nextCosts });
   };
-
   const updateTransSupply = (r: number, val: number) => {
     const nextSupply = [...transProblem.supply];
     nextSupply[r] = val;
@@ -654,7 +550,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           </span>
         </div>
 
-        {/* Auto-Expanding Question Chatbox / Markdown Bar */}
+        {/* Expanding Question Chatbox / Markdown Bar */}
         <div ref={questionBoxRef} className="relative flex-1 max-w-xl z-30">
           {!isQuestionBoxExpanded ? (
             <div
@@ -708,14 +604,14 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     setIsQuestionBoxExpanded(false);
                   }
                 }}
-                placeholder="Paste or type complete problem statement, table data, or markdown here (e.g. 'A company named Rent Car is developing a replacement policy...'). Press ⌘+Enter to solve."
+                placeholder="Paste or type complete problem statement, table data, or markdown here. Press ⌘+Enter to choose solver & solve."
                 className="w-full bg-canvas border border-hairline rounded-xl p-2.5 text-xs text-ink placeholder:text-muted focus:border-primary outline-none transition-colors font-sans leading-relaxed resize-y max-h-60"
               />
 
               <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-2 text-[10px] text-muted-soft">
                   <kbd className="font-mono bg-canvas px-1.5 py-0.5 rounded border border-hairline text-ink">⌘ + Enter</kbd>
-                  <span>to Parse & Solve</span>
+                  <span>to Choose Solver</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -730,11 +626,11 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   )}
                   <button
                     type="submit"
-                    disabled={!quickQuestionText.trim() || isParsingText}
+                    disabled={!quickQuestionText.trim()}
                     className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-xs"
                   >
-                    <Play className={`w-3 h-3 fill-current ${isParsingText ? "animate-spin" : ""}`} />
-                    <span>{isParsingText ? "AI Parsing..." : "Parse & Solve ✨"}</span>
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Confirm Problem Type & Solve ✨</span>
                   </button>
                 </div>
               </div>
@@ -745,7 +641,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
         {/* OCR Scan Button */}
         {onOpenOcr && (
           <button
-            onClick={onOpenOcr}
+            onClick={() => onOpenOcr("", "image")}
             className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors shadow-2xs shrink-0"
             title="Upload photo of paper question for OCR & Vision parsing"
           >

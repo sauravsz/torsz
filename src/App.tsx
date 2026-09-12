@@ -46,6 +46,8 @@ function MainWorkspace() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(false);
+  const [ocrInitialText, setOcrInitialText] = useState("");
+  const [ocrInitialMode, setOcrInitialMode] = useState<"image" | "text">("image");
   const [importedOcrData, setImportedOcrData] = useState<{
     module: OrModule;
     networkSubtype?: NetworkSubtype;
@@ -330,7 +332,11 @@ function MainWorkspace() {
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
-        onOpenOcr={() => setIsOcrOpen(true)}
+        onOpenOcr={() => {
+          setOcrInitialText("");
+          setOcrInitialMode("image");
+          setIsOcrOpen(true);
+        }}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         loading={loadingSchema}
@@ -401,7 +407,11 @@ function MainWorkspace() {
                 setAiInitialPrompt(promptText);
                 setActiveView("ai");
               }}
-              onOpenOcr={() => setIsOcrOpen(true)}
+              onOpenOcr={(text, mode) => {
+                setOcrInitialText(text || "");
+                setOcrInitialMode(mode || "text");
+                setIsOcrOpen(true);
+              }}
               onOpenInSql={(querySql) => {
                 setSql(querySql + "\n");
                 setActiveView("editor");
@@ -436,6 +446,8 @@ function MainWorkspace() {
         isOpen={isOcrOpen}
         onClose={() => setIsOcrOpen(false)}
         onSelectAndSolve={handleOcrSelectAndSolve}
+        initialText={ocrInitialText}
+        initialMode={ocrInitialMode}
       />
     </div>
   );
