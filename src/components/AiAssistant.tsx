@@ -235,7 +235,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted">
-              Ask in Plain English or Formulate Optimization Models
+              Ask Question or Describe Problem
             </label>
             <span className="text-[11px] text-muted font-mono bg-canvas px-2 py-0.5 rounded border border-hairline">
               Provider: {aiSettings.provider.toUpperCase()} ({aiSettings.model})
@@ -243,7 +243,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
           </div>
           <div className="relative">
             <textarea
-              rows={4}
+              rows={3}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {
@@ -252,8 +252,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                   handleGenerate();
                 }
               }}
-              placeholder="Ask a SQL question or describe an Operations Research problem (e.g., 'Maximize product profit with 2 raw materials', 'Solve transportation shipping problem for 3 plants and 4 markets', 'Find critical path duration for project activities'). Press ⌘+Enter to generate."
-              className="w-full bg-canvas border border-hairline rounded-lg p-3.5 text-sm text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors leading-relaxed font-sans"
+              placeholder="Ask a question about your data or describe an optimization problem... (⌘↵ to run)"
+              className="w-full bg-canvas border border-hairline rounded-lg p-3.5 text-sm text-ink placeholder:text-muted focus:border-primary outline-none transition-colors leading-relaxed font-sans"
             />
           </div>
         </div>

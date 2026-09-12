@@ -45,7 +45,8 @@ import {
 } from "../services/or/solvers";
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
-import { extractNetworkEdges } from "../services/ocr";
+import { extractNetworkEdges, classifyOrProblemFromText } from "../services/ocr";
+
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
   onAskAi?: (prompt: string) => void;
@@ -68,11 +69,10 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   importedOcrData,
 }) => {
   const activeModule = controlledModule || "transportation-assignment";
+  const [quickQuestionText, setQuickQuestionText] = useState("");
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
-
-  // ==========================================
   // 1. Transportation & Assignment State (Editable)
   // ==========================================
   const [transProblem, setTransProblem] = useState<TransportationProblem>({
@@ -299,9 +299,92 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
     }
   }, [importedOcrData]);
-  // ==========================================
-  // Transportation Helper Modifiers
-  // ==========================================
+
+  const handleQuickQuestionSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!quickQuestionText.trim()) return;
+
+    const classification = classifyOrProblemFromText(quickQuestionText);
+    const { detectedModule, networkSubtype: netSub, transSubtype: trSub, parsedData } = classification;
+
+    if (netSub) setNetworkSubtype(netSub);
+    if (trSub) setTransSubtype(trSub);
+
+    if (detectedModule === "network-models") {
+      let edges = parsedData?.edges;
+      let start = parsedData?.startNode || "1";
+      let end = parsedData?.endNode || "5";
+
+      if (!edges || edges.length === 0) {
+        const extracted = extractNetworkEdges(quickQuestionText);
+        edges = extracted.edges;
+        start = extracted.startNode;
+        end = extracted.endNode;
+      }
+
+      setNetworkEdges(edges);
+      setNetStartNode(start);
+      setNetEndNode(end);
+
+      if (netSub === "minimum-spanning-tree") {
+        const sol = solveNetworkMst(edges);
+        setNetworkSol(sol);
+      } else if (netSub === "maximal-flow") {
+        const sol = solveNetworkMaxFlow(edges, start, end);
+        setNetworkSol(sol);
+      } else {
+        const sol = solveNetworkShortestRoute(edges, start, end);
+        setNetworkSol(sol);
+      }
+    }
+
+    if (detectedModule === "transportation-assignment") {
+      if (trSub === "hungarian-assignment") {
+        const nextAssign = parsedData?.assign ? { ...assignProblem, ...parsedData.assign } : assignProblem;
+        setAssignProblem(nextAssign);
+        try {
+          const sol = solveHungarianAssignment(nextAssign);
+          setAssignSol(sol);
+        } catch {}
+      } else {
+        const nextTrans = parsedData?.trans ? { ...transProblem, ...parsedData.trans } : transProblem;
+        setTransProblem(nextTrans);
+        try {
+          const sol = solveTransportation(nextTrans);
+          setTransSol(sol);
+        } catch {}
+      }
+    }
+
+    if (detectedModule === "linear-programming") {
+      const nextLp = parsedData?.lp ? { ...lpProblem, ...parsedData.lp } : lpProblem;
+      setLpProblem(nextLp);
+      try {
+        const sol = solveLinearProgramming(nextLp);
+        setLpSol(sol);
+      } catch {}
+    }
+
+    if (detectedModule === "project-planning") {
+      const nextCpm = parsedData?.cpm && parsedData.cpm.length > 0 ? parsedData.cpm : cpmActivities;
+      setCpmActivities(nextCpm);
+      try {
+        const sol = solveCpmPert(nextCpm);
+        setCpmSol(sol);
+      } catch {}
+    }
+
+    if (detectedModule === "inventory-control") {
+      const nextInv = parsedData?.inventory ? { ...inventoryProblem, ...parsedData.inventory } : inventoryProblem;
+      setInventoryProblem(nextInv);
+      try {
+        const sol = solveInventoryControl(nextInv);
+        setInventorySol(sol);
+      } catch {}
+    }
+
+    setQuickQuestionText("");
+  };
   const updateTransCost = (r: number, c: number, val: number) => {
     const nextCosts = transProblem.costs.map((row, ri) =>
       row.map((cell, ci) => (ri === r && ci === c ? val : cell))
@@ -524,23 +607,47 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Module Header Bar */}
-      <div className="h-14 bg-surface-card border-b border-hairline px-6 flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-center gap-2.5">
-          <span className="font-editorial-serif text-2xl font-normal text-ink">
+      <div className="h-14 bg-surface-card border-b border-hairline px-4 flex items-center justify-between gap-3 shrink-0 select-none">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-editorial-serif text-xl font-normal text-ink">
             TORA Optimization Suite
-          </span>
-          <span className="text-xs font-semibold text-muted bg-surface-soft px-2.5 py-0.5 rounded-full border border-hairline">
-            Operations Research & Mathematical Solvers
           </span>
         </div>
 
+        {/* Inline Question Chatbox / Markdown Bar */}
+        <form
+          onSubmit={handleQuickQuestionSubmit}
+          className="flex-1 max-w-xl flex items-center gap-1.5"
+        >
+          <div className="relative flex-1">
+            <Sparkles className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-primary" />
+            <input
+              type="text"
+              value={quickQuestionText}
+              onChange={(e) => setQuickQuestionText(e.target.value)}
+              placeholder="Enter question in plain text / markdown (e.g. 'A company named Rent Car is developing a replacement policy...')"
+              className="w-full bg-canvas border border-hairline text-xs text-ink placeholder:text-muted rounded-xl pl-8 pr-3 py-1.5 outline-none focus:border-primary transition-colors font-sans"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={!quickQuestionText.trim()}
+            className="flex items-center gap-1 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors shadow-2xs shrink-0"
+          >
+            <Play className="w-3 h-3 fill-current" />
+            <span>Parse & Solve</span>
+          </button>
+        </form>
+
+        {/* OCR Scan Button */}
         {onOpenOcr && (
           <button
             onClick={onOpenOcr}
-            className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors shadow-2xs"
+            className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors shadow-2xs shrink-0"
+            title="Upload photo of paper question for OCR & Vision parsing"
           >
-            <Camera className="w-4 h-4" />
-            <span>OCR Scan Question Image</span>
+            <Camera className="w-3.5 h-3.5" />
+            <span>OCR Scan Image</span>
           </button>
         )}
       </div>

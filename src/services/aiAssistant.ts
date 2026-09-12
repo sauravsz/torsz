@@ -35,12 +35,12 @@ export function saveStoredAiSettings(settings: Partial<AiSettings>) {
 export function generateOptimizationSuggestions(): { title: string; prompt: string; module: string }[] {
   return [
     {
-      title: "Maximize Product Profit (LP)",
+      title: "Linear Programming (Simplex / LP)",
       prompt: "Formulate a Linear Programming problem to maximize profit Z = 5*x1 + 4*x2 subject to resource limits 6*x1 + 4*x2 <= 24 and 1*x1 + 2*x2 <= 6.",
       module: "linear-programming",
     },
     {
-      title: "Transportation Shipping Matrix",
+      title: "Transportation Shipping Matrix (VAM)",
       prompt: "Formulate a Transportation shipping cost model for 3 Supply Plants and 4 Destination Markets with supply and demand constraints.",
       module: "transportation-assignment",
     },
@@ -50,19 +50,34 @@ export function generateOptimizationSuggestions(): { title: string; prompt: stri
       module: "transportation-assignment",
     },
     {
-      title: "CPM / PERT Project Duration",
+      title: "Network Models (Dijkstra & MST)",
+      prompt: "Find the shortest replacement route from Node 1 to Node 5 across network arc costs (Rent Car replacement problem).",
+      module: "network-models",
+    },
+    {
+      title: "Project Planning (CPM / PERT)",
       prompt: "Calculate the Critical Path, slack times, and project duration for construction activities A through G.",
       module: "project-planning",
     },
     {
-      title: "Optimal Inventory EOQ",
+      title: "Inventory Control (EOQ)",
       prompt: "Calculate Economic Order Quantity (EOQ), optimal cycle time, and annual holding cost for annual demand D=1000, ordering cost K=$100, holding cost h=$2.",
       module: "inventory-control",
     },
     {
-      title: "M/M/1 Queuing Analysis",
+      title: "Queuing Analysis (M/M/1)",
       prompt: "Compute steady-state queuing metrics for arrival rate lambda=2 arrivals/hr and service rate mu=3 services/hr.",
       module: "queuing-models",
+    },
+    {
+      title: "Zero-Sum Game Theory",
+      prompt: "Evaluate a 3x4 zero-sum payoff matrix for Player 1 and Player 2, find Minimax and Maximin security levels, and determine if a pure saddle point exists.",
+      module: "zero-sum-games",
+    },
+    {
+      title: "Linear Equations (Ax = b)",
+      prompt: "Solve the simultaneous system of linear equations: 2*x1 + x2 - x3 = 8, -3*x1 - x2 + 2*x3 = -11, -2*x1 + x2 + 2*x3 = -3 via Gauss-Jordan elimination.",
+      module: "linear-equations",
     },
   ];
 }
