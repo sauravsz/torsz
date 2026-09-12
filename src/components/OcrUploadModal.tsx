@@ -467,17 +467,32 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                   <span>{scanning ? "Analyzing..." : "Analyze with AI ✨"}</span>
                 </button>
               </div>
-
               <textarea
                 rows={4}
                 value={ocrText}
-                onChange={(e) => setOcrText(e.target.value)}
-                placeholder="Paste or type question in plain text or markdown here (e.g. 'A company named Rent Car is developing a replacement policy...')"
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setOcrText(val);
+                }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  if (pasted && pasted.trim().length > 10) {
+                    setTimeout(() => {
+                      handleAnalyzeText(pasted);
+                    }, 50);
+                  }
+                }}
+                placeholder="Paste or type question in plain text or markdown here. AI will automatically parse and optimize the data structure for TORA..."
                 className="w-full bg-canvas border border-hairline rounded-xl p-3 text-xs text-ink placeholder:text-muted focus:border-primary outline-none transition-colors font-sans leading-relaxed"
               />
+              <div className="flex items-center justify-between text-[11px] text-muted-soft">
+                <span>Pasting raw text automatically triggers AI optimization for TORA.</span>
+                <span>
+                  Press <kbd className="font-mono bg-canvas px-1 rounded border border-hairline text-ink">⌘ + Enter</kbd> to solve
+                </span>
+              </div>
             </div>
           )}
-
           {/* Interactive Problem Type Selection Grid */}
           {(ocrText || imagePreview) && (
             <div className="space-y-2.5 pt-2 border-t border-hairline">
