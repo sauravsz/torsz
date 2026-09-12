@@ -277,13 +277,13 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                         handleUpdateSettings({
                           provider: "groq",
                           baseUrl: "https://api.groq.com/openai/v1",
-                          model: "llama-3.2-11b-vision-preview",
+                          model: "qwen/qwen3.8-27b",
                         });
                       } else if (p === "custom") {
                         handleUpdateSettings({
                           provider: "custom",
                           baseUrl: "https://openrouter.ai/api/v1",
-                          model: "google/gemini-2.0-flash-exp:free",
+                          model: "qwen/qwen3.8-27b",
                         });
                       } else if (p === "claude") {
                         handleUpdateSettings({
@@ -296,19 +296,30 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                     }}
                     className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink focus:border-primary outline-none"
                   >
-                    <option value="groq">Groq Vision (100% Free)</option>
-                    <option value="custom">OpenRouter Free (Gemini Flash)</option>
+                    <option value="groq">Groq (qwen/qwen3.8-27b)</option>
+                    <option value="custom">OpenRouter (qwen/qwen3.8-27b)</option>
                     <option value="claude">Anthropic Claude (Sonnet 3.5)</option>
                     <option value="local">In-Browser OCR (Offline)</option>
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted mb-1">Model Name</label>
+                  <input
+                    type="text"
+                    value={aiSettings.model}
+                    onChange={(e) => handleUpdateSettings({ model: e.target.value.trim() })}
+                    placeholder="qwen/qwen3.8-27b"
+                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink font-mono focus:border-primary outline-none"
+                  />
+                </div>
+
+                <div>
                   <label className="block text-[11px] font-semibold text-muted mb-1">
                     {aiSettings.provider === "groq"
                       ? "Groq API Key (gsk_...)"
                       : aiSettings.provider === "custom"
-                      ? "OpenRouter Key (sk-or-...)"
+                      ? "API Key (sk-...)"
                       : "API Key"}
                   </label>
                   <input

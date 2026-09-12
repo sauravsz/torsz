@@ -107,10 +107,7 @@ async function callGroqVision(
   base64DataUrl: string,
   settings: AiSettings
 ): Promise<OcrProblemClassification> {
-  const modelName =
-    settings.model.includes("vision") || settings.model.includes("llama-3.2")
-      ? settings.model
-      : "llama-3.2-11b-vision-preview";
+  const modelName = settings.model || "qwen/qwen3.8-27b";
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
