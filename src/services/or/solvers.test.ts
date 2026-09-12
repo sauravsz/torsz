@@ -279,4 +279,25 @@ describe("TORA Operations Research Solvers", () => {
     expect(sol.totalMetric).toBe(171.8);
     expect(sol.selectedEdges.length).toBe(10);
   });
+
+  // 15. Large-scale 25-Station 100-Edge MST (GlobalSat Communications)
+  it("solves 25-station 100-edge GlobalSat Minimum Spanning Tree problem", () => {
+    const text = `N1-N2: 60.7\nN1-N6: 42.7\nN1-N8: 57.5\nN1-N13: 52.1\nN1-N16: 89.1\nN1-N19: 23.4\nN2-N3: 69.5\nN2-N4: 26.5\nN2-N6: 40.6\nN2-N9: 65.5\nN2-N13: 32.0\nN2-N15: 33.5\nN2-N19: 72.7\nN2-N22: 11.5\nN2-N23: 46.2\nN3-N4: 94.9\nN3-N8: 94.6\nN3-N10: 11.6\nN3-N13: 24.2\nN3-N14: 28.9\nN3-N16: 89.0\nN3-N18: 84.3\nN3-N25: 84.1\nN4-N8: 38.3\nN4-N10: 19.2\nN4-N13: 80.0\nN4-N20: 68.3\nN4-N22: 60.1\nN4-N23: 93.9\nN5-N13: 63.9\nN5-N14: 5.7\nN5-N15: 78.5\nN5-N17: 31.9\nN5-N20: 64.7\nN6-N10: 89.5\nN6-N12: 17.1\nN6-N25: 15.4\nN7-N8: 14.6\nN7-N10: 54.8\nN7-N13: 29.5\nN7-N15: 59.4\nN7-N17: 69.6\nN7-N20: 23.3\nN7-N21: 62.1\nN7-N22: 28.8\nN7-N23: 49.0\nN8-N12: 86.5\nN8-N20: 81.1\nN8-N24: 13.3\nN9-N14: 43.1\nN9-N20: 29.9\nN9-N21: 5.3\nN9-N22: 74.4\nN9-N23: 62.3\nN9-N25: 28.6\nN10-N11: 71.7\nN10-N13: 54.7\nN10-N17: 43.5\nN10-N20: 5.9\nN10-N21: 11.8\nN10-N22: 84.5\nN10-N23: 86.4\nN11-N12: 54.1\nN11-N13: 80.1\nN11-N15: 57.4\nN11-N17: 18.3\nN11-N18: 16.5\nN11-N20: 32.7\nN11-N21: 85.9\nN11-N23: 76.7\nN12-N13: 82.5\nN12-N15: 85.9\nN12-N17: 23.9\nN12-N20: 27.5\nN13-N15: 14.3\nN13-N16: 75.2\nN13-N17: 84.6\nN13-N18: 41.6\nN13-N21: 60.9\nN13-N24: 18.9\nN14-N15: 88.7\nN14-N21: 82.8\nN14-N23: 92.9\nN15-N18: 78.0\nN15-N19: 84.3\nN16-N20: 7.2\nN16-N21: 71.3\nN16-N24: 34.9\nN16-N25: 88.8\nN17-N19: 77.2\nN17-N20: 82.8\nN17-N21: 78.0\nN17-N23: 29.0\nN17-N25: 75.9\nN19-N20: 14.7\nN21-N24: 83.5\nN21-N25: 82.3\nN22-N25: 25.0\nN23-N24: 78.5\nN23-N25: 46.4`;
+    const edgeRegex = /(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?:->|–|—|-|to|,|\t)\s*(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|\s+)\s*([0-9,.]+)/gi;
+    let match;
+    const edges: NetworkEdge[] = [];
+    while ((match = edgeRegex.exec(text)) !== null) {
+      const from = match[1];
+      const to = match[2];
+      const cost = parseFloat(match[3].replace(/,/g, ""));
+      if (from !== to && !isNaN(cost)) {
+        edges.push({ from, to, cost });
+      }
+    }
+
+    expect(edges.length).toBe(100);
+    const sol = solveNetworkMst(edges);
+    expect(sol.totalMetric).toBe(401.3);
+    expect(sol.selectedEdges.length).toBe(24);
+  });
 });

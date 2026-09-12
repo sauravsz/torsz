@@ -211,17 +211,10 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       if (trSub) setTransSubtype(trSub);
 
       if (module === "network-models" || netSub) {
-        let edges = data?.edges;
-        let start = data?.startNode || "1";
-        let end = data?.endNode || "5";
-
-        if (!edges || edges.length === 0) {
-          const extracted = extractNetworkEdges(rawText || "");
-          edges = extracted.edges;
-          start = extracted.startNode;
-          end = extracted.endNode;
-        }
-
+        const extracted = extractNetworkEdges(rawText || "");
+        const edges = (data?.edges && data.edges.length >= extracted.edges.length) ? data.edges : extracted.edges;
+        const start = data?.startNode || extracted.startNode || "1";
+        const end = data?.endNode || extracted.endNode || "5";
         setNetworkEdges(edges);
         setNetStartNode(start);
         setNetEndNode(end);

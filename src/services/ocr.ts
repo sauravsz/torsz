@@ -162,7 +162,19 @@ ${hintText}
 
         const data = await response.json();
         const content = data.content?.[0]?.text || "";
-        return parseVisionJson(content);
+        const parsed = parseVisionJson(content);
+        if (parsed.detectedModule === "network-models" || targetHint?.module === "network-models") {
+          const extracted = extractNetworkEdges(questionText);
+          if (extracted.edges.length > (parsed.parsedData?.edges?.length || 0)) {
+            parsed.parsedData = {
+              ...parsed.parsedData,
+              edges: extracted.edges,
+              startNode: extracted.startNode,
+              endNode: extracted.endNode,
+            };
+          }
+        }
+        return parsed;
       } else {
         const baseUrl = (
           settings.baseUrl ||
@@ -190,7 +202,19 @@ ${hintText}
 
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content || "";
-        return parseVisionJson(content);
+        const parsed = parseVisionJson(content);
+        if (parsed.detectedModule === "network-models" || targetHint?.module === "network-models") {
+          const extracted = extractNetworkEdges(questionText);
+          if (extracted.edges.length > (parsed.parsedData?.edges?.length || 0)) {
+            parsed.parsedData = {
+              ...parsed.parsedData,
+              edges: extracted.edges,
+              startNode: extracted.startNode,
+              endNode: extracted.endNode,
+            };
+          }
+        }
+        return parsed;
       }
     } catch (err) {
       console.warn("AI Text parsing failed, falling back to heuristic parser:", err);
