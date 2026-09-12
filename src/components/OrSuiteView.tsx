@@ -14,6 +14,7 @@ import {
   Trash2,
   FileText,
   Sparkles,
+  Camera,
 } from "lucide-react";
 import {
   OrModule,
@@ -56,6 +57,7 @@ import { SimplexTableauViewer } from "./SimplexTableauViewer";
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
   onAskAi?: (prompt: string) => void;
+  onOpenOcr?: () => void;
   activeModule?: OrModule;
   onSelectModule?: (module: OrModule) => void;
 }
@@ -63,6 +65,7 @@ interface OrSuiteViewProps {
 export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   onOpenInSql,
   onAskAi,
+  onOpenOcr,
   activeModule: controlledModule,
   onSelectModule,
 }) => {
@@ -434,8 +437,17 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
             Operations Research & Mathematical Solvers
           </span>
         </div>
-      </div>
 
+        {onOpenOcr && (
+          <button
+            onClick={onOpenOcr}
+            className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors shadow-2xs"
+          >
+            <Camera className="w-4 h-4" />
+            <span>OCR Scan Question Image</span>
+          </button>
+        )}
+      </div>
       {/* Main Workspace with Sidebar & Solvers */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left TORA Menu Sidebar */}

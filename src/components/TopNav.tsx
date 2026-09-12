@@ -1,7 +1,6 @@
 import React from "react";
-import { Plus, Sparkles, Network, Terminal, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download, TrendingUp } from "lucide-react";
+import { Plus, Sparkles, Network, Terminal, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download, TrendingUp, Camera } from "lucide-react";
 import { ConnectionConfig } from "../types";
-
 interface TopNavProps {
   activeConnection: ConnectionConfig | null;
   savedConnections: ConnectionConfig[];
@@ -16,6 +15,7 @@ interface TopNavProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onExportDatabase?: () => void;
+  onOpenOcr?: () => void;
   loading: boolean;
 }
 
@@ -33,6 +33,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   isSidebarOpen = true,
   onToggleSidebar,
   onExportDatabase,
+  onOpenOcr,
   loading,
 }) => {
   return (
@@ -207,6 +208,16 @@ export const TopNav: React.FC<TopNavProps> = ({
             className="hidden"
           />
         </label>
+        {/* OCR Scan Paper Question Button */}
+        {onOpenOcr && (
+          <button
+            onClick={onOpenOcr}
+            className="p-2 text-muted hover:text-ink hover:bg-surface-cream rounded-md border border-hairline transition-colors shadow-2xs"
+            title="OCR Scan Operations Research Question"
+          >
+            <Camera className="w-4 h-4 text-primary" />
+          </button>
+        )}
 
         {/* Export Full Database Button */}
         {onExportDatabase && (
@@ -218,8 +229,6 @@ export const TopNav: React.FC<TopNavProps> = ({
             <Download className="w-4 h-4 text-primary" />
           </button>
         )}
-
-        {/* New Connection Primary Button */}
         <button
           onClick={onOpenNewConnection}
           className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-3.5 py-1.5 rounded-md transition-colors shadow-2xs"

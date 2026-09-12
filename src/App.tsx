@@ -8,8 +8,10 @@ import { AiAssistant } from "./components/AiAssistant";
 import { OrSuiteView } from "./components/OrSuiteView";
 import { HistoryModal } from "./components/HistoryModal";
 import { ConnectionModal } from "./components/ConnectionModal";
+import { OcrUploadModal } from "./components/OcrUploadModal";
 import { ToastProvider, useToast } from "./components/Toast";
 import { ConnectionConfig, DatabaseSchema, QueryResult, TableSchema, ColumnSchema } from "./types";
+import { OrModule, NetworkSubtype, TransSubtype } from "./services/or/types";
 import {
   connectDatabase,
   executeQuery,
@@ -43,7 +45,7 @@ function MainWorkspace() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  // Keyboard shortcut ⌘+B / Ctrl+B to toggle sidebar
+  const [isOcrOpen, setIsOcrOpen] = useState(false);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
@@ -289,6 +291,16 @@ function MainWorkspace() {
     }
   };
 
+  const handleOcrSelectAndSolve = (
+    module: OrModule,
+    _subtypes?: { network?: NetworkSubtype; trans?: TransSubtype },
+    _parsedData?: any,
+    _rawText?: string
+  ) => {
+    setActiveOrModule(module);
+    setActiveView("or");
+    showToast(`Loaded ${module} problem from OCR scan!`, "success");
+  };
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-canvas text-ink font-sans">
       {/* Top Nav Header */}
@@ -304,6 +316,7 @@ function MainWorkspace() {
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
+        onOpenOcr={() => setIsOcrOpen(true)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         loading={loadingSchema}
@@ -374,6 +387,7 @@ function MainWorkspace() {
                 setAiInitialPrompt(promptText);
                 setActiveView("ai");
               }}
+              onOpenOcr={() => setIsOcrOpen(true)}
               onOpenInSql={(querySql) => {
                 setSql(querySql + "\n");
                 setActiveView("editor");
@@ -401,6 +415,13 @@ function MainWorkspace() {
             handleExecuteQuery(undefined, hSql);
           }
         }}
+      />
+
+      {/* OCR Problem Scanner Modal */}
+      <OcrUploadModal
+        isOpen={isOcrOpen}
+        onClose={() => setIsOcrOpen(false)}
+        onSelectAndSolve={handleOcrSelectAndSolve}
       />
     </div>
   );
