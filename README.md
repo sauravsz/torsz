@@ -43,7 +43,25 @@ Write SQL in a customized Monaco editor with dark product syntax highlighting, a
 
 <br/>
 
-### 2. Interactive Schema Visualizer (ER Diagram)
+### 2. TORA Operations Research Suite (2D Graphical Solver & Simplex Tableaus)
+Solve complex mathematical optimization problems with real-time editable matrices, interactive 2D graphical constraint canvases, step-by-step Simplex tableaus, Vogel's VAM transportation, and Hungarian assignment.
+
+<div align="center">
+  <img src="docs/screenshots/tora-solvers.png" alt="TORA Operations Research Suite" width="100%" style="border-radius: 8px; border: 1px solid #e6dfd8;" />
+</div>
+
+<br/>
+
+### 3. In-Browser OCR Paper Question Scanner & Classifier
+Upload or paste photos of exam questions, cost matrices, or network graphs. The client-side OCR engine extracts text and parameters, classifies the problem type, and populates the solver in 1 click.
+
+<div align="center">
+  <img src="docs/screenshots/ocr-scanner.png" alt="OCR Question Scanner Modal" width="100%" style="border-radius: 8px; border: 1px solid #e6dfd8;" />
+</div>
+
+<br/>
+
+### 4. Interactive Schema Visualizer (ER Diagram)
 Inspect table relationships, primary key constraints, and foreign key mappings on an interactive canvas with zoom controls.
 
 <div align="center">
@@ -52,13 +70,12 @@ Inspect table relationships, primary key constraints, and foreign key mappings o
 
 <br/>
 
-### 3. Natural Language AI SQL Assistant
-Ask questions about your data in plain English. `torsz` inspects your live database schema and translates your request into accurate, optimized SQL queries using **Groq**, **OpenRouter**, **Claude**, or a local semantic engine.
+### 5. AI Database & Optimization Assistant
+Ask questions about your data or formulate optimization models in plain English. `torsz` translates your request into accurate SQL and mathematical formulations with 1-click execution and solver integration.
 
 <div align="center">
   <img src="docs/screenshots/ai-assistant.png" alt="AI SQL Assistant" width="100%" style="border-radius: 8px; border: 1px solid #e6dfd8;" />
 </div>
-
 ---
 
 ## Core Capabilities
