@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Settings,
   FileText,
+  Filter,
 } from "lucide-react";
 import {
   processOrQuestionWithVisionAi,
@@ -55,6 +56,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("");
   const [ocrText, setOcrText] = useState<string>(initialText);
+  const [targetHintKey, setTargetHintKey] = useState<string>("auto");
   const [classification, setClassification] = useState<OcrProblemClassification | null>(null);
   const [selectedModule, setSelectedModule] = useState<OrModule>("network-models");
   const [selectedNetworkSubtype, setSelectedNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
@@ -64,6 +66,22 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const [aiSettings, setAiSettings] = useState<AiSettings>(getStoredAiSettings);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const getHintObject = (key: string): { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype } | undefined => {
+    if (key === "auto") return undefined;
+    if (key === "shortest-route") return { module: "network-models", networkSubtype: "shortest-route" };
+    if (key === "minimum-spanning-tree") return { module: "network-models", networkSubtype: "minimum-spanning-tree" };
+    if (key === "maximal-flow") return { module: "network-models", networkSubtype: "maximal-flow" };
+    if (key === "transportation") return { module: "transportation-assignment", transSubtype: "transportation" };
+    if (key === "hungarian-assignment") return { module: "transportation-assignment", transSubtype: "hungarian-assignment" };
+    if (key === "linear-programming") return { module: "linear-programming" };
+    if (key === "project-planning") return { module: "project-planning" };
+    if (key === "inventory-control") return { module: "inventory-control" };
+    if (key === "queuing-models") return { module: "queuing-models" };
+    if (key === "zero-sum-games") return { module: "zero-sum-games" };
+    if (key === "linear-equations") return { module: "linear-equations" };
+    return undefined;
+  };
 
   useEffect(() => {
     if (initialText) {
@@ -81,15 +99,17 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     saveStoredAiSettings(updated);
   };
 
-  const handleFileChange = async (file: File) => {
+  const handleFileChange = async (file: File, hintKey?: string) => {
     setSelectedFile(file);
     setImagePreview(URL.createObjectURL(file));
     setError(null);
     setScanning(true);
     setScanStatus("Analyzing image with Multimodal AI Vision...");
 
+    const hint = getHintObject(hintKey !== undefined ? hintKey : targetHintKey);
+
     try {
-      const result = await processOrQuestionWithVisionAi(file, aiSettings);
+      const result = await processOrQuestionWithVisionAi(file, aiSettings, hint);
       setClassification(result);
       setOcrText(result.transcription || result.reason);
       setSelectedModule(result.detectedModule);
@@ -102,7 +122,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     }
   };
 
-  const handleAnalyzeText = async (textToAnalyze?: string) => {
+  const handleAnalyzeText = async (textToAnalyze?: string, hintKey?: string) => {
     const text = textToAnalyze || ocrText;
     if (!text.trim()) return;
 
@@ -110,8 +130,10 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     setScanning(true);
     setScanStatus("Analyzing problem statement with AI...");
 
+    const hint = getHintObject(hintKey !== undefined ? hintKey : targetHintKey);
+
     try {
-      const result = await parseOrQuestionTextWithAi(text, aiSettings);
+      const result = await parseOrQuestionTextWithAi(text, aiSettings, hint);
       setClassification(result);
       setSelectedModule(result.detectedModule);
       if (result.networkSubtype) setSelectedNetworkSubtype(result.networkSubtype);
@@ -141,7 +163,8 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const handleConfirmAndSolve = () => {
     let finalParsedData = classification?.parsedData;
     if (!finalParsedData || Object.keys(finalParsedData).length === 0) {
-      const fallback = classifyOrProblemFromText(ocrText);
+      const hint = getHintObject(targetHintKey);
+      const fallback = classifyOrProblemFromText(ocrText, hint);
       finalParsedData = fallback.parsedData;
     }
 
@@ -159,6 +182,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
 
   const problemTypes: {
     id: OrModule;
+    key: string;
     name: string;
     description: string;
     icon: any;
@@ -167,6 +191,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   }[] = [
     {
       id: "network-models",
+      key: "shortest-route",
       name: "Shortest Route (Dijkstra)",
       description: "Minimum distance/cost path between network nodes (e.g. car replacement).",
       icon: Network,
@@ -174,6 +199,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     },
     {
       id: "network-models",
+      key: "minimum-spanning-tree",
       name: "Minimum Spanning Tree (MST)",
       description: "Connect all network nodes with minimal total length (Kruskal/Prim).",
       icon: Network,
@@ -181,6 +207,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     },
     {
       id: "network-models",
+      key: "maximal-flow",
       name: "Maximal Flow",
       description: "Maximum fluid/capacity throughput between source and sink.",
       icon: Network,
@@ -188,6 +215,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     },
     {
       id: "transportation-assignment",
+      key: "transportation",
       name: "Transportation Model (VAM)",
       description: "Minimize shipping matrix costs between supply plants and demand markets.",
       icon: Truck,
@@ -195,6 +223,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     },
     {
       id: "transportation-assignment",
+      key: "hungarian-assignment",
       name: "Hungarian Task Assignment",
       description: "Allocate N workers to N jobs at minimum total cost.",
       icon: Truck,
@@ -202,36 +231,42 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     },
     {
       id: "linear-programming",
+      key: "linear-programming",
       name: "Linear Programming (Simplex/2D)",
       description: "Maximize/minimize objective functions with resource constraints.",
       icon: TrendingUp,
     },
     {
       id: "project-planning",
+      key: "project-planning",
       name: "Project Planning (CPM / PERT)",
       description: "Activity dependencies, earliest/latest times, and critical path duration.",
       icon: Calendar,
     },
     {
       id: "inventory-control",
+      key: "inventory-control",
       name: "Inventory Control (EOQ)",
       description: "Economic order quantity, cycle times, and planned backorder levels.",
       icon: Package,
     },
     {
       id: "queuing-models",
+      key: "queuing-models",
       name: "Queuing Analysis (M/M/1)",
       description: "Queue lengths, wait times, and server utilization characteristics.",
       icon: Clock,
     },
     {
       id: "zero-sum-games",
+      key: "zero-sum-games",
       name: "Zero-Sum Game Theory",
       description: "2-Player payoff matrices, Minimax/Maximin security levels, saddle points.",
       icon: Swords,
     },
     {
       id: "linear-equations",
+      key: "linear-equations",
       name: "Linear Equations (Ax = b)",
       description: "Simultaneous linear equation systems via Gauss-Jordan elimination.",
       icon: Calculator,
@@ -373,6 +408,47 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
             </div>
           )}
 
+          {/* Problem Type Selector Dropdown Filter */}
+          <div className="bg-canvas border border-hairline rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="font-semibold text-ink">Target Problem Category:</span>
+            </div>
+
+            <select
+              value={targetHintKey}
+              onChange={(e) => {
+                const newKey = e.target.value;
+                setTargetHintKey(newKey);
+                const hint = getHintObject(newKey);
+                if (hint?.module) setSelectedModule(hint.module);
+                if (hint?.networkSubtype) setSelectedNetworkSubtype(hint.networkSubtype);
+                if (hint?.transSubtype) setSelectedTransSubtype(hint.transSubtype);
+
+                // Re-analyze with new target hint if text or image present
+                if (ocrText.trim()) {
+                  handleAnalyzeText(ocrText, newKey);
+                } else if (selectedFile) {
+                  handleFileChange(selectedFile, newKey);
+                }
+              }}
+              className="bg-surface-card border border-hairline rounded-lg px-3 py-1.5 text-xs font-semibold text-primary focus:border-primary outline-none shadow-2xs cursor-pointer"
+            >
+              <option value="auto">✨ Auto-Detect (AI Classification)</option>
+              <option value="minimum-spanning-tree">🌐 Minimum Spanning Tree (MST - Kruskal / Prim)</option>
+              <option value="shortest-route">🛣️ Shortest Route (Dijkstra / Replacement)</option>
+              <option value="maximal-flow">🚰 Maximal Flow Capacity</option>
+              <option value="transportation">🚚 Transportation Cost Matrix (VAM)</option>
+              <option value="hungarian-assignment">👷 Hungarian Task Assignment</option>
+              <option value="linear-programming">📈 Linear Programming (Simplex / Graphical)</option>
+              <option value="project-planning">📅 Project Planning (CPM / PERT)</option>
+              <option value="inventory-control">📦 Inventory Control (EOQ)</option>
+              <option value="queuing-models">⏱️ Queuing Analysis (M/M/1)</option>
+              <option value="zero-sum-games">⚔️ Zero-Sum Game Theory</option>
+              <option value="linear-equations">🔢 Linear Equations (Ax = b)</option>
+            </select>
+          </div>
+
           {/* Mode 1: Image Upload Dropzone */}
           {inputMode === "image" && (
             <div>
@@ -467,6 +543,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                   <span>{scanning ? "Analyzing..." : "Analyze with AI ✨"}</span>
                 </button>
               </div>
+
               <textarea
                 rows={4}
                 value={ocrText}
@@ -493,6 +570,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
               </div>
             </div>
           )}
+
           {/* Interactive Problem Type Selection Grid */}
           {(ocrText || imagePreview) && (
             <div className="space-y-2.5 pt-2 border-t border-hairline">
@@ -524,6 +602,12 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                         setSelectedModule(pt.id);
                         if (pt.networkSubtype) setSelectedNetworkSubtype(pt.networkSubtype);
                         if (pt.transSubtype) setSelectedTransSubtype(pt.transSubtype);
+                        setTargetHintKey(pt.key);
+
+                        // Re-trigger extraction specifically for chosen model
+                        if (ocrText.trim()) {
+                          handleAnalyzeText(ocrText, pt.key);
+                        }
                       }}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         isSelected

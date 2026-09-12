@@ -83,7 +83,8 @@ export async function performInBrowserOcr(
 
 export async function processOrQuestionWithVisionAi(
   imageFile: File,
-  customSettings?: Partial<AiSettings>
+  customSettings?: Partial<AiSettings>,
+  targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
 ): Promise<OcrProblemClassification> {
   const settings = { ...getStoredAiSettings(), ...customSettings };
   const preprocessed = await preprocessImageFile(imageFile);
@@ -93,11 +94,11 @@ export async function processOrQuestionWithVisionAi(
   if (settings.apiKey && settings.provider !== "local") {
     try {
       if (settings.provider === "claude") {
-        return await callClaudeVision(preprocessed, base64DataUrl, settings.apiKey);
+        return await callClaudeVision(preprocessed, base64DataUrl, settings.apiKey, targetHint);
       } else if (settings.provider === "groq") {
-        return await callGroqVision(base64DataUrl, settings);
+        return await callGroqVision(base64DataUrl, settings, targetHint);
       } else {
-        return await callOpenAiVision(base64DataUrl, settings);
+        return await callOpenAiVision(base64DataUrl, settings, targetHint);
       }
     } catch (err) {
       console.warn("Vision AI call failed, trying in-browser fallback:", err);
@@ -106,13 +107,20 @@ export async function processOrQuestionWithVisionAi(
 
   // Fallback: In-browser Tesseract OCR + Heuristic classification
   const rawText = await performInBrowserOcr(preprocessed);
-  return classifyOrProblemFromText(rawText);
+  return classifyOrProblemFromText(rawText, targetHint);
 }
+
 export async function parseOrQuestionTextWithAi(
   questionText: string,
-  customSettings?: Partial<AiSettings>
+  customSettings?: Partial<AiSettings>,
+  targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
 ): Promise<OcrProblemClassification> {
   const settings = { ...getStoredAiSettings(), ...customSettings };
+  const hintText = targetHint?.module
+    ? `IMPORTANT: The user has explicitly specified this problem type as "${targetHint.module}"${
+        targetHint.networkSubtype ? ` (Subtype: "${targetHint.networkSubtype}")` : ""
+      }${targetHint.transSubtype ? ` (Subtype: "${targetHint.transSubtype}")` : ""}. Extract the structured parameters strictly matching this problem type.`
+    : "";
 
   if (settings.apiKey && settings.provider !== "local") {
     try {
@@ -133,8 +141,8 @@ Extract all exact parameters into the JSON schema:
    - If LP: { "objective": "max", "objectiveCoefficients": [5,4], "constraints": [{ "coefficients": [6,4], "operator": "<=", "rhs": 24 }] }
    - If CPM: { "cpm": [{ "id": "A", "name": "Task A", "predecessors": [], "duration": 4 }] }
    - If inventory: { "annualDemandD": 1000, "orderingCostK": 100, "holdingCostH": 2 }
-   - If queuing: { "arrivalRateLambda": 2, "serviceRateMu": 3 }`;
-
+${hintText}
+`;
       if (settings.provider === "claude") {
         const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
@@ -218,10 +226,13 @@ Output strictly valid JSON with keys: "detectedModule", "networkSubtype", "trans
 
 async function callGroqVision(
   base64DataUrl: string,
-  settings: AiSettings
+  settings: AiSettings,
+  targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
 ): Promise<OcrProblemClassification> {
   const modelName = settings.model || "qwen/qwen3.8-27b";
-
+  const prompt = targetHint?.module
+    ? `Analyze and extract all Operations Research problem parameters from this question image. Note: The problem type is specified as "${targetHint.module}"${targetHint.networkSubtype ? ` (subtype: ${targetHint.networkSubtype})` : ""}${targetHint.transSubtype ? ` (subtype: ${targetHint.transSubtype})` : ""}.`
+    : "Analyze and extract all Operations Research problem parameters from this question image.";
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -235,7 +246,7 @@ async function callGroqVision(
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze and extract all Operations Research problem parameters from this question image." },
+            { type: "text", text: prompt },
             { type: "image_url", image_url: { url: base64DataUrl } },
           ],
         },
@@ -257,11 +268,14 @@ async function callGroqVision(
 
 async function callOpenAiVision(
   base64DataUrl: string,
-  settings: AiSettings
+  settings: AiSettings,
+  targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
 ): Promise<OcrProblemClassification> {
   const modelName = settings.model || "gpt-4o-mini";
   const baseUrl = (settings.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
-
+  const prompt = targetHint?.module
+    ? `Analyze and extract all Operations Research problem parameters from this question image. Note: The problem type is specified as "${targetHint.module}"${targetHint.networkSubtype ? ` (subtype: ${targetHint.networkSubtype})` : ""}${targetHint.transSubtype ? ` (subtype: ${targetHint.transSubtype})` : ""}.`
+    : "Analyze and extract all Operations Research problem parameters from this question image.";
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
@@ -275,7 +289,7 @@ async function callOpenAiVision(
         {
           role: "user",
           content: [
-            { type: "text", text: "Analyze and extract all Operations Research problem parameters from this question image." },
+            { type: "text", text: prompt },
             { type: "image_url", image_url: { url: base64DataUrl } },
           ],
         },
@@ -298,11 +312,14 @@ async function callOpenAiVision(
 async function callClaudeVision(
   imageFile: File,
   base64DataUrl: string,
-  apiKey: string
+  apiKey: string,
+  targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
 ): Promise<OcrProblemClassification> {
   const mediaType = imageFile.type || "image/jpeg";
   const rawBase64 = base64DataUrl.includes(",") ? base64DataUrl.split(",")[1] : base64DataUrl;
-
+  const prompt = targetHint?.module
+    ? `Extract all Operations Research parameters and formulate the solution. Note: The problem type is specified as "${targetHint.module}"${targetHint.networkSubtype ? ` (subtype: ${targetHint.networkSubtype})` : ""}${targetHint.transSubtype ? ` (subtype: ${targetHint.transSubtype})` : ""}.`
+    : "Extract all Operations Research parameters and formulate the solution.";
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -327,7 +344,7 @@ async function callClaudeVision(
                 data: rawBase64,
               },
             },
-            { type: "text", text: "Extract all Operations Research parameters and formulate the solution." },
+            { type: "text", text: prompt },
           ],
         },
       ],
@@ -372,9 +389,90 @@ function parseVisionJson(text: string): OcrProblemClassification {
   };
 }
 
-export function classifyOrProblemFromText(text: string): OcrProblemClassification {
+export function classifyOrProblemFromText(
+  text: string,
+  targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
+): OcrProblemClassification {
   const lower = text.toLowerCase();
 
+  if (targetHint?.module) {
+    if (targetHint.module === "network-models") {
+      const { edges, startNode, endNode } = extractNetworkEdges(text);
+      return {
+        detectedModule: "network-models",
+        networkSubtype: targetHint.networkSubtype || "shortest-route",
+        confidence: 1.0,
+        reason: `User selected ${targetHint.networkSubtype || "network-models"}.`,
+        transcription: text,
+        parsedData: { edges, startNode, endNode },
+      };
+    }
+    if (targetHint.module === "transportation-assignment") {
+      return {
+        detectedModule: "transportation-assignment",
+        transSubtype: targetHint.transSubtype || "transportation",
+        confidence: 1.0,
+        reason: `User selected ${targetHint.transSubtype || "transportation"}.`,
+        transcription: text,
+      };
+    }
+    if (targetHint.module === "linear-programming") {
+      return {
+        detectedModule: "linear-programming",
+        confidence: 1.0,
+        reason: "User selected Linear Programming.",
+        transcription: text,
+      };
+    }
+    if (targetHint.module === "project-planning") {
+      return {
+        detectedModule: "project-planning",
+        confidence: 1.0,
+        reason: "User selected Project Planning (CPM/PERT).",
+        transcription: text,
+      };
+    }
+    if (targetHint.module === "inventory-control") {
+      const numbers = text.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+      return {
+        detectedModule: "inventory-control",
+        confidence: 1.0,
+        reason: "User selected Inventory Control.",
+        transcription: text,
+        parsedData: {
+          inventory: {
+            annualDemandD: numbers[0] || 1000,
+            orderingCostK: numbers[1] || 100,
+            holdingCostH: numbers[2] || 2,
+          },
+        },
+      };
+    }
+    if (targetHint.module === "queuing-models") {
+      return {
+        detectedModule: "queuing-models",
+        confidence: 1.0,
+        reason: "User selected Queuing Analysis.",
+        transcription: text,
+      };
+    }
+    if (targetHint.module === "zero-sum-games") {
+      return {
+        detectedModule: "zero-sum-games",
+        confidence: 1.0,
+        reason: "User selected Zero-Sum Games.",
+        transcription: text,
+      };
+    }
+    if (targetHint.module === "linear-equations") {
+      return {
+        detectedModule: "linear-equations",
+        confidence: 1.0,
+        reason: "User selected Linear Equations.",
+        transcription: text,
+      };
+    }
+  }
   // 1. Shortest Route / Path (Dijkstra) or Equipment Replacement
   if (
     lower.includes("shortest route") ||
