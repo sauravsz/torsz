@@ -382,7 +382,6 @@ function MainWorkspace() {
           ) : (
             <OrSuiteView
               activeModule={activeOrModule}
-              onSelectModule={setActiveOrModule}
               onAskAi={(promptText) => {
                 setAiInitialPrompt(promptText);
                 setActiveView("ai");

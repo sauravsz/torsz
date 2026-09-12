@@ -1,15 +1,7 @@
 import React, { useState } from "react";
 import {
-  TrendingUp,
-  Truck,
-  Network,
-  Calendar,
-  Clock,
-  Swords,
-  Calculator,
   Play,
   CheckCircle2,
-  Package,
   Plus,
   Trash2,
   FileText,
@@ -59,7 +51,6 @@ interface OrSuiteViewProps {
   onAskAi?: (prompt: string) => void;
   onOpenOcr?: () => void;
   activeModule?: OrModule;
-  onSelectModule?: (module: OrModule) => void;
 }
 
 export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
@@ -67,11 +58,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   onAskAi,
   onOpenOcr,
   activeModule: controlledModule,
-  onSelectModule,
 }) => {
-  const [internalModule, setInternalModule] = useState<OrModule>("transportation-assignment");
-  const activeModule = controlledModule || internalModule;
-  const setActiveModule = onSelectModule || setInternalModule;
+  const activeModule = controlledModule || "transportation-assignment";
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
@@ -448,43 +436,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           </button>
         )}
       </div>
-      {/* Main Workspace with Sidebar & Solvers */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left TORA Menu Sidebar */}
-        <aside className="w-64 bg-surface-soft border-r border-hairline flex flex-col select-none shrink-0 p-3 space-y-1 overflow-y-auto">
-          <div className="px-3 py-2 text-[11px] font-semibold text-muted uppercase tracking-wider">
-            TORA Main Menu
-          </div>
-
-          {[
-            { id: "transportation-assignment", name: "Transportation & Assignment", icon: Truck },
-            { id: "linear-programming", name: "Linear Programming", icon: TrendingUp },
-            { id: "network-models", name: "Network Models", icon: Network },
-            { id: "project-planning", name: "Project Planning (CPM/PERT)", icon: Calendar },
-            { id: "inventory-control", name: "Inventory Control (EOQ)", icon: Package },
-            { id: "queuing-models", name: "Queuing Analysis", icon: Clock },
-            { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords },
-            { id: "linear-equations", name: "Linear Equations", icon: Calculator },
-          ].map((m) => {
-            const Icon = m.icon;
-            const isActive = activeModule === m.id;
-            return (
-              <button
-                key={m.id}
-                onClick={() => setActiveModule(m.id as OrModule)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl font-medium transition-colors text-left ${
-                  isActive
-                    ? "bg-surface-card text-ink font-semibold shadow-2xs border border-hairline text-primary"
-                    : "text-body hover:bg-surface-cream"
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? "text-primary" : "text-muted"}`} />
-                <span>{m.name}</span>
-              </button>
-            );
-          })}
-        </aside>
-
         {/* Right Module Solver Content */}
         <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6">
           {/* ========================================== */}
@@ -1858,6 +1809,5 @@ FROM lp_variables;`)
           )}
         </main>
       </div>
-    </div>
   );
 };
