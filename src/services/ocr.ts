@@ -14,7 +14,7 @@ import {
   ZeroSumGameProblem,
 } from "./or/types";
 import { AiSettings, getStoredAiSettings } from "./aiAssistant";
-
+import { extractTransportationProblem, extractAssignmentProblem } from "./ocrMatrixParser";
 export interface OcrProblemClassification {
   detectedModule: OrModule;
   confidence: number;
@@ -432,12 +432,18 @@ export function classifyOrProblemFromText(
       };
     }
     if (targetHint.module === "transportation-assignment") {
+      const transData = extractTransportationProblem(text);
+      const assignData = extractAssignmentProblem(text);
       return {
         detectedModule: "transportation-assignment",
         transSubtype: targetHint.transSubtype || "transportation",
         confidence: 1.0,
         reason: `User selected ${targetHint.transSubtype || "transportation"}.`,
         transcription: text,
+        parsedData: {
+          trans: transData || undefined,
+          assign: assignData || undefined,
+        },
       };
     }
     if (targetHint.module === "linear-programming") {
@@ -564,15 +570,16 @@ export function classifyOrProblemFromText(
     lower.includes("shipping cost") ||
     (lower.includes("plants") && lower.includes("destinations"))
   ) {
+    const trans = extractTransportationProblem(text);
     return {
       detectedModule: "transportation-assignment",
       transSubtype: "transportation",
       confidence: 0.9,
       reason: "Detected supply/demand shipping cost matrix structure.",
       transcription: text,
+      parsedData: { trans: trans || undefined },
     };
   }
-
   // 5. Hungarian Assignment
   if (
     lower.includes("assignment") ||
