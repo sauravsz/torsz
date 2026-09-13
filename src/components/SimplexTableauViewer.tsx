@@ -223,16 +223,25 @@ export const SimplexTableauViewer: React.FC<SimplexTableauViewerProps> = ({ tabl
               <td className="p-2.5 text-center border-r border-hairline text-primary">
                 Z (z_j - c_j)
               </td>
-              {current.zRow.map((val, colIdx) => (
-                <td
-                  key={colIdx}
-                  className={`p-2.5 text-center border-r border-hairline ${
-                    current.pivotColIdx === colIdx ? "bg-primary/20 text-primary font-bold" : "text-ink"
-                  }`}
-                >
-                  {Math.round(val * 1000) / 1000}
-                </td>
-              ))}
+              {current.zRow.map((val, colIdx) => {
+                const isRhsCell = colIdx === current.zRow.length - 1;
+                const displayVal = isRhsCell ? Math.abs(val) : val;
+
+                return (
+                  <td
+                    key={colIdx}
+                    className={`p-2.5 text-center border-r border-hairline ${
+                      current.pivotColIdx === colIdx
+                        ? "bg-primary/20 text-primary font-bold"
+                        : isRhsCell
+                        ? "font-bold text-primary"
+                        : "text-ink"
+                    }`}
+                  >
+                    {Math.round(displayVal * 1000) / 1000}
+                  </td>
+                );
+              })}
               <td className="p-2.5 text-center text-muted">-</td>
             </tr>
           </tbody>
