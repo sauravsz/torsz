@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Play,
   CheckCircle2,
@@ -91,6 +91,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 }) => {
   const activeModule = controlledModule || "transportation-assignment";
   const [quickQuestionText, setQuickQuestionText] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
@@ -327,10 +328,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   // Auto-populate & Auto-solve on OCR Data Import
   useEffect(() => {
     if (importedOcrData) {
+      setQuickQuestionText("");
+      if (textareaRef.current) {
+        textareaRef.current.value = "";
+        textareaRef.current.style.height = "auto";
+      }
       const { module, networkSubtype: netSub, transSubtype: trSub, data, rawText } = importedOcrData;
-      if (netSub) setNetworkSubtype(netSub);
       if (trSub) setTransSubtype(trSub);
-
       if (module === "network-models" || netSub) {
         const extracted = extractNetworkEdges(rawText || "");
         const edges = (data?.edges && data.edges.length >= extracted.edges.length) ? data.edges : extracted.edges;
@@ -418,12 +422,22 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   }, [importedOcrData]);
 
   const handleQuickQuestionSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (onOpenOcr) {
-      onOpenOcr(quickQuestionText, "text");
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const text = quickQuestionText.trim();
+    if (text) {
+      setQuickQuestionText("");
+      if (textareaRef.current) {
+        textareaRef.current.value = "";
+        textareaRef.current.style.height = "auto";
+      }
+      if (onOpenOcr) {
+        onOpenOcr(text, "text");
+      }
     }
   };
-
   const updateTransCost = (r: number, c: number, val: number) => {
     const nextCosts = transProblem.costs.map((row, ri) =>
       row.map((cell, ci) => (ri === r && ci === c ? val : cell))
@@ -1980,8 +1994,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               <Plus className="w-4 h-4" />
             </button>
 
-            {/* Multiline/Auto-expanding input */}
             <textarea
+              ref={textareaRef}
               rows={1}
               value={quickQuestionText}
               onChange={(e) => {
