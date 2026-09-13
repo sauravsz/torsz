@@ -11,9 +11,10 @@ import {
   ChevronDown,
   Sparkles,
   ArrowUp,
+  AlignLeft,
 } from "lucide-react";
+import { formatSqlQuery } from "../services/sqlFormatter";
 import { DatabaseSchema } from "../types";
-
 const LOCAL_STORAGE_WORKSHEETS_KEY = "torsz_monaco_worksheets";
 
 interface WorksheetTab {
@@ -147,8 +148,14 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onExecute();
     });
-  };
 
+    editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+      const current = editor.getValue();
+      const formatted = formatSqlQuery(current);
+      editor.setValue(formatted);
+      onChangeSql(formatted);
+    });
+  };
   const handlePromptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!promptText.trim() || !onGenerateFromPrompt) return;
@@ -275,7 +282,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
             )}
           </div>
 
-          {/* More Actions (Explain Plan / Clear) */}
+          {/* More Actions (Explain Plan / Format / Clear) */}
           <div className="relative">
             <button
               onClick={() => setShowMoreActions(!showMoreActions)}
@@ -286,7 +293,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
             </button>
 
             {showMoreActions && (
-              <div className="absolute right-0 top-7 w-44 bg-surface-dark border border-surface-dark-elevated rounded-xl shadow-2xl p-1 z-50 animate-keyframe-fade-up text-[11px]">
+              <div className="absolute right-0 top-7 w-48 bg-surface-dark border border-surface-dark-elevated rounded-xl shadow-2xl p-1 z-50 animate-keyframe-fade-up text-[11px]">
                 {onExplainPlan && (
                   <button
                     onClick={() => {
@@ -301,6 +308,17 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
                 )}
                 <button
                   onClick={() => {
+                    const formatted = formatSqlQuery(sql);
+                    onChangeSql(formatted);
+                    setShowMoreActions(false);
+                  }}
+                  className="w-full flex items-center gap-1.5 p-2 rounded-lg hover:bg-surface-dark-elevated text-on-dark transition-colors"
+                >
+                  <AlignLeft className="w-3.5 h-3.5 text-accent-amber" />
+                  <span>Format SQL (⇧⌥F)</span>
+                </button>
+                <button
+                  onClick={() => {
                     onChangeSql("");
                     setShowMoreActions(false);
                   }}
@@ -312,7 +330,6 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
               </div>
             )}
           </div>
-
           {/* Primary Run Button */}
           <button
             onClick={onExecute}

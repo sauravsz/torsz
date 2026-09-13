@@ -5,13 +5,14 @@ export default defineConfig({
   plugins: [react()],
   build: {
     target: "esnext",
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ["react", "react-dom", "lucide-react", "clsx", "tailwind-merge"],
           monaco: ["monaco-editor", "@monaco-editor/react"],
           spreadsheet: ["xlsx", "papaparse"],
+          ocr: ["tesseract.js", "heic2any"],
         },
       },
     },

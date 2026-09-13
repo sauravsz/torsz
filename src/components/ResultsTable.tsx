@@ -214,7 +214,17 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
 
   const exportCsv = () => {
     if (!result || result.columns.length === 0) return;
-    const header = result.columns.map((c) => `"${c.name}"`).join(",");
+
+    const escapeCsvCell = (val: unknown): string => {
+      if (val === null || val === undefined) return "";
+      const str = String(val);
+      if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const header = result.columns.map((c) => escapeCsvCell(c.name)).join(",");
     const rows = result.rows
       .map((row, rowIdx) =>
         row
@@ -223,14 +233,13 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
               (u) => u.rowIdx === rowIdx && u.colIdx === colIdx
             );
             const effectiveVal = pending ? pending.newVal : val;
-            if (effectiveVal === null || effectiveVal === undefined) return '""';
-            return `"${String(effectiveVal).replace(/"/g, '""')}"`;
+            return escapeCsvCell(effectiveVal);
           })
           .join(",")
       )
-      .join("\n");
+      .join("\r\n");
 
-    const blob = new Blob([`${header}\n${rows}`], { type: "text/csv" });
+    const blob = new Blob([`${header}\r\n${rows}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

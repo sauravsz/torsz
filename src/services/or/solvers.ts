@@ -62,9 +62,9 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   const tableaus: SimplexTableauIteration[] = [];
   let iterations = 0;
   const maxIterations = 50;
+  let isUnbounded = false;
 
   while (iterations < maxIterations) {
-    // Check optimality: find entering variable (most negative in Z row)
     let pivotCol = -1;
     let minVal = -1e-6;
 
@@ -109,7 +109,11 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       ratios: ratios.length > 0 ? ratios : undefined,
     });
 
-    if (pivotCol === -1 || pivotRow === -1) {
+    if (pivotCol !== -1 && pivotRow === -1) {
+      isUnbounded = true;
+      break;
+    }
+    if (pivotCol === -1) {
       break;
     }
 
@@ -166,8 +170,8 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   }
 
   return {
-    status: "optimal",
-    objectiveValue: Math.round(optimalZ * 1000) / 1000,
+    status: isUnbounded ? "unbounded" : "optimal",
+    objectiveValue: isUnbounded ? Infinity : Math.round(optimalZ * 1000) / 1000,
     variableValues: varNames.map((name) => ({
       name,
       value: Math.round((varMap[name] || 0) * 1000) / 1000,
@@ -1151,17 +1155,21 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
     const r = lambda / mu;
     const rho = r / c;
 
-    let sumTerms = 0;
-    let fact = 1;
-    for (let n = 0; n < c; n++) {
-      if (n > 0) fact *= n;
-      sumTerms += Math.pow(r, n) / fact;
+    // Iteratively compute terms: term[n] = (r^n / n!) using recurrence term[n] = term[n-1] * (r / n)
+    let sumTerms = 1.0; // n=0 term: r^0 / 0! = 1
+    let currentTerm = 1.0;
+
+    for (let n = 1; n < c; n++) {
+      currentTerm *= r / n;
+      sumTerms += currentTerm;
     }
-    fact *= c;
-    const lastTerm = Math.pow(r, c) / (fact * (1 - rho));
+
+    // Term for n = c
+    const termC = currentTerm * (r / c);
+    const lastTerm = termC / (1 - rho);
     const p0 = 1 / (sumTerms + lastTerm);
 
-    const Lq = (p0 * Math.pow(r, c) * rho) / (fact * Math.pow(1 - rho, 2));
+    const Lq = (p0 * termC * rho) / Math.pow(1 - rho, 2);
     const Ls = Lq + r;
     const Wq = Lq / lambda;
     const Ws = Wq + 1 / mu;

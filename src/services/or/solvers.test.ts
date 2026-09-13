@@ -58,6 +58,19 @@ describe("TORA Operations Research Multi-Scenario Test Suite", () => {
     expect(sol.status).toBe("optimal");
     expect(sol.objectiveValue).toBeLessThanOrEqual(50);
   });
+  it("detects unbounded feasible region in Simplex method", () => {
+    const lp: LpProblem = {
+      objective: "max",
+      objectiveCoefficients: [2, 1],
+      constraints: [
+        { coefficients: [1, -1], operator: "<=", rhs: 10 },
+        { coefficients: [2, 0], operator: "<=", rhs: 40 },
+      ],
+    };
+    const sol = solveLinearProgramming(lp);
+    expect(sol.status).toBe("unbounded");
+    expect(sol.objectiveValue).toBe(Infinity);
+  });
 
   // 2. Transportation Model (Vogel's VAM)
   it("solves balanced 3x4 transportation matrix with VAM", () => {

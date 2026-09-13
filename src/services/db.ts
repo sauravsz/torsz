@@ -163,21 +163,22 @@ export async function executeQuery(_connectionId: string, sql: string): Promise<
   const startTime = performance.now();
 
   try {
-    // Execute batch script (handles multi-statement CREATE/INSERT/SELECT scripts)
+    // Execute SQL query
     const execResults = db.exec(sql);
     const executionTime = Math.round(performance.now() - startTime);
 
     // Persist changes if statement is DDL or DML
-    const upper = sql.toUpperCase();
+    const upper = sql.trim().toUpperCase();
     if (
       upper.includes("CREATE") ||
       upper.includes("INSERT") ||
       upper.includes("UPDATE") ||
       upper.includes("DELETE") ||
       upper.includes("DROP") ||
-      upper.includes("ALTER")
+      upper.includes("ALTER") ||
+      upper.includes("REPLACE")
     ) {
-      persistCurrentDatabase();
+      await persistCurrentDatabase();
     }
 
     if (execResults.length > 0) {

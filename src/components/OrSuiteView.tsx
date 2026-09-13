@@ -13,6 +13,7 @@ import {
   Database,
   FileCode,
   X,
+  ChevronDown,
 } from "lucide-react";
 import {
   OrModule,
@@ -57,6 +58,8 @@ import { BranchAndBoundTree } from "./BranchAndBoundTree";
 import { MultiScenarioSensitivitySweep } from "./MultiScenarioSensitivitySweep";
 import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
 import { extractTransportationProblem, extractAssignmentProblem } from "../services/ocrMatrixParser";
+import { loadSavedSolverState, saveSolverState } from "../services/orStateManager";
+import { BENCHMARKS } from "../services/orBenchmarks";
 import {
   detectImportableTables,
   importNetworkEdgesFromDb,
@@ -107,119 +110,129 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   }, [controlledModule]);
   // 1. Transportation & Assignment State (Editable)
   // ==========================================
-  const [transProblem, setTransProblem] = useState<TransportationProblem>({
-    sources: ["Plant 1", "Plant 2", "Plant 3"],
-    destinations: ["Market 1", "Market 2", "Market 3", "Market 4"],
-    supply: [15, 25, 10],
-    demand: [5, 15, 15, 15],
-    costs: [
-      [10, 2, 20, 11],
-      [12, 7, 9, 20],
-      [4, 14, 16, 18],
-    ],
-  });
+  const [transProblem, setTransProblem] = useState<TransportationProblem>(() =>
+    loadSavedSolverState<TransportationProblem>("trans", {
+      sources: ["Plant 1", "Plant 2", "Plant 3"],
+      destinations: ["Market 1", "Market 2", "Market 3", "Market 4"],
+      supply: [15, 25, 10],
+      demand: [5, 15, 15, 15],
+      costs: [
+        [10, 2, 20, 11],
+        [12, 7, 9, 20],
+        [4, 14, 16, 18],
+      ],
+    })
+  );
 
-  const [assignProblem, setAssignProblem] = useState<AssignmentProblem>({
-    workers: ["Worker 1", "Worker 2", "Worker 3", "Worker 4"],
-    jobs: ["Job A", "Job B", "Job C", "Job D"],
-    costs: [
-      [1, 4, 6, 3],
-      [9, 7, 10, 9],
-      [4, 5, 11, 7],
-      [8, 7, 8, 5],
-    ],
-  });
+  const [assignProblem, setAssignProblem] = useState<AssignmentProblem>(() =>
+    loadSavedSolverState<AssignmentProblem>("assign", {
+      workers: ["Worker 1", "Worker 2", "Worker 3", "Worker 4"],
+      jobs: ["Job A", "Job B", "Job C", "Job D"],
+      costs: [
+        [1, 4, 6, 3],
+        [9, 7, 10, 9],
+        [4, 5, 11, 7],
+        [8, 7, 8, 5],
+      ],
+    })
+  );
 
-  // ==========================================
-  // 2. Linear Programming State (Editable)
-  // ==========================================
-  const [lpProblem, setLpProblem] = useState<LpProblem>({
-    objective: "max",
-    objectiveCoefficients: [5, 4],
-    constraints: [
-      { coefficients: [6, 4], operator: "<=", rhs: 24 },
-      { coefficients: [1, 2], operator: "<=", rhs: 6 },
-      { coefficients: [-1, 1], operator: "<=", rhs: 1 },
-      { coefficients: [0, 1], operator: "<=", rhs: 2 },
-    ],
-    variableNames: ["x1", "x2"],
-  });
+  const [lpProblem, setLpProblem] = useState<LpProblem>(() =>
+    loadSavedSolverState<LpProblem>("lp", {
+      objective: "max",
+      objectiveCoefficients: [5, 4],
+      constraints: [
+        { coefficients: [6, 4], operator: "<=", rhs: 24 },
+        { coefficients: [1, 2], operator: "<=", rhs: 6 },
+        { coefficients: [-1, 1], operator: "<=", rhs: 1 },
+        { coefficients: [0, 1], operator: "<=", rhs: 2 },
+      ],
+      variableNames: ["x1", "x2"],
+    })
+  );
 
-  // ==========================================
-  // 3. Network Models State (Editable)
-  // ==========================================
-  const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>([
-    { from: 1, to: 2, cost: 4000 },
-    { from: 1, to: 3, cost: 5400 },
-    { from: 1, to: 4, cost: 9800 },
-    { from: 2, to: 3, cost: 4300 },
-    { from: 2, to: 4, cost: 6200 },
-    { from: 2, to: 5, cost: 8700 },
-    { from: 3, to: 4, cost: 4800 },
-    { from: 3, to: 5, cost: 7100 },
-    { from: 4, to: 5, cost: 4900 },
-  ]);
+  const [networkEdges, setNetworkEdges] = useState<NetworkEdge[]>(() =>
+    loadSavedSolverState<NetworkEdge[]>("edges", [
+      { from: 1, to: 2, cost: 4000 },
+      { from: 1, to: 3, cost: 5400 },
+      { from: 1, to: 4, cost: 9800 },
+      { from: 2, to: 3, cost: 4300 },
+      { from: 2, to: 4, cost: 6200 },
+      { from: 2, to: 5, cost: 8700 },
+      { from: 3, to: 4, cost: 4800 },
+      { from: 3, to: 5, cost: 7100 },
+      { from: 4, to: 5, cost: 4900 },
+    ])
+  );
   const [netStartNode, setNetStartNode] = useState("1");
   const [netEndNode, setNetEndNode] = useState("5");
 
-  // ==========================================
-  // 4. Project Planning State (Editable)
-  // ==========================================
-  const [cpmActivities, setCpmActivities] = useState<CpmActivity[]>([
-    { id: "A", name: "Site Prep", predecessors: [], duration: 2, optimisticA: 1, mostLikelyM: 2, pessimisticB: 3 },
-    { id: "B", name: "Foundation", predecessors: ["A"], duration: 4, optimisticA: 2, mostLikelyM: 4, pessimisticB: 6 },
-    { id: "C", name: "Framing", predecessors: ["B"], duration: 10, optimisticA: 6, mostLikelyM: 10, pessimisticB: 14 },
-    { id: "D", name: "Roofing", predecessors: ["C"], duration: 6, optimisticA: 4, mostLikelyM: 6, pessimisticB: 8 },
-    { id: "E", name: "Electrical", predecessors: ["C"], duration: 4, optimisticA: 3, mostLikelyM: 4, pessimisticB: 5 },
-    { id: "F", name: "Plumbing", predecessors: ["C"], duration: 5, optimisticA: 4, mostLikelyM: 5, pessimisticB: 6 },
-    { id: "G", name: "Finish", predecessors: ["D", "E", "F"], duration: 7, optimisticA: 5, mostLikelyM: 7, pessimisticB: 9 },
-  ]);
+  const [cpmActivities, setCpmActivities] = useState<CpmActivity[]>(() =>
+    loadSavedSolverState<CpmActivity[]>("cpm", [
+      { id: "A", name: "Site Prep", predecessors: [], duration: 2, optimisticA: 1, mostLikelyM: 2, pessimisticB: 3 },
+      { id: "B", name: "Foundation", predecessors: ["A"], duration: 4, optimisticA: 2, mostLikelyM: 4, pessimisticB: 6 },
+      { id: "C", name: "Framing", predecessors: ["B"], duration: 10, optimisticA: 6, mostLikelyM: 10, pessimisticB: 14 },
+      { id: "D", name: "Roofing", predecessors: ["C"], duration: 6, optimisticA: 4, mostLikelyM: 6, pessimisticB: 8 },
+      { id: "E", name: "Electrical", predecessors: ["C"], duration: 4, optimisticA: 3, mostLikelyM: 4, pessimisticB: 5 },
+      { id: "F", name: "Plumbing", predecessors: ["C"], duration: 5, optimisticA: 4, mostLikelyM: 5, pessimisticB: 6 },
+      { id: "G", name: "Finish", predecessors: ["D", "E", "F"], duration: 7, optimisticA: 5, mostLikelyM: 7, pessimisticB: 9 },
+    ])
+  );
 
-  // ==========================================
-  // 5. Queuing Models State (Editable)
-  // ==========================================
-  const [queuingProblem, setQueuingProblem] = useState<QueuingProblem>({
-    model: "M/M/1",
-    arrivalRateLambda: 2,
-    serviceRateMu: 3,
-    serversCountC: 1,
-  });
+  const [queuingProblem, setQueuingProblem] = useState<QueuingProblem>(() =>
+    loadSavedSolverState<QueuingProblem>("queuing", {
+      model: "M/M/1",
+      arrivalRateLambda: 2,
+      serviceRateMu: 3,
+      serversCountC: 1,
+    })
+  );
 
-  // ==========================================
-  // 6. Zero-Sum Games State (Editable)
-  // ==========================================
-  const [gameProblem, setGameProblem] = useState<ZeroSumGameProblem>({
-    player1Strategies: ["A1", "A2", "A3"],
-    player2Strategies: ["B1", "B2", "B3", "B4"],
-    payoffMatrix: [
-      [3, -1, 4, 2],
-      [-1, -3, -7, 0],
-      [4, 0, 6, 3],
-    ],
-  });
+  const [gameProblem, setGameProblem] = useState<ZeroSumGameProblem>(() =>
+    loadSavedSolverState<ZeroSumGameProblem>("game", {
+      player1Strategies: ["A1", "A2", "A3"],
+      player2Strategies: ["B1", "B2", "B3", "B4"],
+      payoffMatrix: [
+        [3, -1, 4, 2],
+        [-1, -3, -7, 0],
+        [4, 0, 6, 3],
+      ],
+    })
+  );
 
-  // ==========================================
-  // 7. Inventory Control State (Editable)
-  // ==========================================
-  const [inventoryProblem, setInventoryProblem] = useState<InventoryProblem>({
-    model: "classic-eoq",
-    annualDemandD: 1000,
-    orderingCostK: 100,
-    holdingCostH: 2,
-    unitPriceC: 10,
-    shortageCostP: 5,
-  });
+  const [inventoryProblem, setInventoryProblem] = useState<InventoryProblem>(() =>
+    loadSavedSolverState<InventoryProblem>("inventory", {
+      model: "classic-eoq",
+      annualDemandD: 1000,
+      orderingCostK: 100,
+      holdingCostH: 2,
+      unitPriceC: 10,
+      shortageCostP: 5,
+    })
+  );
 
-  // ==========================================
-  // 8. Linear Equations State (Editable)
-  // ==========================================
-  const [linearEqA, setLinearEqA] = useState<number[][]>([
-    [2, 1, -1],
-    [-3, -1, 2],
-    [-2, 1, 2],
-  ]);
-  const [linearEqB, setLinearEqB] = useState<number[]>([8, -11, -3]);
+  const [linearEqA, setLinearEqA] = useState<number[][]>(() =>
+    loadSavedSolverState<number[][]>("linearEqA", [
+      [2, 1, -1],
+      [-3, -1, 2],
+      [-2, 1, 2],
+    ])
+  );
+  const [linearEqB, setLinearEqB] = useState<number[]>(() =>
+    loadSavedSolverState<number[]>("linearEqB", [8, -11, -3])
+  );
 
+  // Sync to localStorage on changes
+  useEffect(() => { saveSolverState("trans", transProblem); }, [transProblem]);
+  useEffect(() => { saveSolverState("assign", assignProblem); }, [assignProblem]);
+  useEffect(() => { saveSolverState("lp", lpProblem); }, [lpProblem]);
+  useEffect(() => { saveSolverState("edges", networkEdges); }, [networkEdges]);
+  useEffect(() => { saveSolverState("cpm", cpmActivities); }, [cpmActivities]);
+  useEffect(() => { saveSolverState("queuing", queuingProblem); }, [queuingProblem]);
+  useEffect(() => { saveSolverState("game", gameProblem); }, [gameProblem]);
+  useEffect(() => { saveSolverState("inventory", inventoryProblem); }, [inventoryProblem]);
+  useEffect(() => { saveSolverState("linearEqA", linearEqA); }, [linearEqA]);
+  useEffect(() => { saveSolverState("linearEqB", linearEqB); }, [linearEqB]);
   // Solution State Outputs
   const [transSol, setTransSol] = useState<TransportationSolution | null>(null);
   const [assignSol, setAssignSol] = useState<AssignmentSolution | null>(null);
@@ -234,6 +247,53 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const [availableDbTables, setAvailableDbTables] = useState<AvailableImportTable[]>([]);
   const [copiedLatex, setCopiedLatex] = useState(false);
 
+  const [showBenchmarks, setShowBenchmarks] = useState(false);
+
+  const loadBenchmark = (b: any) => {
+    setShowBenchmarks(false);
+    if (activeModule === "transportation-assignment") {
+      if (transSubtype === "hungarian-assignment") {
+        setAssignProblem(b.data);
+        const sol = solveHungarianAssignment(b.data);
+        setAssignSol(sol);
+      } else {
+        setTransProblem(b.data);
+        const sol = solveTransportation(b.data);
+        setTransSol(sol);
+      }
+    } else if (activeModule === "linear-programming") {
+      setLpProblem(b.data);
+      const sol = solveLinearProgramming(b.data);
+      setLpSol(sol);
+    } else if (activeModule === "network-models") {
+      setNetworkEdges(b.data.edges);
+      if (b.data.startNode) setNetStartNode(b.data.startNode);
+      if (b.data.endNode) setNetEndNode(b.data.endNode);
+      const sol = networkSubtype === "minimum-spanning-tree" ? solveNetworkMst(b.data.edges) : networkSubtype === "maximal-flow" ? solveNetworkMaxFlow(b.data.edges, b.data.startNode || "1", b.data.endNode || "5") : solveNetworkShortestRoute(b.data.edges, b.data.startNode || "1", b.data.endNode || "5");
+      setNetworkSol(sol);
+    } else if (activeModule === "project-planning") {
+      setCpmActivities(b.data);
+      const sol = solveCpmPert(b.data);
+      setCpmSol(sol);
+    } else if (activeModule === "inventory-control") {
+      setInventoryProblem(b.data);
+      const sol = solveInventoryControl(b.data);
+      setInventorySol(sol);
+    } else if (activeModule === "queuing-models") {
+      setQueuingProblem(b.data);
+      const sol = solveQueuing(b.data);
+      setQueuingSol(sol);
+    } else if (activeModule === "zero-sum-games") {
+      setGameProblem(b.data);
+      const sol = solveZeroSumGame(b.data);
+      setGameSol(sol);
+    } else if (activeModule === "linear-equations") {
+      setLinearEqA(b.data.matrixA);
+      setLinearEqB(b.data.vectorB);
+      const sol = solveLinearEquations(b.data.matrixA, b.data.vectorB);
+      setLinearEqSol(sol);
+    }
+  };
   const handleOpenDbImport = async () => {
     const tables = await detectImportableTables();
     setAvailableDbTables(tables);
@@ -684,15 +744,66 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       {/* Main Module Solver Content */}
       <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-28">
         <div className="flex items-center justify-between gap-3 text-xs shrink-0 pb-1 border-b border-hairline-soft">
-          <button
-            onClick={handleOpenDbImport}
-            className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-card px-2.5 py-1 rounded-lg border border-hairline transition-colors"
-            title="Import active SQLite database table into this solver"
-          >
-            <Database className="w-3.5 h-3.5 text-primary" />
-            <span>Import Table</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Benchmark Problems Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowBenchmarks(!showBenchmarks)}
+                className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg border border-primary/30 transition-colors shadow-2xs"
+                title="Load classic textbook benchmark problems"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Benchmark Examples</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
 
+              {showBenchmarks && (
+                <div className="absolute left-0 top-8 w-72 bg-surface-card border border-hairline rounded-2xl shadow-2xl p-2 z-50 animate-keyframe-fade-up space-y-1">
+                  <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                    Textbook Benchmark Problems
+                  </div>
+                  {((activeModule === "transportation-assignment"
+                    ? (transSubtype === "hungarian-assignment" ? BENCHMARKS.assign : BENCHMARKS.trans)
+                    : activeModule === "linear-programming"
+                    ? BENCHMARKS.lp
+                    : activeModule === "network-models"
+                    ? BENCHMARKS.network
+                    : activeModule === "project-planning"
+                    ? BENCHMARKS.cpm
+                    : activeModule === "inventory-control"
+                    ? BENCHMARKS.inventory
+                    : activeModule === "queuing-models"
+                    ? BENCHMARKS.queuing
+                    : activeModule === "zero-sum-games"
+                    ? BENCHMARKS.game
+                    : BENCHMARKS.linearEq) || []
+                  ).map((b: any) => (
+                    <button
+                      key={b.id}
+                      onClick={() => loadBenchmark(b)}
+                      className="w-full text-left p-2 rounded-xl hover:bg-surface-cream transition-colors group"
+                    >
+                      <div className="text-xs font-semibold text-ink group-hover:text-primary">
+                        {b.title}
+                      </div>
+                      <div className="text-[11px] text-muted line-clamp-1">
+                        {b.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleOpenDbImport}
+              className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-card px-2.5 py-1 rounded-lg border border-hairline transition-colors"
+              title="Import active SQLite database table into this solver"
+            >
+              <Database className="w-3.5 h-3.5 text-primary" />
+              <span>Import Table</span>
+            </button>
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               onClick={handleExportLatex}

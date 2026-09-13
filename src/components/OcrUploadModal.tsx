@@ -308,9 +308,12 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   return (
     <div
       onPaste={handlePaste}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 select-none transition-opacity duration-300 ease-apple-ease"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 select-none transition-opacity duration-300 ease-apple-ease overflow-y-auto"
     >
-      <div className="bg-surface-card border border-hairline w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-keyframe-scale">
+      <div className="bg-surface-card border border-hairline w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-keyframe-scale my-auto">
         {/* Header */}
         <div className="px-6 py-4 border-b border-hairline flex items-center justify-between bg-surface-soft">
           <div className="flex items-center gap-3">

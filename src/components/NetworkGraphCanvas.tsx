@@ -30,7 +30,7 @@ export const NetworkGraphCanvas: React.FC<NetworkGraphCanvasProps> = ({
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Compute circular layout for nodes on initial load or when edge vertex set changes
+  // Compute circular layout for nodes on initial load or when edge vertex set changes, preserving dragged positions
   useEffect(() => {
     const nodeSet = new Set<string>();
     for (const e of edges) {
@@ -51,18 +51,25 @@ export const NetworkGraphCanvas: React.FC<NetworkGraphCanvasProps> = ({
     const radiusX = (width - 2 * padding) / 2.2;
     const radiusY = (height - 2 * padding) / 2.2;
 
-    const computed: GraphNode[] = nodeIds.map((id, idx) => {
-      const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
-      return {
-        id,
-        x: centerX + radiusX * Math.cos(angle),
-        y: centerY + radiusY * Math.sin(angle),
-      };
+    setNodes((prevNodes) => {
+      const existingMap = new Map<string, { x: number; y: number }>(
+        prevNodes.map((n) => [n.id, { x: n.x, y: n.y }])
+      );
+
+      return nodeIds.map((id, idx) => {
+        const saved = existingMap.get(id);
+        if (saved) {
+          return { id, x: saved.x, y: saved.y };
+        }
+        const angle = (2 * Math.PI * idx) / total - Math.PI / 2;
+        return {
+          id,
+          x: centerX + radiusX * Math.cos(angle),
+          y: centerY + radiusY * Math.sin(angle),
+        };
+      });
     });
-
-    setNodes(computed);
   }, [edges]);
-
   const handleNodeMouseDown = (nodeId: string, e: React.MouseEvent) => {
     e.preventDefault();
     setDraggingNodeId(nodeId);

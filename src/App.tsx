@@ -10,6 +10,8 @@ import { HistoryModal } from "./components/HistoryModal";
 import { ConnectionModal } from "./components/ConnectionModal";
 import { OcrUploadModal } from "./components/OcrUploadModal";
 import { SqlProfilerModal, QueryPlanStep } from "./components/SqlProfilerModal";
+import { CommandPaletteModal } from "./components/CommandPaletteModal";
+import { applyTheme } from "./services/theme";
 import { ToastProvider, useToast } from "./components/Toast";
 import { ConnectionConfig, DatabaseSchema, QueryResult, TableSchema, ColumnSchema } from "./types";
 import { OrModule, NetworkSubtype, TransSubtype } from "./services/or/types";
@@ -53,6 +55,7 @@ function MainWorkspace() {
   const [ocrInitialMode, setOcrInitialMode] = useState<"image" | "text">("image");
   const [isProfilerOpen, setIsProfilerOpen] = useState(false);
   const [profilerSteps, setProfilerSteps] = useState<QueryPlanStep[]>([]);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [importedOcrData, setImportedOcrData] = useState<{
     module: OrModule;
     networkSubtype?: NetworkSubtype;
@@ -65,6 +68,21 @@ function MainWorkspace() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         setIsSidebarOpen((prev) => !prev);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "1") {
+        e.preventDefault();
+        setActiveView("or");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "2") {
+        e.preventDefault();
+        setActiveView("editor");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "3") {
+        e.preventDefault();
+        setActiveView("diagram");
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "4") {
+        e.preventDefault();
+        setActiveView("ai");
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -377,23 +395,39 @@ function MainWorkspace() {
 
       {/* Main Workspace Layout */}
       <div className="flex flex-1 h-[calc(100vh-3.5rem)] overflow-hidden">
-        {/* Left Schema Sidebar */}
+        {/* Mobile Backdrop */}
         {isSidebarOpen && (
-          <Sidebar
-            activeView={activeView}
-            onSelectView={setActiveView}
-            schema={schema}
-            onSelectTable={handleSelectTable}
-            loadingSchema={loadingSchema}
-            activeOrModule={activeOrModule}
-            onSelectOrModule={(mod) => {
-              setActiveOrModule(mod);
-              setActiveView("or");
-            }}
-            onToggle={() => setIsSidebarOpen(false)}
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden fixed inset-0 z-30 bg-black/40 backdrop-blur-xs transition-opacity"
           />
         )}
 
+        {/* Left Schema Sidebar */}
+        {isSidebarOpen && (
+          <div className="fixed md:static inset-y-14 left-0 z-40 md:z-auto h-[calc(100vh-3.5rem)] shadow-2xl md:shadow-none">
+            <Sidebar
+              activeView={activeView}
+              onSelectView={(v) => {
+                setActiveView(v);
+                if (window.innerWidth < 768) setIsSidebarOpen(false);
+              }}
+              schema={schema}
+              onSelectTable={(t) => {
+                handleSelectTable(t);
+                if (window.innerWidth < 768) setIsSidebarOpen(false);
+              }}
+              loadingSchema={loadingSchema}
+              activeOrModule={activeOrModule}
+              onSelectOrModule={(mod) => {
+                setActiveOrModule(mod);
+                setActiveView("or");
+                if (window.innerWidth < 768) setIsSidebarOpen(false);
+              }}
+              onToggle={() => setIsSidebarOpen(false)}
+            />
+          </div>
+        )}
         {/* Center Canvas Area */}
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft/40">
           <main className="flex-1 flex flex-col h-full overflow-hidden">
@@ -496,6 +530,21 @@ function MainWorkspace() {
         querySql={sql}
         planSteps={profilerSteps}
         onApplyIndexSql={handleApplyIndexSql}
+      />
+
+      {/* Command Palette Modal (⌘K) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onNavigateView={(v) => setActiveView(v)}
+        onSelectOrModule={(mod) => {
+          setActiveOrModule(mod);
+          setActiveView("or");
+        }}
+        onThemeChange={(m) => applyTheme(m)}
+        onOpenOcr={() => setIsOcrOpen(true)}
+        onExecuteQuery={() => handleExecuteQuery()}
+        onExportDb={handleExportDatabase}
       />
     </div>
   );
