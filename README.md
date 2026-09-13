@@ -209,6 +209,18 @@ bun test
 ✓ Zero-Sum Saddle Point Game Theory
 ✓ Gauss-Jordan Linear Equation Solver
 ```
+---
+
+## Acknowledgements & Foundations
+
+`torsz` synthesizes and builds upon several open-source software libraries, research foundations, and architectural projects:
+
+* **[tora-tool/tora](https://github.com/tora-tool/tora)**: The original open-source multi-database C++/Qt SQL IDE, which inspired the modernized zero-install WebAssembly and TypeScript architecture of `torsz`.
+* **[sql-js/sql.js](https://github.com/sql-js/sql.js)**: SQLite compiled to WebAssembly via Emscripten, enabling in-browser relational queries and binary SQLite file import/export.
+* **[RouteIQ](https://github.com/sauravsz/RouteIQ)**: Mathematical models, auto-balancing dummy nodes, and supply chain network optimization algorithms.
+* **[Operations Research: An Introduction (Hamdy A. Taha)](https://www.pearson.com/)**: Theoretical formulations for the TORA optimization suite (Simplex Method, Vogel's Approximation Method, Hungarian Assignment, Dijkstra, Kruskal's MST, Edmonds-Karp Max-Flow / Min-Cut, CPM/PERT, EOQ, and Queuing models).
+* **[microsoft/monaco-editor](https://github.com/microsoft/monaco-editor)**: The code editor powering VS Code, customized in `torsz` with dark product syntax highlighting and schema auto-completion.
+* **[tesseract.js](https://github.com/naptha/tesseract.js)**: Pure JavaScript OCR engine for client-side handwritten and printed question transcription.
 
 ---
 
