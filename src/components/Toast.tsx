@@ -41,11 +41,11 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto bg-canvas border rounded-xl p-3.5 shadow-lg flex items-start gap-3 transition-all duration-200 animate-in slide-in-from-bottom-5 fade-in ${
+            className={`pointer-events-auto bg-surface-card border rounded-2xl p-3.5 shadow-xl flex items-start gap-3 transition-all duration-300 ease-swiftui-spring animate-swiftui-pop ${
               t.type === "success"
-                ? "border-success/40 text-ink"
+                ? "border-success/40 text-ink bg-canvas"
                 : t.type === "error"
-                ? "border-error/40 text-ink bg-[#fdf2f2]"
+                ? "border-error/40 text-ink bg-[#fdf2f2] dark:bg-error/10"
                 : "border-primary/40 text-ink bg-surface-card"
             }`}
           >

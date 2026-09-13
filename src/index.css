@@ -21,6 +21,13 @@
     --color-surface-dark: #181715;
     --color-surface-dark-elevated: #252320;
     --color-surface-dark-soft: #1f1e1b;
+
+    /* SwiftUI Spring & Easing Physics Curves */
+    --ease-swiftui-bouncy: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --ease-swiftui-spring: cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-swiftui-snappy: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-swiftui-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-swiftui-gentle: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -43,14 +50,6 @@
     --color-surface-dark-soft: #1c1b18;
   }
 
-  /* Apple Keyframer Easing Curves */
-  :root {
-    --ease-apple-spring: cubic-bezier(0.32, 0.72, 0, 1);
-    --ease-apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
-    --ease-apple-snappy: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-apple-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
   body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
@@ -58,94 +57,92 @@
 }
 
 /* ========================================================== */
-/* Apple Keyframer Animation & Motion Physics System          */
+/* SwiftUI & Open-SwiftUI Animation & Motion Physics System   */
 /* ========================================================== */
 
-@keyframes keyframe-fade-in-up {
+@keyframes swiftui-spring-pop {
   0% {
     opacity: 0;
-    transform: translateY(12px) scale(0.985);
+    transform: scale(0.92) translateY(6px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.03) translateY(-1px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1) translateY(0);
   }
 }
 
-@keyframes keyframe-fade-in-down {
+@keyframes swiftui-fade-slide-up {
   0% {
     opacity: 0;
-    transform: translateY(-10px) scale(0.985);
+    transform: translateY(14px);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
-@keyframes keyframe-scale-in {
+@keyframes swiftui-stagger-in {
   0% {
     opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes swiftui-pulse-ring {
+  0% {
     transform: scale(0.95);
+    opacity: 0.9;
   }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes keyframe-slide-right {
-  0% {
+  50% {
+    transform: scale(1.4);
     opacity: 0;
-    transform: translateX(-16px);
   }
   100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes keyframe-slide-left {
-  0% {
+    transform: scale(0.95);
     opacity: 0;
-    transform: translateX(16px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
   }
 }
 
-@keyframes keyframe-pulse-glow {
+@keyframes swiftui-glow-pulse {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(204, 120, 92, 0);
   }
   50% {
-    box-shadow: 0 0 18px 3px rgba(204, 120, 92, 0.4);
+    box-shadow: 0 0 16px 3px rgba(204, 120, 92, 0.35);
   }
 }
 
-@keyframes keyframe-pulse-teal {
+@keyframes swiftui-glow-teal {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(93, 184, 166, 0);
   }
   50% {
-    box-shadow: 0 0 16px 3px rgba(93, 184, 166, 0.45);
+    box-shadow: 0 0 14px 2px rgba(93, 184, 166, 0.4);
   }
 }
 
-@keyframes keyframe-draw-line {
+@keyframes swiftui-rotate-spring {
   0% {
-    stroke-dashoffset: 1200;
-    opacity: 0.3;
+    transform: rotate(0deg);
+  }
+  70% {
+    transform: rotate(190deg);
   }
   100% {
-    stroke-dashoffset: 0;
-    opacity: 1;
+    transform: rotate(180deg);
   }
 }
 
-@keyframes keyframe-shimmer {
+@keyframes swiftui-shimmer {
   0% {
     background-position: -200% 0;
   }
@@ -154,80 +151,59 @@
   }
 }
 
-@keyframes keyframe-tab-spring {
-  0% {
-    transform: scaleX(0.75);
-    opacity: 0.5;
-  }
-  100% {
-    transform: scaleX(1);
-    opacity: 1;
-  }
+/* SwiftUI Utility Classes */
+.animate-swiftui-pop {
+  animation: swiftui-spring-pop 320ms var(--ease-swiftui-bouncy) forwards;
 }
 
-/* Keyframer Utility Classes */
-.animate-keyframe-fade-up {
-  animation: keyframe-fade-in-up 350ms var(--ease-apple-spring) forwards;
+.animate-swiftui-slide-up {
+  animation: swiftui-fade-slide-up 280ms var(--ease-swiftui-spring) forwards;
 }
 
-.animate-keyframe-fade-down {
-  animation: keyframe-fade-in-down 300ms var(--ease-apple-spring) forwards;
+.animate-swiftui-stagger {
+  animation: swiftui-stagger-in 220ms var(--ease-swiftui-smooth) forwards;
 }
 
-.animate-keyframe-scale-in {
-  animation: keyframe-scale-in 320ms var(--ease-apple-spring) forwards;
+.animate-swiftui-ring {
+  animation: swiftui-pulse-ring 2s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.animate-keyframe-slide-right {
-  animation: keyframe-slide-right 300ms var(--ease-apple-snappy) forwards;
+.animate-swiftui-glow {
+  animation: swiftui-glow-pulse 2.4s infinite ease-in-out;
 }
 
-.animate-keyframe-slide-left {
-  animation: keyframe-slide-left 300ms var(--ease-apple-snappy) forwards;
+.animate-swiftui-glow-teal {
+  animation: swiftui-glow-teal 2.4s infinite ease-in-out;
 }
 
-.animate-keyframe-pulse-glow {
-  animation: keyframe-pulse-glow 2.2s infinite ease-in-out;
+/* SwiftUI Interactive Button Micro-Physics */
+.swiftui-btn {
+  transition: transform 140ms var(--ease-swiftui-bouncy), background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.animate-keyframe-pulse-teal {
-  animation: keyframe-pulse-teal 2.2s infinite ease-in-out;
-}
-
-.animate-keyframe-draw-line {
-  stroke-dasharray: 1200;
-  animation: keyframe-draw-line 800ms var(--ease-apple-ease) forwards;
-}
-
-.animate-keyframe-shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
-  background-size: 200% 100%;
-  animation: keyframe-shimmer 1.8s infinite;
-}
-
-/* Apple Spring Interactive Element Classes */
-.apple-interactive {
-  transition: all 220ms var(--ease-apple-snappy);
-}
-
-.apple-interactive:hover {
+.swiftui-btn:hover {
   transform: translateY(-1px);
 }
 
-.apple-interactive:active {
-  transform: scale(0.97);
+.swiftui-btn:active {
+  transform: scale(0.95);
 }
 
-.apple-card {
-  transition: transform 250ms var(--ease-apple-spring), box-shadow 250ms var(--ease-apple-spring), border-color 250ms var(--ease-apple-spring);
+/* SwiftUI Card Lift Physics */
+.swiftui-card {
+  transition: transform 220ms var(--ease-swiftui-spring), box-shadow 220ms var(--ease-swiftui-spring), border-color 220ms ease;
 }
 
-.apple-card:hover {
+.swiftui-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.08);
 }
 
-/* Custom Claude Editorial Scrollbars */
+.dark .swiftui-card:hover {
+  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.4);
+}
+
+/* Custom Editorial Scrollbars */
 ::-webkit-scrollbar {
   width: 7px;
   height: 7px;
@@ -240,11 +216,19 @@
 ::-webkit-scrollbar-thumb {
   background: #e6dfd8;
   border-radius: 9999px;
-  transition: background 200ms var(--ease-apple-smooth);
+  transition: background 150ms ease;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2e2c28;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #8e8b82;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6c6a64;
 }
 
 .font-editorial-serif {

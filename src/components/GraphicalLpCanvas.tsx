@@ -22,10 +22,9 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
     .join(" ");
 
   return (
-    <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm flex flex-col md:flex-row gap-6 items-center animate-keyframe-fade-up text-ink">
+    <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm flex flex-col md:flex-row gap-6 items-center animate-swiftui-slide-up text-ink">
       <div className="relative bg-canvas border border-hairline rounded-xl p-2 shadow-inner">
         <svg width={width} height={height} className="overflow-visible">
-          {/* Grid lines */}
           {Array.from({ length: 9 }).map((_, i) => {
             const xVal = (maxX / 8) * i;
             const yVal = (maxY / 8) * i;
@@ -143,15 +142,15 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
             </g>
           ))}
 
-          {/* Optimal Target Vertex with Keyframer Pulse Ring */}
+          {/* Optimal Target Vertex with SwiftUI Pulse Ring */}
           <circle
             cx={scaleX(solution.optimalPoint[0])}
             cy={scaleY(solution.optimalPoint[1])}
-            r="12"
+            r="14"
             fill="none"
             stroke="#cc785c"
-            strokeWidth="1.5"
-            className="animate-ping opacity-75"
+            strokeWidth="2"
+            className="animate-swiftui-ring"
           />
           <circle
             cx={scaleX(solution.optimalPoint[0])}
