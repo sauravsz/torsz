@@ -348,10 +348,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
       )}
 
       {/* Generated Result Card */}
+      {/* Generated Result Card in Light Mode */}
       {result && (
-        <div className="bg-surface-dark border border-surface-dark-elevated rounded-xl p-5 shadow-md space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between text-xs text-on-dark-soft border-b border-surface-dark-elevated pb-3">
-            <span className="font-semibold text-on-dark uppercase tracking-wider flex items-center gap-1.5">
+        <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4 animate-keyframe-fade-up text-ink">
+          <div className="flex items-center justify-between text-xs text-muted border-b border-hairline pb-3">
+            <span className="font-semibold text-ink uppercase tracking-wider flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
               {result.isOptimizationModel
                 ? "Generated Optimization Model & SQL Analysis"
@@ -360,7 +361,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCopy}
-                className="flex items-center gap-1 bg-surface-dark-elevated hover:bg-surface-dark text-on-dark px-2.5 py-1 rounded text-xs transition-colors"
+                className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink px-2.5 py-1 rounded-lg border border-hairline text-xs transition-colors shadow-2xs"
               >
                 {copied ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
                 <span>{copied ? "Copied" : "Copy SQL"}</span>
@@ -369,7 +370,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
               {result.isOptimizationModel && onNavigateToOr && (
                 <button
                   onClick={() => onNavigateToOr(result.orModule)}
-                  className="flex items-center gap-1.5 bg-accent-teal/20 text-accent-teal hover:bg-accent-teal/30 border border-accent-teal/40 font-semibold px-3 py-1 rounded text-xs transition-colors"
+                  className="flex items-center gap-1.5 bg-accent-teal/10 text-accent-teal hover:bg-accent-teal/20 border border-accent-teal/30 font-semibold px-3 py-1 rounded-lg text-xs transition-colors shadow-2xs"
                 >
                   <Calculator className="w-3.5 h-3.5" />
                   <span>Open in TORA Solvers</span>
@@ -378,7 +379,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
               <button
                 onClick={() => onApplySql(result.sql, true)}
-                className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary font-semibold px-3.5 py-1 rounded text-xs transition-colors shadow-xs"
+                className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary font-semibold px-3.5 py-1 rounded-xl text-xs transition-colors shadow-2xs"
               >
                 <Play className="w-3 h-3 fill-current" />
                 <span>Execute Query</span>
@@ -387,13 +388,13 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
           </div>
 
           {/* SQL Block */}
-          <pre className="font-mono text-xs text-on-dark bg-surface-dark-soft p-4 rounded-lg overflow-x-auto leading-relaxed border border-surface-dark-elevated">
+          <pre className="font-mono text-xs text-ink bg-canvas p-4 rounded-xl overflow-x-auto leading-relaxed border border-hairline">
             {result.sql}
           </pre>
 
           {/* Explanation */}
           {result.explanation && (
-            <div className="text-xs text-on-dark-soft flex items-start gap-2 bg-surface-dark-elevated/40 p-3 rounded-lg leading-relaxed whitespace-pre-line">
+            <div className="text-xs text-body flex items-start gap-2 bg-surface-soft p-3.5 rounded-xl border border-hairline leading-relaxed whitespace-pre-line">
               <ArrowRight className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
               <span>{result.explanation}</span>
             </div>
@@ -401,8 +402,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
           {/* Follow-up Question Suggestions */}
           {result.suggestedQuestions && result.suggestedQuestions.length > 0 && (
-            <div className="pt-2 border-t border-surface-dark-elevated space-y-1.5">
-              <span className="text-[11px] text-on-dark-soft font-semibold uppercase tracking-wider">
+            <div className="pt-2 border-t border-hairline space-y-1.5">
+              <span className="text-[11px] text-muted font-semibold uppercase tracking-wider">
                 Follow-up Questions:
               </span>
               <div className="flex flex-wrap gap-2">
@@ -413,7 +414,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                       setPrompt(q);
                       handleGenerate(q);
                     }}
-                    className="text-xs bg-surface-dark-soft hover:bg-surface-dark-elevated text-on-dark px-2.5 py-1 rounded border border-surface-dark-elevated transition-colors"
+                    className="text-xs bg-canvas hover:bg-surface-cream text-ink px-2.5 py-1 rounded-lg border border-hairline transition-colors shadow-2xs"
                   >
                     {q}
                   </button>

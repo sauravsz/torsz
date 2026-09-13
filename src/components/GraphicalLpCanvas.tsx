@@ -22,8 +22,8 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
     .join(" ");
 
   return (
-    <div className="bg-surface-dark border border-surface-dark-elevated rounded-2xl p-5 shadow-md flex flex-col md:flex-row gap-6 items-center animate-keyframe-fade-up">
-      <div className="relative bg-[#141312] border border-surface-dark-elevated rounded-xl p-2 shadow-inner">
+    <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm flex flex-col md:flex-row gap-6 items-center animate-keyframe-fade-up text-ink">
+      <div className="relative bg-canvas border border-hairline rounded-xl p-2 shadow-inner">
         <svg width={width} height={height} className="overflow-visible">
           {/* Grid lines */}
           {Array.from({ length: 9 }).map((_, i) => {
@@ -36,7 +36,7 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
                   y1={scaleY(0)}
                   x2={scaleX(xVal)}
                   y2={scaleY(maxY)}
-                  stroke="#252320"
+                  stroke="#ebe6df"
                   strokeDasharray="2,2"
                 />
                 <line
@@ -44,7 +44,7 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
                   y1={scaleY(yVal)}
                   x2={scaleX(maxX)}
                   y2={scaleY(yVal)}
-                  stroke="#252320"
+                  stroke="#ebe6df"
                   strokeDasharray="2,2"
                 />
                 <text x={scaleX(xVal)} y={height - padding + 18} fill="#6c6a64" fontSize="10" textAnchor="middle" fontFamily="monospace">
@@ -63,21 +63,21 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
             y1={height - padding}
             x2={width - padding + 10}
             y2={height - padding}
-            stroke="#e6dfd8"
-            strokeWidth="2"
+            stroke="#141413"
+            strokeWidth="1.5"
           />
           <line
             x1={padding}
             y1={height - padding}
             x2={padding}
             y2={padding - 10}
-            stroke="#e6dfd8"
-            strokeWidth="2"
+            stroke="#141413"
+            strokeWidth="1.5"
           />
-          <text x={width - padding + 15} y={height - padding + 4} fill="#faf9f5" fontSize="11" fontWeight="bold" fontFamily="sans-serif">
+          <text x={width - padding + 15} y={height - padding + 4} fill="#141413" fontSize="11" fontWeight="bold" fontFamily="sans-serif">
             x₁
           </text>
-          <text x={padding} y={padding - 15} fill="#faf9f5" fontSize="11" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
+          <text x={padding} y={padding - 15} fill="#141413" fontSize="11" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">
             x₂
           </text>
 
@@ -168,10 +168,10 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
       {/* Legend & Vertex Table */}
       <div className="flex-1 space-y-4">
         <div>
-          <h4 className="font-editorial-serif text-xl font-semibold text-on-dark mb-1">
+          <h4 className="font-editorial-serif text-xl font-semibold text-ink mb-1">
             2D Graphical Solution
           </h4>
-          <p className="text-xs text-on-dark-soft">
+          <p className="text-xs text-muted">
             Feasible region shown in <span className="text-accent-teal font-semibold">Teal</span>. Optimal corner point at{" "}
             <span className="text-primary font-bold">
               ({solution.optimalPoint[0]}, {solution.optimalPoint[1]})
@@ -181,8 +181,8 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
         </div>
 
         {/* Constraint Legend */}
-        <div className="space-y-1.5 bg-surface-dark-soft p-3 rounded-xl border border-surface-dark-elevated text-xs font-mono">
-          <span className="text-[10px] uppercase font-semibold text-muted-soft block font-sans mb-1">
+        <div className="space-y-1.5 bg-canvas p-3 rounded-xl border border-hairline text-xs font-mono">
+          <span className="text-[10px] uppercase font-semibold text-muted block font-sans mb-1">
             Constraint Lines:
           </span>
           {solution.lines.map((l, i) => {
@@ -190,17 +190,17 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
             return (
               <div key={i} className="flex items-center gap-2">
                 <span className="w-3 h-0.5" style={{ backgroundColor: colors[i % colors.length] }} />
-                <span className="text-on-dark">{l.label}</span>
+                <span className="text-ink">{l.label}</span>
               </div>
             );
           })}
         </div>
 
         {/* Vertex Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-2">
           <table className="w-full text-left font-mono text-xs border-collapse">
             <thead>
-              <tr className="border-b border-surface-dark-elevated text-muted-soft">
+              <tr className="border-b border-hairline text-muted">
                 <th className="p-1.5">Corner (x₁, x₂)</th>
                 <th className="p-1.5">Z Value</th>
                 <th className="p-1.5">Status</th>
@@ -212,8 +212,8 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
                 .map((p, i) => (
                   <tr
                     key={i}
-                    className={`border-b border-surface-dark-elevated/40 ${
-                      p.isOptimal ? "bg-primary/20 text-primary font-bold" : "text-on-dark"
+                    className={`border-b border-hairline-soft ${
+                      p.isOptimal ? "bg-primary/10 text-primary font-bold" : "text-ink"
                     }`}
                   >
                     <td className="p-1.5">

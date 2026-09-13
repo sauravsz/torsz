@@ -750,18 +750,18 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
 
                   {/* Solution Output */}
                   {transSol && (
-                    <div className="bg-surface-dark text-on-dark p-5 rounded-2xl border border-surface-dark-elevated space-y-3 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between border-b border-surface-dark-elevated pb-2">
+                    <div className="bg-surface-card text-ink p-5 rounded-2xl border border-hairline space-y-3 animate-keyframe-fade-up shadow-sm">
+                      <div className="flex items-center justify-between border-b border-hairline pb-2">
                         <span className="font-semibold text-base">Optimal Distribution Plan</span>
                         <span className="text-lg font-mono font-bold text-primary">
                           Total Minimum Cost: ${transSol.totalCost.toLocaleString()}
                         </span>
                       </div>
 
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-1">
                         <table className="w-full text-left font-mono text-xs">
                           <thead>
-                            <tr className="text-on-dark-soft border-b border-surface-dark-elevated">
+                            <tr className="text-muted border-b border-hairline bg-surface-soft">
                               <th className="p-2">From Source \ To Dest</th>
                               {transProblem.destinations.map((d, c) => (
                                 <th key={c} className="p-2">{d}</th>
@@ -770,14 +770,14 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                           </thead>
                           <tbody>
                             {transProblem.sources.map((s, r) => (
-                              <tr key={r} className="border-b border-surface-dark-elevated/40">
-                                <td className="p-2 font-semibold text-on-dark">{s}</td>
+                              <tr key={r} className="border-b border-hairline-soft">
+                                <td className="p-2 font-semibold text-ink">{s}</td>
                                 {transProblem.destinations.map((_, c) => {
                                   const alloc = transSol.allocations[r]?.[c] || 0;
                                   return (
                                     <td key={c} className="p-2">
                                       {alloc > 0 ? (
-                                        <span className="bg-primary/20 text-primary font-bold px-2 py-0.5 rounded border border-primary/30">
+                                        <span className="bg-primary/10 text-primary font-bold px-2 py-0.5 rounded border border-primary/20">
                                           {alloc} units (${transProblem.costs[r][c] * alloc})
                                         </span>
                                       ) : (
@@ -883,8 +883,8 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
 
                   {/* Solution Output */}
                   {assignSol && (
-                    <div className="bg-surface-dark text-on-dark p-5 rounded-2xl border border-surface-dark-elevated space-y-4 animate-in fade-in duration-200">
-                      <div className="flex items-center justify-between border-b border-surface-dark-elevated pb-2">
+                    <div className="bg-surface-card text-ink p-5 rounded-2xl border border-hairline space-y-4 animate-keyframe-fade-up shadow-sm">
+                      <div className="flex items-center justify-between border-b border-hairline pb-2">
                         <span className="font-semibold text-base">Optimal One-to-One Matchings</span>
                         <span className="text-lg font-mono font-bold text-primary">
                           Total Assignment Cost: ${assignSol.totalCost}
@@ -894,9 +894,9 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                         {assignSol.assignments.map((a, i) => (
                           <div
                             key={i}
-                            className="bg-surface-dark-soft p-3 rounded-xl border border-surface-dark-elevated flex items-center justify-between text-xs"
+                            className="bg-canvas p-3 rounded-xl border border-hairline flex items-center justify-between text-xs"
                           >
-                            <span className="font-semibold text-on-dark">
+                            <span className="font-semibold text-ink">
                               {a.worker} → {a.job}
                             </span>
                             <span className="font-mono text-accent-teal font-bold">
@@ -1297,11 +1297,11 @@ FROM lp_variables;`)
 
               {/* Solution Result Card */}
               {networkSol && (
-                <div className="bg-surface-dark text-on-dark border border-surface-dark-elevated rounded-2xl p-6 shadow-md space-y-4 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between border-b border-surface-dark-elevated pb-3">
+                <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
+                  <div className="flex items-center justify-between border-b border-hairline pb-3">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-success" />
-                      <h4 className="font-editorial-serif text-xl font-medium text-on-dark">
+                      <h4 className="font-editorial-serif text-xl font-medium text-ink">
                         {networkSubtype === "shortest-route"
                           ? "Optimal Shortest Route"
                           : networkSubtype === "minimum-spanning-tree"
@@ -1314,8 +1314,8 @@ FROM lp_variables;`)
                     </span>
                   </div>
 
-                  <p className="text-xs text-on-dark-soft font-mono">
-                    Sequence: <span className="text-on-dark font-bold">{networkSol.pathString}</span>
+                  <p className="text-xs text-muted font-mono">
+                    Sequence: <span className="text-ink font-bold">{networkSol.pathString}</span>
                   </p>
                 </div>
               )}
@@ -1458,8 +1458,8 @@ FROM lp_variables;`)
               </div>
 
               {cpmSol && (
-                <div className="bg-surface-dark text-on-dark border border-surface-dark-elevated rounded-2xl p-6 shadow-md space-y-4">
-                  <div className="flex items-center justify-between border-b border-surface-dark-elevated pb-3">
+                <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
+                  <div className="flex items-center justify-between border-b border-hairline pb-3">
                     <span className="font-semibold text-lg">
                       Critical Path: {cpmSol.criticalPath.join(" → ")}
                     </span>
@@ -1468,39 +1468,41 @@ FROM lp_variables;`)
                     </span>
                   </div>
 
-                  <table className="w-full text-left font-mono text-xs">
-                    <thead>
-                      <tr className="border-b border-surface-dark-elevated text-on-dark-soft">
-                        <th className="p-2">Activity</th>
-                        <th className="p-2">Duration</th>
-                        <th className="p-2">ES</th>
-                        <th className="p-2">EF</th>
-                        <th className="p-2">LS</th>
-                        <th className="p-2">LF</th>
-                        <th className="p-2">Slack</th>
-                        <th className="p-2">Critical?</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cpmSol.activities.map((a) => (
-                        <tr
-                          key={a.id}
-                          className={`border-b border-surface-dark-elevated/40 ${
-                            a.isCritical ? "bg-primary/10 text-primary font-bold" : "text-on-dark"
-                          }`}
-                        >
-                          <td className="p-2">{a.id}</td>
-                          <td className="p-2">{a.duration}</td>
-                          <td className="p-2">{a.earlyStart}</td>
-                          <td className="p-2">{a.earlyFinish}</td>
-                          <td className="p-2">{a.lateStart}</td>
-                          <td className="p-2">{a.lateFinish}</td>
-                          <td className="p-2">{a.slack}</td>
-                          <td className="p-2">{a.isCritical ? "YES ★" : "No"}</td>
+                  <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-1">
+                    <table className="w-full text-left font-mono text-xs">
+                      <thead>
+                        <tr className="border-b border-hairline text-muted bg-surface-soft">
+                          <th className="p-2">Activity</th>
+                          <th className="p-2">Duration</th>
+                          <th className="p-2">ES</th>
+                          <th className="p-2">EF</th>
+                          <th className="p-2">LS</th>
+                          <th className="p-2">LF</th>
+                          <th className="p-2">Slack</th>
+                          <th className="p-2">Critical?</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {cpmSol.activities.map((a) => (
+                          <tr
+                            key={a.id}
+                            className={`border-b border-hairline-soft ${
+                              a.isCritical ? "bg-primary/10 text-primary font-bold" : "text-body"
+                            }`}
+                          >
+                            <td className="p-2">{a.id}</td>
+                            <td className="p-2">{a.duration}</td>
+                            <td className="p-2">{a.earlyStart}</td>
+                            <td className="p-2">{a.earlyFinish}</td>
+                            <td className="p-2">{a.lateStart}</td>
+                            <td className="p-2">{a.lateFinish}</td>
+                            <td className="p-2">{a.slack}</td>
+                            <td className="p-2">{a.isCritical ? "YES ★" : "No"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -1590,28 +1592,28 @@ FROM lp_variables;`)
               </div>
 
               {inventorySol && (
-                <div className="bg-surface-dark text-on-dark p-6 rounded-2xl border border-surface-dark-elevated grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div className="bg-surface-dark-soft p-4 rounded-xl border border-surface-dark-elevated text-center">
-                    <span className="text-xs text-on-dark-soft block mb-1">Optimal EOQ (y*)</span>
+                <div className="bg-surface-card text-ink p-6 rounded-2xl border border-hairline grid grid-cols-2 sm:grid-cols-4 gap-4 shadow-sm animate-keyframe-fade-up">
+                  <div className="bg-canvas p-4 rounded-xl border border-hairline text-center shadow-2xs">
+                    <span className="text-xs text-muted block mb-1">Optimal EOQ (y*)</span>
                     <span className="font-mono text-2xl font-bold text-primary">
                       {inventorySol.optimalOrderQtyY} units
                     </span>
                   </div>
-                  <div className="bg-surface-dark-soft p-4 rounded-xl border border-surface-dark-elevated text-center">
-                    <span className="text-xs text-on-dark-soft block mb-1">Cycle Time (t₀)</span>
+                  <div className="bg-canvas p-4 rounded-xl border border-hairline text-center shadow-2xs">
+                    <span className="text-xs text-muted block mb-1">Cycle Time (t₀)</span>
                     <span className="font-mono text-2xl font-bold text-accent-teal">
                       {inventorySol.cycleTimeT0Days} days
                     </span>
                   </div>
-                  <div className="bg-surface-dark-soft p-4 rounded-xl border border-surface-dark-elevated text-center">
-                    <span className="text-xs text-on-dark-soft block mb-1">Annual Holding</span>
+                  <div className="bg-canvas p-4 rounded-xl border border-hairline text-center shadow-2xs">
+                    <span className="text-xs text-muted block mb-1">Annual Holding</span>
                     <span className="font-mono text-2xl font-bold text-accent-amber">
                       ${inventorySol.annualHoldingCost}
                     </span>
                   </div>
-                  <div className="bg-surface-dark-soft p-4 rounded-xl border border-surface-dark-elevated text-center">
-                    <span className="text-xs text-on-dark-soft block mb-1">Total Annual Cost</span>
-                    <span className="font-mono text-2xl font-bold text-on-dark">
+                  <div className="bg-canvas p-4 rounded-xl border border-hairline text-center shadow-2xs">
+                    <span className="text-xs text-muted block mb-1">Total Annual Cost</span>
+                    <span className="font-mono text-2xl font-bold text-ink">
                       ${inventorySol.totalAnnualCost}
                     </span>
                   </div>
@@ -1690,25 +1692,25 @@ FROM lp_variables;`)
               </div>
 
               {queuingSol && (
-                <div className="bg-surface-dark text-on-dark border border-surface-dark-elevated rounded-2xl p-6 shadow-md space-y-4">
-                  <h4 className="font-editorial-serif text-xl font-medium text-on-dark border-b border-surface-dark-elevated pb-3">
+                <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
+                  <h4 className="font-editorial-serif text-xl font-medium text-ink border-b border-hairline pb-3">
                     Steady-State Operating Characteristics
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div className="bg-surface-dark-soft p-3.5 rounded-xl border border-surface-dark-elevated text-center">
-                      <span className="text-xs text-on-dark-soft block mb-1">Utilization (ρ)</span>
+                    <div className="bg-canvas p-3.5 rounded-xl border border-hairline text-center shadow-2xs">
+                      <span className="text-xs text-muted block mb-1">Utilization (ρ)</span>
                       <span className="font-mono text-xl font-bold text-accent-teal">
                         {Math.round(queuingSol.utilizationRho * 1000) / 10}%
                       </span>
                     </div>
-                    <div className="bg-surface-dark-soft p-3.5 rounded-xl border border-surface-dark-elevated text-center">
-                      <span className="text-xs text-on-dark-soft block mb-1">Avg in Queue (Lq)</span>
+                    <div className="bg-canvas p-3.5 rounded-xl border border-hairline text-center shadow-2xs">
+                      <span className="text-xs text-muted block mb-1">Avg in Queue (Lq)</span>
                       <span className="font-mono text-xl font-bold text-primary">
                         {queuingSol.avgInQueueLq} units
                       </span>
                     </div>
-                    <div className="bg-surface-dark-soft p-3.5 rounded-xl border border-surface-dark-elevated text-center">
-                      <span className="text-xs text-on-dark-soft block mb-1">Avg Wait (Wq)</span>
+                    <div className="bg-canvas p-3.5 rounded-xl border border-hairline text-center shadow-2xs">
+                      <span className="text-xs text-muted block mb-1">Avg Wait (Wq)</span>
                       <span className="font-mono text-xl font-bold text-accent-amber">
                         {queuingSol.avgWaitQueueWq} hrs
                       </span>
@@ -1789,11 +1791,11 @@ FROM lp_variables;`)
               </div>
 
               {gameSol && (
-                <div className="bg-surface-dark text-on-dark border border-surface-dark-elevated rounded-2xl p-6 shadow-md space-y-4">
-                  <div className="flex items-center justify-between border-b border-surface-dark-elevated pb-3">
+                <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
+                  <div className="flex items-center justify-between border-b border-hairline pb-3">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="w-5 h-5 text-success" />
-                      <h4 className="font-editorial-serif text-xl font-medium text-on-dark">
+                      <h4 className="font-editorial-serif text-xl font-medium text-ink">
                         {gameSol.hasSaddlePoint
                           ? "Pure Strategy Saddle Point Found"
                           : "Mixed Strategy Matrix"}
@@ -1874,15 +1876,15 @@ FROM lp_variables;`)
               </div>
 
               {linearEqSol && (
-                <div className="bg-surface-dark text-on-dark border border-surface-dark-elevated rounded-2xl p-6 shadow-md space-y-4">
-                  <h4 className="font-editorial-serif text-xl font-medium text-on-dark border-b border-surface-dark-elevated pb-3">
+                <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
+                  <h4 className="font-editorial-serif text-xl font-medium text-ink border-b border-hairline pb-3">
                     Solution Vector x:
                   </h4>
                   <div className="flex gap-4">
                     {linearEqSol.map((val: number, idx: number) => (
                       <div
                         key={idx}
-                        className="bg-surface-dark-soft p-3 rounded-xl border border-surface-dark-elevated font-mono text-base text-accent-teal font-bold"
+                        className="bg-canvas p-3 rounded-xl border border-hairline font-mono text-base text-primary font-bold shadow-2xs"
                       >
                         x{idx + 1} = {val}
                       </div>
