@@ -52,6 +52,11 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     let { coefficients, operator, rhs } = problem.constraints[i];
     let row = [...coefficients];
     while (row.length < numVars) row.push(0);
+    // Simplify >= 0 homogeneous constraints to <= 0 with slack to avoid degenerate artificial variables
+    if (operator === ">=" && rhs === 0) {
+      row = row.map((x) => -x);
+      operator = "<=";
+    }
 
     // Make RHS >= 0
     if (rhs < 0) {
@@ -59,7 +64,6 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       rhs = -rhs;
       operator = operator === "<=" ? ">=" : operator === ">=" ? "<=" : "=";
     }
-
     if (operator === "<=") {
       // Add slack (+1)
       const slackCol = cols.length;

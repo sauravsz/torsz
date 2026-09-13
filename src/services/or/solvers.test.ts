@@ -67,13 +67,20 @@ describe("TORA Operations Research Multi-Scenario Test Suite", () => {
         { coefficients: [270, 241, 331, -1, 1, 0, 0, 0, 0], operator: "=", rhs: 299 },
         { coefficients: [241, 331, 299, 0, 0, -1, 1, 0, 0], operator: "=", rhs: 360 },
         { coefficients: [331, 299, 360, 0, 0, 0, 0, -1, 1], operator: "=", rhs: 340 },
+        { coefficients: [1, 1, 1, 0, 0, 0, 0, 0, 0], operator: "=", rhs: 1 },
         { coefficients: [0, -1, 1, 0, 0, 0, 0, 0, 0], operator: ">=", rhs: 0 },
         { coefficients: [-1, 1, 0, 0, 0, 0, 0, 0, 0], operator: ">=", rhs: 0 },
       ],
     };
     const sol = solveLinearProgramming(lp);
     expect(sol.status).toBe("optimal");
-    expect(sol.objectiveValue).toBeCloseTo(62.258, 1);
+    expect(sol.objectiveValue).toBeCloseTo(51.311, 1);
+    const w1Val = sol.variableValues.find(v => v.name === "w1")?.value || 0;
+    const w2Val = sol.variableValues.find(v => v.name === "w2")?.value || 0;
+    const w3Val = sol.variableValues.find(v => v.name === "w3")?.value || 0;
+    expect(w1Val).toBeCloseTo(0, 2);
+    expect(w2Val).toBeCloseTo(0.356, 2);
+    expect(w3Val).toBeCloseTo(0.644, 2);
   });
   it("detects unbounded feasible region in Simplex method", () => {
     const lp: LpProblem = {
