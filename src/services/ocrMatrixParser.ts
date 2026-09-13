@@ -1,7 +1,8 @@
 import { TransportationProblem, AssignmentProblem } from "./or/types";
 
 /**
- * Extracts a structured transportation cost matrix, supplies, and demands from plain text or Markdown tables.
+ * Robustly extracts a structured transportation cost matrix, supplies, and demands
+ * from plain text, bullet points, key-value assignments, and Markdown tables.
  */
 export function extractTransportationProblem(text: string): TransportationProblem | null {
   const lines = text
@@ -9,15 +10,102 @@ export function extractTransportationProblem(text: string): TransportationProble
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith("---") && !l.startsWith("==="));
 
-  // Find candidate matrix lines (lines with numbers, pipes, or colons)
-  const matrixLines = lines.filter(
-    (l) =>
-      (l.includes("|") && /\d/.test(l)) ||
-      (l.includes(":") && /\d/.test(l)) ||
-      (/\b(plant|factory|source|s\d|warehouse|wh\d|f\d|p\d)\b/i.test(l) && /\d/.test(l))
-  );
+  // -------------------------------------------------------------
+  // Pattern 1: Section-based Supply, Demand, and Shipping Costs
+  // (e.g. Meridian Manufacturing question format)
+  // -------------------------------------------------------------
+  const supplyMap = new Map<string, number>();
+  const demandMap = new Map<string, number>();
+  const costMap = new Map<string, Map<string, number>>();
 
-  // Parse pipe-separated Markdown table
+  let currentSection: "supply" | "demand" | "cost" | "none" = "none";
+
+  for (const line of lines) {
+    if (/plant supply|supply\s*(?:\(units|available|capacity)?/i.test(line) && !line.includes("=")) {
+      currentSection = "supply";
+      continue;
+    }
+    if (/warehouse demand|demand\s*(?:\(units|required)?/i.test(line) && !line.includes("=")) {
+      currentSection = "demand";
+      continue;
+    }
+    if (/shipping cost|cost per unit|unit cost|cost matrix/i.test(line) && !line.includes("=")) {
+      currentSection = "cost";
+      continue;
+    }
+    if (/total\s+(?:supply|demand)/i.test(line)) {
+      continue;
+    }
+
+    // Check for "Plant X: Warehouse 1 = 34, Warehouse 2 = 38..." in Cost section or inline
+    if (currentSection === "cost" || (line.includes(":") && line.includes("="))) {
+      const plantMatch = line.match(/(Plant\s+[A-Za-z0-9]+|[A-Za-z0-9\s_-]+)[:]\s*(.*)/i);
+      if (plantMatch) {
+        const plantName = plantMatch[1].trim();
+        const rest = plantMatch[2];
+        const pairRegex = /([A-Za-z0-9\s_-]+)\s*=\s*([0-9.]+)/g;
+        let match;
+        const rowCosts = new Map<string, number>();
+        while ((match = pairRegex.exec(rest)) !== null) {
+          const destName = match[1].trim();
+          const costVal = parseFloat(match[2]);
+          if (!isNaN(costVal)) {
+            rowCosts.set(destName, costVal);
+          }
+        }
+        if (rowCosts.size > 0) {
+          costMap.set(plantName, rowCosts);
+          continue;
+        }
+      }
+    }
+
+    // Check for "Plant A: 143" or "Warehouse 1: 75"
+    const kvMatch = line.match(/^([A-Za-z0-9\s_-]+)[:=]\s*([0-9.]+)(?:\s*units)?$/i);
+    if (kvMatch) {
+      const name = kvMatch[1].trim();
+      const val = parseFloat(kvMatch[2]);
+      if (!isNaN(val)) {
+        if (currentSection === "supply" || /^plant\b/i.test(name)) {
+          supplyMap.set(name, val);
+        } else if (currentSection === "demand" || /^warehouse\b|^market\b|^city\b|^dest\b/i.test(name)) {
+          demandMap.set(name, val);
+        }
+      }
+    }
+  }
+
+  if (costMap.size > 0) {
+    const sources = Array.from(costMap.keys());
+    // Get all destination names across rows
+    const destSet = new Set<string>();
+    for (const row of costMap.values()) {
+      for (const d of row.keys()) {
+        destSet.add(d);
+      }
+    }
+    const destinations = Array.from(destSet);
+
+    const costs: number[][] = sources.map((s) => {
+      const row = costMap.get(s);
+      return destinations.map((d) => (row ? row.get(d) ?? 10 : 10));
+    });
+
+    const supply: number[] = sources.map((s) => supplyMap.get(s) ?? 100);
+    const demand: number[] = destinations.map((d) => demandMap.get(d) ?? 100);
+
+    return {
+      sources,
+      destinations,
+      costs,
+      supply,
+      demand,
+    };
+  }
+
+  // -------------------------------------------------------------
+  // Pattern 2: Markdown Pipe Tables
+  // -------------------------------------------------------------
   const pipeLines = lines.filter((l) => l.includes("|") && !l.includes("---"));
   if (pipeLines.length >= 3) {
     const rawRows = pipeLines.map((row) =>
@@ -27,7 +115,6 @@ export function extractTransportationProblem(text: string): TransportationProble
         .filter((c) => c.length > 0)
     );
 
-    // Look for header with destinations
     const headerRow = rawRows[0];
     const dataRows = rawRows.slice(1);
 
@@ -36,10 +123,9 @@ export function extractTransportationProblem(text: string): TransportationProble
     let supply: number[] = [];
     let demand: number[] = [];
     let destinations: string[] = [];
-    // Check if last row is Demand
+
     const lastRow = dataRows[dataRows.length - 1];
     const isLastRowDemand = /demand/i.test(lastRow[0]);
-
     const activeDataRows = isLastRowDemand ? dataRows.slice(0, -1) : dataRows;
 
     if (isLastRowDemand) {
@@ -49,7 +135,6 @@ export function extractTransportationProblem(text: string): TransportationProble
         .filter((v) => !isNaN(v));
     }
 
-    // Determine destinations from headerRow (excluding first label and possible 'Supply' column)
     const hasSupplyCol = /supply/i.test(headerRow[headerRow.length - 1]);
     const destHeaders = headerRow.slice(1, hasSupplyCol ? -1 : undefined);
     destinations = destHeaders.filter((h) => h.length > 0);
@@ -75,7 +160,6 @@ export function extractTransportationProblem(text: string): TransportationProble
     }
 
     if (sources.length > 0 && costs.length > 0 && costs[0].length > 0) {
-      // Ensure dimensions match
       if (destinations.length !== costs[0].length) {
         destinations = Array.from({ length: costs[0].length }, (_, i) => `Market ${i + 1}`);
       }
@@ -90,7 +174,16 @@ export function extractTransportationProblem(text: string): TransportationProble
     }
   }
 
-  // Regex patterns for key-value text lines: e.g., "Plant 1: 10, 2, 20, 11 | Supply: 15"
+  // -------------------------------------------------------------
+  // Pattern 3: Key-Value matrix rows: e.g., "Plant 1: 10, 2, 20, 11 | Supply: 15"
+  // -------------------------------------------------------------
+  const matrixLines = lines.filter(
+    (l) =>
+      (l.includes("|") && /\d/.test(l)) ||
+      (l.includes(":") && /\d/.test(l)) ||
+      (/\b(plant|factory|source|s\d|warehouse|wh\d|f\d|p\d)\b/i.test(l) && /\d/.test(l))
+  );
+
   const rowPattern = /([A-Za-z0-9\s_-]+)[:]\s*([0-9.,\s]+)(?:\|\s*Supply[:\s]*([0-9.]+))?/i;
   const parsedSources: string[] = [];
   const parsedCosts: number[][] = [];
@@ -113,7 +206,6 @@ export function extractTransportationProblem(text: string): TransportationProble
           parsedSupply.push(explicitSupply);
           parsedCosts.push(rawNums);
         } else {
-          // Last number might be supply
           parsedSupply.push(rawNums[rawNums.length - 1]);
           parsedCosts.push(rawNums.slice(0, -1));
         }
@@ -121,7 +213,6 @@ export function extractTransportationProblem(text: string): TransportationProble
     }
   }
 
-  // Check for Demand line
   const demandLine = lines.find((l) => /demand/i.test(l));
   let parsedDemand: number[] = [];
   if (demandLine) {

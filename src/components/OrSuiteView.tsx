@@ -56,6 +56,7 @@ import { HungarianMatrixViewer } from "./HungarianMatrixViewer";
 import { BranchAndBoundTree } from "./BranchAndBoundTree";
 import { MultiScenarioSensitivitySweep } from "./MultiScenarioSensitivitySweep";
 import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
+import { extractTransportationProblem, extractAssignmentProblem } from "../services/ocrMatrixParser";
 import {
   detectImportableTables,
   importNetworkEdgesFromDb,
@@ -370,16 +371,24 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
         }
       }
 
-      if (module === "transportation-assignment") {
+      if (module === "transportation-assignment" || trSub) {
         if (trSub === "hungarian-assignment") {
-          const nextAssign = data?.assign ? { ...assignProblem, ...data.assign } : assignProblem;
+          const extractedAssign = extractAssignmentProblem(rawText || "");
+          const nextAssign: AssignmentProblem = extractedAssign || {
+            ...assignProblem,
+            ...(data?.assign || {}),
+          };
           setAssignProblem(nextAssign);
           try {
             const sol = solveHungarianAssignment(nextAssign);
             setAssignSol(sol);
           } catch {}
         } else {
-          const nextTrans = data?.trans ? { ...transProblem, ...data.trans } : transProblem;
+          const extractedTrans = extractTransportationProblem(rawText || "");
+          const nextTrans: TransportationProblem = extractedTrans || {
+            ...transProblem,
+            ...(data?.trans || {}),
+          };
           setTransProblem(nextTrans);
           try {
             const sol = solveTransportation(nextTrans);
