@@ -816,8 +816,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Main Module Solver Content */}
-      <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-28">
-        <div className="flex items-center justify-between gap-3 text-xs shrink-0 pb-1 border-b border-hairline-soft">
+      <main className="flex-1 overflow-y-auto p-3 sm:p-6 max-w-5xl mx-auto w-full space-y-4 sm:space-y-6 pb-28">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 pb-1 border-b border-hairline-soft">
           <div className="flex items-center gap-2">
             {/* Benchmark Problems Dropdown */}
             <div className="relative">
@@ -2340,15 +2340,14 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           )}
         </main>
 
-        {/* Claude-style Bottom Chat & Problem Input Bar */}
         {/* Light Mode Bottom Chat & Problem Input Bar */}
-        <div className="p-4 bg-gradient-to-t from-canvas via-canvas/95 to-transparent border-t border-hairline/60 shrink-0 select-none">
+        <div className="p-2 sm:p-4 bg-gradient-to-t from-canvas via-canvas/95 to-transparent border-t border-hairline/60 shrink-0 select-none">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleQuickQuestionSubmit(e);
             }}
-            className="max-w-3xl mx-auto w-full bg-surface-card text-ink rounded-2xl border border-hairline shadow-md p-2 px-3 flex items-center gap-2.5 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20"
+            className="max-w-3xl mx-auto w-full bg-surface-card text-ink rounded-2xl border border-hairline shadow-md p-1.5 sm:p-2 px-2.5 sm:px-3 flex items-center gap-1.5 sm:gap-2.5 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20"
           >
             {/* Plus / Category Option Button */}
             <button

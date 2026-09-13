@@ -46,7 +46,9 @@ function MainWorkspace() {
   const [activeView, setActiveView] = useState<"editor" | "diagram" | "ai" | "or">("or");
   const [activeOrModule, setActiveOrModule] = useState<any>("transportation-assignment");
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string>("");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 768 : true
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(false);
@@ -387,6 +389,7 @@ function MainWorkspace() {
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         onExportDatabase={handleExportDatabase}
         isFileImported={isFileImported}
         loading={loadingSchema}
@@ -427,8 +430,8 @@ function MainWorkspace() {
           </div>
         )}
         {/* Center Canvas Area */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft p-2.5 pl-2">
-          <main className="flex-1 flex flex-col h-full overflow-hidden bg-canvas rounded-2xl border border-hairline shadow-2xs">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft p-1 sm:p-2.5 sm:pl-2">
+          <main className="flex-1 flex flex-col h-full overflow-hidden bg-canvas rounded-xl sm:rounded-2xl border border-hairline shadow-2xs">
             {activeView === "editor" ? (
               <div className="flex flex-col h-full overflow-hidden p-3 gap-3">
               <div className="h-[44%] min-h-[200px] shrink-0">
