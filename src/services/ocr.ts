@@ -261,14 +261,16 @@ async function callGroqVision(
   settings: AiSettings,
   targetHint?: { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype }
 ): Promise<OcrProblemClassification> {
-  const modelName = settings.model || "qwen/qwen3.8-27b";
+  const modelName = settings.model && settings.model.includes("vision")
+    ? settings.model
+    : "llama-3.2-11b-vision-preview";
   const prompt = targetHint?.module
     ? `Analyze and extract all Operations Research problem parameters from this question image. Note: The problem type is specified as "${targetHint.module}"${targetHint.networkSubtype ? ` (subtype: ${targetHint.networkSubtype})` : ""}${targetHint.transSubtype ? ` (subtype: ${targetHint.transSubtype})` : ""}.`
     : "Analyze and extract all Operations Research problem parameters from this question image.";
+
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${settings.apiKey}`,
     },
     body: JSON.stringify({

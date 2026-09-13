@@ -653,6 +653,71 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   };
 
 
+  // Linear Programming Dynamic Variables & Constraints
+  const addLpVariable = () => {
+    const nextIdx = lpProblem.objectiveCoefficients.length + 1;
+    const nextNames = lpProblem.variableNames
+      ? [...lpProblem.variableNames, `x${nextIdx}`]
+      : Array.from({ length: nextIdx }, (_, i) => `x${i + 1}`);
+    const nextObj = [...lpProblem.objectiveCoefficients, 1];
+    const nextConstraints = lpProblem.constraints.map((c) => ({
+      ...c,
+      coefficients: [...c.coefficients, 0],
+    }));
+    setLpProblem({
+      ...lpProblem,
+      objectiveCoefficients: nextObj,
+      variableNames: nextNames,
+      constraints: nextConstraints,
+    });
+    if (nextObj.length > 2) {
+      setLpMode("simplex-tableau");
+    }
+  };
+
+  const removeLpVariable = () => {
+    if (lpProblem.objectiveCoefficients.length <= 2) return;
+    const nextObj = lpProblem.objectiveCoefficients.slice(0, -1);
+    const nextNames = lpProblem.variableNames?.slice(0, -1);
+    const nextConstraints = lpProblem.constraints.map((c) => ({
+      ...c,
+      coefficients: c.coefficients.slice(0, -1),
+    }));
+    setLpProblem({
+      ...lpProblem,
+      objectiveCoefficients: nextObj,
+      variableNames: nextNames,
+      constraints: nextConstraints,
+    });
+  };
+
+  const updateLpVariableName = (varIdx: number, name: string) => {
+    const nextNames = lpProblem.variableNames
+      ? [...lpProblem.variableNames]
+      : Array.from({ length: lpProblem.objectiveCoefficients.length }, (_, i) => `x${i + 1}`);
+    nextNames[varIdx] = name;
+    setLpProblem({ ...lpProblem, variableNames: nextNames });
+  };
+
+  const addLpConstraint = () => {
+    const numVars = lpProblem.objectiveCoefficients.length;
+    setLpProblem({
+      ...lpProblem,
+      constraints: [
+        ...lpProblem.constraints,
+        { coefficients: Array(numVars).fill(0), operator: "<=", rhs: 10 },
+      ],
+    });
+  };
+
+  const removeLpConstraint = (idx: number) => {
+    if (lpProblem.constraints.length <= 1) return;
+    setLpProblem({
+      ...lpProblem,
+      constraints: lpProblem.constraints.filter((_, i) => i !== idx),
+    });
+  };
+
   // Execution Triggers
   const handleSolveLp = () => {
     try {
@@ -662,7 +727,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       alert(`LP Solver error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-
   const handleSolveTransportation = () => {
     try {
       const sol = solveTransportation(transProblem);
@@ -1182,30 +1246,37 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 </div>
               </div>
               <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                    Model Formulation
+                    Model Formulation ({lpProblem.objectiveCoefficients.length} Variables, {lpProblem.constraints.length} Constraints)
                   </h4>
-                  <div className="flex items-center gap-2">
-                    {onAskAi && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={addLpVariable}
+                      className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
+                      title="Add decision variable"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-primary" />
+                      <span>Add Variable</span>
+                    </button>
+                    {lpProblem.objectiveCoefficients.length > 2 && (
                       <button
-                        onClick={() =>
-                          onAskAi(
-                            `Analyze this Linear Program: Maximize Z = ${lpProblem.objectiveCoefficients[0]}*x1 + ${
-                              lpProblem.objectiveCoefficients[1]
-                            }*x2 subject to constraints. Current optimal objective Z* = ${
-                              lpSol?.objectiveValue || 21
-                            }. Explain binding constraints, shadow prices, and capacity investments.`
-                          )
-                        }
-                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-primary text-xs font-semibold px-3 py-2 rounded-xl border border-hairline transition-colors shadow-2xs"
+                        onClick={removeLpVariable}
+                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
+                        title="Remove last variable"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Ask AI Advisor</span>
+                        <Trash2 className="w-3.5 h-3.5 text-error" />
+                        <span>Remove Variable</span>
                       </button>
                     )}
-
-
+                    <button
+                      onClick={addLpConstraint}
+                      className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
+                      title="Add constraint equation"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-accent-teal" />
+                      <span>Add Constraint</span>
+                    </button>
                     <button
                       onClick={handleSolveLp}
                       className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"
@@ -1217,83 +1288,92 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 </div>
 
                 {/* Objective Function Input */}
-                <div className="p-3 bg-canvas border border-hairline rounded-xl flex items-center gap-3 text-xs">
-                  <span className="font-semibold text-muted">Objective:</span>
-                  <select
-                    value={lpProblem.objective}
-                    onChange={(e) =>
-                      setLpProblem({ ...lpProblem, objective: e.target.value as "max" | "min" })
-                    }
-                    className="bg-surface-card border border-hairline rounded-md px-2 py-1 text-xs font-semibold text-primary focus:outline-none"
-                  >
-                    <option value="max">Maximize Z =</option>
-                    <option value="min">Minimize Z =</option>
-                  </select>
-                  <div className="flex items-center gap-2 font-mono">
-                    <input
-                      type="number"
-                      value={lpProblem.objectiveCoefficients[0]}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setLpProblem({
-                          ...lpProblem,
-                          objectiveCoefficients: [val, lpProblem.objectiveCoefficients[1]],
-                        });
-                      }}
-                      className="w-16 px-2 py-1 bg-surface-card border border-hairline rounded-md text-right font-bold text-ink"
-                    />
-                    <span>x₁ +</span>
-                    <input
-                      type="number"
-                      value={lpProblem.objectiveCoefficients[1]}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        setLpProblem({
-                          ...lpProblem,
-                          objectiveCoefficients: [lpProblem.objectiveCoefficients[0], val],
-                        });
-                      }}
-                      className="w-16 px-2 py-1 bg-surface-card border border-hairline rounded-md text-right font-bold text-ink"
-                    />
-                    <span>x₂</span>
+                <div className="p-3 bg-canvas border border-hairline rounded-xl space-y-2 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-muted">Objective:</span>
+                    <select
+                      value={lpProblem.objective}
+                      onChange={(e) =>
+                        setLpProblem({ ...lpProblem, objective: e.target.value as "max" | "min" })
+                      }
+                      className="bg-surface-card border border-hairline rounded-md px-2 py-1 text-xs font-semibold text-primary focus:outline-none"
+                    >
+                      <option value="max">Maximize Z =</option>
+                      <option value="min">Minimize Z =</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 font-mono overflow-x-auto p-1">
+                    {lpProblem.objectiveCoefficients.map((coef, varIdx) => {
+                      const vName = lpProblem.variableNames?.[varIdx] || `x${varIdx + 1}`;
+                      const isLast = varIdx === lpProblem.objectiveCoefficients.length - 1;
+
+                      return (
+                        <div key={varIdx} className="flex items-center gap-1.5 bg-surface-card px-2 py-1 rounded-lg border border-hairline">
+                          <input
+                            type="number"
+                            value={coef}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              const nextObj = [...lpProblem.objectiveCoefficients];
+                              nextObj[varIdx] = val;
+                              setLpProblem({ ...lpProblem, objectiveCoefficients: nextObj });
+                            }}
+                            className="w-14 px-1.5 py-0.5 bg-canvas border border-hairline rounded text-right font-bold text-ink text-xs outline-none focus:border-primary"
+                          />
+                          <input
+                            type="text"
+                            value={vName}
+                            onChange={(e) => updateLpVariableName(varIdx, e.target.value)}
+                            className="w-14 px-1 py-0.5 bg-canvas border border-hairline rounded text-center text-primary font-bold text-xs outline-none focus:border-primary"
+                          />
+                          {!isLast && <span className="text-muted font-bold">+</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
                 {/* Constraints Inputs */}
                 <div className="space-y-2">
-                  <span className="text-[11px] font-semibold text-muted uppercase">
+                  <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
                     Subject to Constraints:
                   </span>
                   {lpProblem.constraints.map((c, idx) => (
                     <div
                       key={idx}
-                      className="p-2.5 bg-canvas border border-hairline rounded-xl flex items-center gap-2 text-xs font-mono"
+                      className="p-2.5 bg-canvas border border-hairline rounded-xl flex flex-wrap items-center gap-2 text-xs font-mono"
                     >
-                      <span className="text-muted w-8">C{idx + 1}:</span>
-                      <input
-                        type="number"
-                        value={c.coefficients[0] || 0}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const next = [...lpProblem.constraints];
-                          next[idx] = { ...next[idx], coefficients: [val, next[idx].coefficients[1] || 0] };
-                          setLpProblem({ ...lpProblem, constraints: next });
-                        }}
-                        className="w-16 px-2 py-1 bg-surface-card border border-hairline rounded-md text-right text-ink"
-                      />
-                      <span>x₁ +</span>
-                      <input
-                        type="number"
-                        value={c.coefficients[1] || 0}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const next = [...lpProblem.constraints];
-                          next[idx] = { ...next[idx], coefficients: [next[idx].coefficients[0] || 0, val] };
-                          setLpProblem({ ...lpProblem, constraints: next });
-                        }}
-                        className="w-16 px-2 py-1 bg-surface-card border border-hairline rounded-md text-right text-ink"
-                      />
-                      <span>x₂</span>
+                      <span className="text-muted w-7 font-bold">C{idx + 1}:</span>
+                      <div className="flex flex-wrap items-center gap-1.5 flex-1 overflow-x-auto">
+                        {lpProblem.objectiveCoefficients.map((_, varIdx) => {
+                          const vName = lpProblem.variableNames?.[varIdx] || `x${varIdx + 1}`;
+                          const isLast = varIdx === lpProblem.objectiveCoefficients.length - 1;
+                          const coefVal = c.coefficients[varIdx] !== undefined ? c.coefficients[varIdx] : 0;
+
+                          return (
+                            <div key={varIdx} className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={coefVal}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  const nextConstraints = [...lpProblem.constraints];
+                                  const nextRowCoeffs = [...(nextConstraints[idx].coefficients || [])];
+                                  while (nextRowCoeffs.length < lpProblem.objectiveCoefficients.length) nextRowCoeffs.push(0);
+                                  nextRowCoeffs[varIdx] = val;
+                                  nextConstraints[idx] = { ...nextConstraints[idx], coefficients: nextRowCoeffs };
+                                  setLpProblem({ ...lpProblem, constraints: nextConstraints });
+                                }}
+                                className="w-14 px-1.5 py-1 bg-surface-card border border-hairline rounded text-right text-ink outline-none focus:border-primary text-xs"
+                              />
+                              <span className="text-[11px] text-muted">{vName}</span>
+                              {!isLast && <span className="text-muted font-bold">+</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+
                       <select
                         value={c.operator}
                         onChange={(e) => {
@@ -1301,12 +1381,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                           next[idx] = { ...next[idx], operator: e.target.value as "<=" | ">=" | "=" };
                           setLpProblem({ ...lpProblem, constraints: next });
                         }}
-                        className="bg-surface-card border border-hairline rounded-md px-2 py-1 font-semibold text-primary"
+                        className="bg-surface-card border border-hairline rounded-md px-2 py-1 font-semibold text-primary outline-none"
                       >
                         <option value="<=">≤</option>
                         <option value=">=">≥</option>
                         <option value="=">=</option>
                       </select>
+
                       <input
                         type="number"
                         value={c.rhs}
@@ -1316,8 +1397,18 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                           next[idx] = { ...next[idx], rhs: val };
                           setLpProblem({ ...lpProblem, constraints: next });
                         }}
-                        className="w-20 px-2 py-1 bg-surface-card border border-hairline rounded-md text-right font-bold text-ink"
+                        className="w-20 px-2 py-1 bg-surface-card border border-hairline rounded-md text-right font-bold text-ink outline-none focus:border-primary text-xs"
                       />
+
+                      {lpProblem.constraints.length > 1 && (
+                        <button
+                          onClick={() => removeLpConstraint(idx)}
+                          className="p-1 text-muted hover:text-error rounded transition-colors"
+                          title="Delete constraint"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
