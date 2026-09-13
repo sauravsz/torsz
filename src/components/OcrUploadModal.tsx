@@ -19,7 +19,6 @@ import {
   ExternalLink,
   Settings,
   FileText,
-  Filter,
 } from "lucide-react";
 import {
   processOrQuestionWithVisionAi,
@@ -56,8 +55,9 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const [scanning, setScanning] = useState(false);
   const [scanStatus, setScanStatus] = useState("");
   const [ocrText, setOcrText] = useState<string>(initialText);
-  const [targetHintKey, setTargetHintKey] = useState<string>("auto");
+  const [autoAnalyze, setAutoAnalyze] = useState(false); // Default OFF
   const [classification, setClassification] = useState<OcrProblemClassification | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string>("shortest-route");
   const [selectedModule, setSelectedModule] = useState<OrModule>("network-models");
   const [selectedNetworkSubtype, setSelectedNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [selectedTransSubtype, setSelectedTransSubtype] = useState<TransSubtype>("transportation");
@@ -67,27 +67,115 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const getHintObject = (key: string): { module?: OrModule; networkSubtype?: NetworkSubtype; transSubtype?: TransSubtype } | undefined => {
-    if (key === "auto") return undefined;
-    if (key === "shortest-route") return { module: "network-models", networkSubtype: "shortest-route" };
-    if (key === "minimum-spanning-tree") return { module: "network-models", networkSubtype: "minimum-spanning-tree" };
-    if (key === "maximal-flow") return { module: "network-models", networkSubtype: "maximal-flow" };
-    if (key === "transportation") return { module: "transportation-assignment", transSubtype: "transportation" };
-    if (key === "hungarian-assignment") return { module: "transportation-assignment", transSubtype: "hungarian-assignment" };
-    if (key === "linear-programming") return { module: "linear-programming" };
-    if (key === "project-planning") return { module: "project-planning" };
-    if (key === "inventory-control") return { module: "inventory-control" };
-    if (key === "queuing-models") return { module: "queuing-models" };
-    if (key === "zero-sum-games") return { module: "zero-sum-games" };
-    if (key === "linear-equations") return { module: "linear-equations" };
-    return undefined;
+  const problemTypes: {
+    id: OrModule;
+    key: string;
+    name: string;
+    description: string;
+    icon: any;
+    networkSubtype?: NetworkSubtype;
+    transSubtype?: TransSubtype;
+  }[] = [
+    {
+      id: "network-models",
+      key: "shortest-route",
+      name: "Shortest Route (Dijkstra)",
+      description: "Minimum distance/cost path between network nodes.",
+      icon: Network,
+      networkSubtype: "shortest-route",
+    },
+    {
+      id: "network-models",
+      key: "minimum-spanning-tree",
+      name: "Minimum Spanning Tree (MST)",
+      description: "Connect all nodes with minimal total length (Kruskal/Prim).",
+      icon: Network,
+      networkSubtype: "minimum-spanning-tree",
+    },
+    {
+      id: "network-models",
+      key: "maximal-flow",
+      name: "Maximal Flow",
+      description: "Maximum throughput between source and sink.",
+      icon: Network,
+      networkSubtype: "maximal-flow",
+    },
+    {
+      id: "transportation-assignment",
+      key: "transportation",
+      name: "Transportation Model (VAM)",
+      description: "Minimize shipping costs between plants and markets.",
+      icon: Truck,
+      transSubtype: "transportation",
+    },
+    {
+      id: "transportation-assignment",
+      key: "hungarian-assignment",
+      name: "Hungarian Task Assignment",
+      description: "Allocate N workers to N tasks at minimum total cost.",
+      icon: Truck,
+      transSubtype: "hungarian-assignment",
+    },
+    {
+      id: "linear-programming",
+      key: "linear-programming",
+      name: "Linear Programming (Simplex / 2D)",
+      description: "Maximize/minimize linear objective with constraints.",
+      icon: TrendingUp,
+    },
+    {
+      id: "project-planning",
+      key: "project-planning",
+      name: "Project Planning (CPM / PERT)",
+      description: "Activity network, critical paths, and duration.",
+      icon: Calendar,
+    },
+    {
+      id: "inventory-control",
+      key: "inventory-control",
+      name: "Inventory Control (EOQ)",
+      description: "Economic order quantity, holding, and backorders.",
+      icon: Package,
+    },
+    {
+      id: "queuing-models",
+      key: "queuing-models",
+      name: "Queuing Analysis (M/M/1)",
+      description: "Queue lengths, wait times, and server utilization.",
+      icon: Clock,
+    },
+    {
+      id: "zero-sum-games",
+      key: "zero-sum-games",
+      name: "Zero-Sum Game Theory",
+      description: "Payoff matrix, Minimax/Maximin, and saddle points.",
+      icon: Swords,
+    },
+    {
+      id: "linear-equations",
+      key: "linear-equations",
+      name: "Linear Equations (Ax = b)",
+      description: "Simultaneous linear equations via Gauss-Jordan.",
+      icon: Calculator,
+    },
+  ];
+
+  const applyProblemType = (key: string) => {
+    setSelectedKey(key);
+    const pt = problemTypes.find((p) => p.key === key);
+    if (!pt) return;
+    setSelectedModule(pt.id);
+    if (pt.networkSubtype) setSelectedNetworkSubtype(pt.networkSubtype);
+    if (pt.transSubtype) setSelectedTransSubtype(pt.transSubtype);
   };
 
   useEffect(() => {
     if (initialText) {
       setOcrText(initialText);
       setInputMode("text");
-      handleAnalyzeText(initialText);
+      if (autoAnalyze) {
+        handleAnalyzeText(initialText);
+      }
     }
   }, [initialText]);
 
@@ -99,30 +187,44 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     saveStoredAiSettings(updated);
   };
 
-  const handleFileChange = async (file: File, hintKey?: string) => {
+  const handleFileChange = async (file: File) => {
     setSelectedFile(file);
     setImagePreview(URL.createObjectURL(file));
     setError(null);
-    setScanning(true);
-    setScanStatus("Analyzing image with Multimodal AI Vision...");
 
-    const hint = getHintObject(hintKey !== undefined ? hintKey : targetHintKey);
+    if (autoAnalyze) {
+      setScanning(true);
+      setScanStatus("Analyzing image with Multimodal AI Vision...");
 
-    try {
-      const result = await processOrQuestionWithVisionAi(file, aiSettings, hint);
-      setClassification(result);
-      setOcrText(result.transcription || result.reason);
-      setSelectedModule(result.detectedModule);
-      if (result.networkSubtype) setSelectedNetworkSubtype(result.networkSubtype);
-      if (result.transSubtype) setSelectedTransSubtype(result.transSubtype);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setScanning(false);
+      const hint = {
+        module: selectedModule,
+        networkSubtype: selectedNetworkSubtype,
+        transSubtype: selectedTransSubtype,
+      };
+
+      try {
+        const result = await processOrQuestionWithVisionAi(file, aiSettings, hint);
+        setClassification(result);
+        setOcrText(result.transcription || result.reason);
+        setSelectedModule(result.detectedModule);
+        if (result.networkSubtype) setSelectedNetworkSubtype(result.networkSubtype);
+        if (result.transSubtype) setSelectedTransSubtype(result.transSubtype);
+
+        const matchedPt = problemTypes.find((p) =>
+          p.id === result.detectedModule &&
+          (!p.networkSubtype || p.networkSubtype === result.networkSubtype) &&
+          (!p.transSubtype || p.transSubtype === result.transSubtype)
+        );
+        if (matchedPt) setSelectedKey(matchedPt.key);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setScanning(false);
+      }
     }
   };
 
-  const handleAnalyzeText = async (textToAnalyze?: string, hintKey?: string) => {
+  const handleAnalyzeText = async (textToAnalyze?: string) => {
     const text = textToAnalyze || ocrText;
     if (!text.trim()) return;
 
@@ -130,7 +232,11 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     setScanning(true);
     setScanStatus("Analyzing problem statement with AI...");
 
-    const hint = getHintObject(hintKey !== undefined ? hintKey : targetHintKey);
+    const hint = {
+      module: selectedModule,
+      networkSubtype: selectedNetworkSubtype,
+      transSubtype: selectedTransSubtype,
+    };
 
     try {
       const result = await parseOrQuestionTextWithAi(text, aiSettings, hint);
@@ -138,6 +244,13 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
       setSelectedModule(result.detectedModule);
       if (result.networkSubtype) setSelectedNetworkSubtype(result.networkSubtype);
       if (result.transSubtype) setSelectedTransSubtype(result.transSubtype);
+
+      const matchedPt = problemTypes.find((p) =>
+        p.id === result.detectedModule &&
+        (!p.networkSubtype || p.networkSubtype === result.networkSubtype) &&
+        (!p.transSubtype || p.transSubtype === result.transSubtype)
+      );
+      if (matchedPt) setSelectedKey(matchedPt.key);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -163,7 +276,11 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   const handleConfirmAndSolve = () => {
     let finalParsedData = classification?.parsedData;
     if (!finalParsedData || Object.keys(finalParsedData).length === 0) {
-      const hint = getHintObject(targetHintKey);
+      const hint = {
+        module: selectedModule,
+        networkSubtype: selectedNetworkSubtype,
+        transSubtype: selectedTransSubtype,
+      };
       const fallback = classifyOrProblemFromText(ocrText, hint);
       finalParsedData = fallback.parsedData;
     }
@@ -180,109 +297,18 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     onClose();
   };
 
-  const problemTypes: {
-    id: OrModule;
-    key: string;
-    name: string;
-    description: string;
-    icon: any;
-    networkSubtype?: NetworkSubtype;
-    transSubtype?: TransSubtype;
-  }[] = [
-    {
-      id: "network-models",
-      key: "shortest-route",
-      name: "Shortest Route (Dijkstra)",
-      description: "Minimum distance/cost path between network nodes (e.g. car replacement).",
-      icon: Network,
-      networkSubtype: "shortest-route",
-    },
-    {
-      id: "network-models",
-      key: "minimum-spanning-tree",
-      name: "Minimum Spanning Tree (MST)",
-      description: "Connect all network nodes with minimal total length (Kruskal/Prim).",
-      icon: Network,
-      networkSubtype: "minimum-spanning-tree",
-    },
-    {
-      id: "network-models",
-      key: "maximal-flow",
-      name: "Maximal Flow",
-      description: "Maximum fluid/capacity throughput between source and sink.",
-      icon: Network,
-      networkSubtype: "maximal-flow",
-    },
-    {
-      id: "transportation-assignment",
-      key: "transportation",
-      name: "Transportation Model (VAM)",
-      description: "Minimize shipping matrix costs between supply plants and demand markets.",
-      icon: Truck,
-      transSubtype: "transportation",
-    },
-    {
-      id: "transportation-assignment",
-      key: "hungarian-assignment",
-      name: "Hungarian Task Assignment",
-      description: "Allocate N workers to N jobs at minimum total cost.",
-      icon: Truck,
-      transSubtype: "hungarian-assignment",
-    },
-    {
-      id: "linear-programming",
-      key: "linear-programming",
-      name: "Linear Programming (Simplex/2D)",
-      description: "Maximize/minimize objective functions with resource constraints.",
-      icon: TrendingUp,
-    },
-    {
-      id: "project-planning",
-      key: "project-planning",
-      name: "Project Planning (CPM / PERT)",
-      description: "Activity dependencies, earliest/latest times, and critical path duration.",
-      icon: Calendar,
-    },
-    {
-      id: "inventory-control",
-      key: "inventory-control",
-      name: "Inventory Control (EOQ)",
-      description: "Economic order quantity, cycle times, and planned backorder levels.",
-      icon: Package,
-    },
-    {
-      id: "queuing-models",
-      key: "queuing-models",
-      name: "Queuing Analysis (M/M/1)",
-      description: "Queue lengths, wait times, and server utilization characteristics.",
-      icon: Clock,
-    },
-    {
-      id: "zero-sum-games",
-      key: "zero-sum-games",
-      name: "Zero-Sum Game Theory",
-      description: "2-Player payoff matrices, Minimax/Maximin security levels, saddle points.",
-      icon: Swords,
-    },
-    {
-      id: "linear-equations",
-      key: "linear-equations",
-      name: "Linear Equations (Ax = b)",
-      description: "Simultaneous linear equation systems via Gauss-Jordan elimination.",
-      icon: Calculator,
-    },
-  ];
-
   return (
     <div
       onPaste={handlePaste}
       className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 select-none transition-opacity duration-300 ease-apple-ease"
     >
-      <div className="bg-surface-card border border-hairline w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-keyframe-scale">
+      <div className="bg-surface-card border border-hairline w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-keyframe-scale">
+        {/* Header */}
         <div className="px-6 py-4 border-b border-hairline flex items-center justify-between bg-surface-soft">
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-canvas p-1 rounded-xl border border-hairline">
               <button
+                type="button"
                 onClick={() => setInputMode("image")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   inputMode === "image"
@@ -294,6 +320,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                 <span>Image / Photo Scan</span>
               </button>
               <button
+                type="button"
                 onClick={() => setInputMode("text")}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   inputMode === "text"
@@ -309,13 +336,15 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setShowConfig(!showConfig)}
-              className="flex items-center gap-1 text-xs text-primary font-medium bg-canvas hover:bg-surface-cream px-2.5 py-1 rounded-lg border border-hairline transition-colors shadow-2xs"
+              className="flex items-center gap-1 text-xs text-primary font-medium bg-canvas hover:bg-surface-cream px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
             >
               <Settings className="w-3.5 h-3.5" />
               <span>Vision API</span>
             </button>
             <button
+              type="button"
               onClick={onClose}
               className="p-1.5 text-muted hover:text-ink hover:bg-surface-cream rounded-lg transition-colors"
             >
@@ -369,7 +398,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                         handleUpdateSettings({ provider: p });
                       }
                     }}
-                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink focus:border-primary outline-none"
+                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1.5 text-xs text-ink focus:border-primary outline-none"
                   >
                     <option value="groq">Groq (qwen/qwen3.8-27b)</option>
                     <option value="claude">Anthropic Claude (Sonnet 3.5)</option>
@@ -385,7 +414,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                     value={aiSettings.model}
                     onChange={(e) => handleUpdateSettings({ model: e.target.value.trim() })}
                     placeholder="qwen/qwen3.8-27b"
-                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink font-mono focus:border-primary outline-none"
+                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1.5 text-xs text-ink font-mono focus:border-primary outline-none"
                   />
                 </div>
 
@@ -400,53 +429,12 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                     value={aiSettings.apiKey}
                     onChange={(e) => handleUpdateSettings({ apiKey: e.target.value.trim() })}
                     placeholder={aiSettings.provider === "groq" ? "gsk_..." : "sk-..."}
-                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1 text-xs text-ink font-mono focus:border-primary outline-none"
+                    className="w-full bg-canvas border border-hairline rounded-md px-2.5 py-1.5 text-xs text-ink font-mono focus:border-primary outline-none"
                   />
                 </div>
               </div>
             </div>
           )}
-
-          {/* Problem Type Selector Dropdown Filter */}
-          <div className="bg-canvas border border-hairline rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <Filter className="w-3.5 h-3.5 text-primary shrink-0" />
-              <span className="font-semibold text-ink">Target Problem Category:</span>
-            </div>
-
-            <select
-              value={targetHintKey}
-              onChange={(e) => {
-                const newKey = e.target.value;
-                setTargetHintKey(newKey);
-                const hint = getHintObject(newKey);
-                if (hint?.module) setSelectedModule(hint.module);
-                if (hint?.networkSubtype) setSelectedNetworkSubtype(hint.networkSubtype);
-                if (hint?.transSubtype) setSelectedTransSubtype(hint.transSubtype);
-
-                // Re-analyze with new target hint if text or image present
-                if (ocrText.trim()) {
-                  handleAnalyzeText(ocrText, newKey);
-                } else if (selectedFile) {
-                  handleFileChange(selectedFile, newKey);
-                }
-              }}
-              className="bg-surface-card border border-hairline rounded-lg px-3 py-1.5 text-xs font-semibold text-primary focus:border-primary outline-none shadow-2xs cursor-pointer"
-            >
-              <option value="auto">✨ Auto-Detect (AI Classification)</option>
-              <option value="minimum-spanning-tree">🌐 Minimum Spanning Tree (MST - Kruskal / Prim)</option>
-              <option value="shortest-route">🛣️ Shortest Route (Dijkstra / Replacement)</option>
-              <option value="maximal-flow">🚰 Maximal Flow Capacity</option>
-              <option value="transportation">🚚 Transportation Cost Matrix (VAM)</option>
-              <option value="hungarian-assignment">👷 Hungarian Task Assignment</option>
-              <option value="linear-programming">📈 Linear Programming (Simplex / Graphical)</option>
-              <option value="project-planning">📅 Project Planning (CPM / PERT)</option>
-              <option value="inventory-control">📦 Inventory Control (EOQ)</option>
-              <option value="queuing-models">⏱️ Queuing Analysis (M/M/1)</option>
-              <option value="zero-sum-games">⚔️ Zero-Sum Game Theory</option>
-              <option value="linear-equations">🔢 Linear Equations (Ax = b)</option>
-            </select>
-          </div>
 
           {/* Mode 1: Image Upload Dropzone */}
           {inputMode === "image" && (
@@ -454,7 +442,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
               {!imagePreview ? (
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-hairline hover:border-primary bg-canvas hover:bg-surface-cream/50 rounded-2xl p-8 text-center cursor-pointer transition-colors space-y-3"
+                  className="border-2 border-dashed border-hairline hover:border-primary bg-canvas hover:bg-surface-cream/50 rounded-2xl p-7 text-center cursor-pointer transition-colors space-y-3"
                 >
                   <input
                     ref={fileInputRef}
@@ -482,7 +470,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-4 p-3 bg-canvas border border-hairline rounded-xl mb-4">
+                <div className="flex items-start gap-4 p-3 bg-canvas border border-hairline rounded-xl">
                   <img
                     src={imagePreview}
                     alt="Scanned Question"
@@ -494,6 +482,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                         {selectedFile?.name || "Pasted Image"}
                       </span>
                       <button
+                        type="button"
                         onClick={() => {
                           setImagePreview(null);
                           setSelectedFile(null);
@@ -507,17 +496,24 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                     </div>
 
                     {scanning ? (
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-xs text-primary font-medium animate-pulse">
-                          <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                          <span>{scanStatus}</span>
-                        </div>
+                      <div className="flex items-center gap-2 text-xs text-primary font-medium animate-pulse">
+                        <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                        <span>{scanStatus}</span>
                       </div>
-                    ) : (
+                    ) : classification ? (
                       <div className="flex items-center gap-1.5 text-xs text-success font-semibold">
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>Parameters Extracted</span>
+                        <span>AI Analysis Complete</span>
                       </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => selectedFile && handleFileChange(selectedFile)}
+                        className="flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Run AI Vision Analysis</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -530,7 +526,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted">
-                  Paste Problem Statement or Markdown Table:
+                  Problem Statement or Markdown Table:
                 </label>
                 <button
                   type="button"
@@ -547,80 +543,74 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                 rows={4}
                 value={ocrText}
                 onChange={(e) => {
-                  const val = e.target.value;
-                  setOcrText(val);
+                  setOcrText(e.target.value);
                 }}
-                onPaste={(e) => {
-                  const pasted = e.clipboardData.getData("text");
-                  if (pasted && pasted.trim().length > 10) {
-                    setTimeout(() => {
-                      handleAnalyzeText(pasted);
-                    }, 50);
-                  }
-                }}
-                placeholder="Paste or type question in plain text or markdown here. AI will automatically parse and optimize the data structure for TORA..."
+                placeholder="Paste or type question text, linear equations, network arcs, or cost matrix here..."
                 className="w-full bg-canvas border border-hairline rounded-xl p-3 text-xs text-ink placeholder:text-muted focus:border-primary outline-none transition-colors font-sans leading-relaxed"
               />
-              <div className="flex items-center justify-between text-[11px] text-muted-soft">
-                <span>Pasting raw text automatically triggers AI optimization for TORA.</span>
-                <span>
-                  Press <kbd className="font-mono bg-canvas px-1 rounded border border-hairline text-ink">⌘ + Enter</kbd> to solve
-                </span>
-              </div>
             </div>
           )}
 
-          {/* Interactive Problem Type Selection Grid */}
-          {(ocrText || imagePreview) && (
-            <div className="space-y-2.5 pt-2 border-t border-hairline">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-ink uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  <span>Confirm Problem Type:</span>
+          {/* SINGLE Problem Type Selection Section with Auto-Analyze Toggle */}
+          <div className="space-y-3 pt-3 border-t border-hairline">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-ink uppercase tracking-wider">
+                Select Problem Type:
+              </span>
+
+              {/* Auto-Analysing Toggle */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoAnalyze}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAutoAnalyze(checked);
+                    if (checked) {
+                      if (inputMode === "text" && ocrText.trim()) {
+                        handleAnalyzeText(ocrText);
+                      } else if (inputMode === "image" && selectedFile) {
+                        handleFileChange(selectedFile);
+                      }
+                    }
+                  }}
+                  className="rounded border-hairline text-primary focus:ring-primary h-3.5 w-3.5"
+                />
+                <span className="text-xs font-medium text-body">
+                  Auto-analyse with AI
                 </span>
-                {classification && (
-                  <span className="text-[11px] text-primary font-medium bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
-                    Auto-detected: {Math.round(classification.confidence * 100)}% match
+                {autoAnalyze && classification && (
+                  <span className="text-[10px] text-primary font-semibold bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                    {Math.round(classification.confidence * 100)}% match
                   </span>
                 )}
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto p-1">
-                {problemTypes.map((pt, idx) => {
-                  const Icon = pt.icon;
-                  const isSelected =
-                    selectedModule === pt.id &&
-                    (!pt.networkSubtype || selectedNetworkSubtype === pt.networkSubtype) &&
-                    (!pt.transSubtype || selectedTransSubtype === pt.transSubtype);
-
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setSelectedModule(pt.id);
-                        if (pt.networkSubtype) setSelectedNetworkSubtype(pt.networkSubtype);
-                        if (pt.transSubtype) setSelectedTransSubtype(pt.transSubtype);
-                        setTargetHintKey(pt.key);
-
-                        if (ocrText.trim()) {
-                          handleAnalyzeText(ocrText, pt.key);
-                        }
-                      }}
-                      className={`p-2.5 px-3 rounded-xl border text-left transition-all duration-150 flex items-center gap-2 ${
-                        isSelected
-                          ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/40 text-primary font-semibold"
-                          : "bg-canvas border-hairline hover:bg-surface-cream text-ink font-medium"
-                      }`}
-                    >
-                      <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted"}`} />
-                      <span className="text-xs truncate">{pt.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              </label>
             </div>
-          )}
+
+            {/* Single Unified Grid of Problem Types */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto p-1">
+              {problemTypes.map((pt) => {
+                const Icon = pt.icon;
+                const isSelected = selectedKey === pt.key;
+
+                return (
+                  <button
+                    key={pt.key}
+                    type="button"
+                    onClick={() => applyProblemType(pt.key)}
+                    className={`p-2.5 px-3 rounded-xl border text-left transition-all duration-150 flex items-center gap-2 ${
+                      isSelected
+                        ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/40 text-primary font-semibold"
+                        : "bg-canvas border-hairline hover:bg-surface-cream text-ink font-medium"
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted"}`} />
+                    <span className="text-xs truncate">{pt.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {error && (
             <div className="bg-[#fdf2f2] border border-[#f5c6c6] text-error p-3.5 rounded-xl text-xs flex items-center gap-2">
@@ -633,6 +623,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
         {/* Modal Footer */}
         <div className="px-6 py-4 border-t border-hairline bg-surface-soft flex items-center justify-between">
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold text-body hover:text-ink transition-colors"
           >
@@ -640,6 +631,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={handleConfirmAndSolve}
             disabled={(!imagePreview && !ocrText.trim()) || scanning}
             className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"

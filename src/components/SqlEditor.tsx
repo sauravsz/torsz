@@ -307,8 +307,8 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
           onMount={handleEditorMount}
           options={{
             minimap: { enabled: false },
-            fontSize: 13,
-            lineHeight: 20,
+            fontSize: 14.5,
+            lineHeight: 22,
             fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', monospace",
             lineNumbers: "on",
             lineNumbersMinChars: 3,

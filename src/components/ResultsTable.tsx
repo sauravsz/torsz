@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Download, AlertCircle, CheckCircle2, Search, Save, RotateCcw, Check, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, AlertCircle, CheckCircle2, Search, Save, RotateCcw, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { QueryResult } from "../types";
 
 export interface PendingCellUpdate {
@@ -17,8 +17,15 @@ interface ResultsTableProps {
   onSaveCellUpdates?: (updates: PendingCellUpdate[]) => Promise<void>;
 }
 
-const ROW_HEIGHT = 38;
+interface SortCriterion {
+  colIdx: number;
+  dir: "asc" | "desc";
+}
+
+const ROW_HEIGHT = 38; // Increased from 32px for larger font readability
 const BUFFER_ROWS = 10;
+const DEFAULT_COLUMN_WIDTH = 180;
+const MIN_COLUMN_WIDTH = 80;
 
 export const ResultsTable: React.FC<ResultsTableProps> = ({
   result,
@@ -26,27 +33,20 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
   onSaveCellUpdates,
 }) => {
   const [filterText, setFilterText] = useState("");
+  const [sortCriteria, setSortCriteria] = useState<SortCriterion[]>([]);
+  const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [editingCell, setEditingCell] = useState<{ rowIdx: number; colIdx: number } | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editValue, setEditValue] = useState<string>("");
   const [pendingUpdates, setPendingUpdates] = useState<PendingCellUpdate[]>([]);
   const [saving, setSaving] = useState(false);
-  const [sortCriteria, setSortCriteria] = useState<{ colIdx: number; dir: "asc" | "desc" }[]>([]);
-  const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
+
+  // Virtualization state
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(400);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const resizingColRef = useRef<{ colIdx: number; startX: number; startW: number } | null>(null);
 
-  // Clear pending updates when result changes
-  useEffect(() => {
-    setPendingUpdates([]);
-    setEditingCell(null);
-    setSortCriteria([]);
-  }, [result]);
-
-  // Focus input when editing starts
   useEffect(() => {
     if (editingCell && inputRef.current) {
       inputRef.current.focus();
@@ -54,7 +54,6 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
     }
   }, [editingCell]);
 
-  // Update container height
   useEffect(() => {
     const updateHeight = () => {
       if (containerRef.current) {
@@ -66,124 +65,130 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
     return () => window.removeEventListener("resize", updateHeight);
   }, []);
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    setScrollTop(e.currentTarget.scrollTop);
+  const handleScroll = () => {
+    if (containerRef.current) {
+      setScrollTop(containerRef.current.scrollTop);
+    }
   };
 
-  // Sort and Filter Rows
+  // Reset staging and sorting when result changes
+  useEffect(() => {
+    setPendingUpdates([]);
+    setEditingCell(null);
+    setFilterText("");
+    setSortCriteria([]);
+  }, [result]);
+
+  // Sorting Handler
+  const toggleSort = (colIdx: number, e: React.MouseEvent) => {
+    const isShift = e.shiftKey;
+    setSortCriteria((prev) => {
+      const existing = prev.find((s) => s.colIdx === colIdx);
+      if (!isShift) {
+        if (!existing) return [{ colIdx, dir: "asc" }];
+        if (existing.dir === "asc") return [{ colIdx, dir: "desc" }];
+        return [];
+      } else {
+        if (!existing) return [...prev, { colIdx, dir: "asc" }];
+        if (existing.dir === "asc") {
+          return prev.map((s) => (s.colIdx === colIdx ? { ...s, dir: "desc" } : s));
+        }
+        return prev.filter((s) => s.colIdx !== colIdx);
+      }
+    });
+  };
+
+  // Column Resizing Handler
+  const handleMouseDownResize = (e: React.MouseEvent, colIdx: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = columnWidths[colIdx] || DEFAULT_COLUMN_WIDTH;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(
+        MIN_COLUMN_WIDTH,
+        startWidth + (moveEvent.clientX - startX)
+      );
+      setColumnWidths((prev) => ({
+        ...prev,
+        [colIdx]: newWidth,
+      }));
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+
+  // Filter & Sort Rows
   const processedRows = useMemo(() => {
-    if (!result || result.rows.length === 0) return [];
+    if (!result || !result.rows) return [];
+    let rowsWithIndex = result.rows.map((row, originalIdx) => ({ row, originalIdx }));
 
-    let rowsWithIndex = result.rows.map((row, idx) => ({ row, originalIdx: idx }));
-
-    // Filter
+    // Text Filter
     if (filterText.trim()) {
-      const lower = filterText.toLowerCase();
-      rowsWithIndex = rowsWithIndex.filter(({ row, originalIdx }) => {
-        return row.some((val, colIdx) => {
-          const pending = pendingUpdates.find(
-            (u) => u.rowIdx === originalIdx && u.colIdx === colIdx
-          );
-          const effective = pending ? pending.newVal : val;
-          return String(effective).toLowerCase().includes(lower);
-        });
-      });
+      const term = filterText.toLowerCase();
+      rowsWithIndex = rowsWithIndex.filter(({ row }) =>
+        row.some((val) =>
+          val !== null && val !== undefined && String(val).toLowerCase().includes(term)
+        )
+      );
     }
 
-    // Multi-Column Sorting
+    // Multi-column Sort
     if (sortCriteria.length > 0) {
       rowsWithIndex.sort((a, b) => {
-        for (const criterion of sortCriteria) {
-          const valA = a.row[criterion.colIdx];
-          const valB = b.row[criterion.colIdx];
+        for (const crit of sortCriteria) {
+          const valA = a.row[crit.colIdx];
+          const valB = b.row[crit.colIdx];
+
           if (valA === valB) continue;
           if (valA === null || valA === undefined) return 1;
           if (valB === null || valB === undefined) return -1;
+
+          let comp = 0;
           if (typeof valA === "number" && typeof valB === "number") {
-            return criterion.dir === "asc" ? valA - valB : valB - valA;
+            comp = valA - valB;
+          } else {
+            comp = String(valA).localeCompare(String(valB), undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
           }
-          const strA = String(valA).toLowerCase();
-          const strB = String(valB).toLowerCase();
-          const cmp = strA.localeCompare(strB);
-          if (cmp !== 0) {
-            return criterion.dir === "asc" ? cmp : -cmp;
-          }
+
+          return crit.dir === "asc" ? comp : -comp;
         }
         return 0;
       });
     }
 
     return rowsWithIndex;
-  }, [result, filterText, sortCriteria, pendingUpdates]);
-
-  const toggleSort = (colIdx: number, e?: React.MouseEvent) => {
-    const isShift = e?.shiftKey;
-    setSortCriteria((prev) => {
-      const existingIdx = prev.findIndex((s) => s.colIdx === colIdx);
-      if (!isShift) {
-        if (existingIdx !== -1) {
-          return prev[existingIdx].dir === "asc"
-            ? [{ colIdx, dir: "desc" }]
-            : [];
-        }
-        return [{ colIdx, dir: "asc" }];
-      }
-
-      if (existingIdx !== -1) {
-        if (prev[existingIdx].dir === "asc") {
-          const next = [...prev];
-          next[existingIdx] = { colIdx, dir: "desc" };
-          return next;
-        } else {
-          return prev.filter((s) => s.colIdx !== colIdx);
-        }
-      }
-      return [...prev, { colIdx, dir: "asc" }];
-    });
-  };
-
-  // Column Resizing Handlers
-  const handleMouseDownResize = (e: React.MouseEvent, colIdx: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startW = columnWidths[colIdx] || 160;
-    resizingColRef.current = { colIdx, startX: e.clientX, startW };
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!resizingColRef.current) return;
-      const diff = moveEvent.clientX - resizingColRef.current.startX;
-      const newWidth = Math.max(80, resizingColRef.current.startW + diff);
-      setColumnWidths((prev) => ({
-        ...prev,
-        [resizingColRef.current!.colIdx]: newWidth,
-      }));
-    };
-
-    const handleMouseUp = () => {
-      resizingColRef.current = null;
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
+  }, [result, filterText, sortCriteria]);
 
   if (loading) {
     return (
-      <div className="flex-1 bg-canvas border border-hairline rounded-2xl flex flex-col items-center justify-center p-8 text-center text-muted select-none shadow-2xs">
+      <div className="flex-1 bg-canvas border border-hairline rounded-2xl flex flex-col items-center justify-center p-8 select-none shadow-2xs">
         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-        <p className="text-xs font-medium text-ink">Executing SQL query...</p>
+        <p className="text-sm text-ink font-semibold">Executing SQL query...</p>
+        <p className="text-xs text-muted-soft mt-1">Processing in WebAssembly SQLite engine</p>
       </div>
     );
   }
 
   if (!result) {
     return (
-      <div className="flex-1 bg-canvas border border-hairline rounded-2xl flex flex-col items-center justify-center p-8 text-center text-muted select-none shadow-2xs">
-        <p className="font-editorial-serif text-xl text-ink mb-1">No Results Yet</p>
-        <p className="text-xs text-muted-soft">
-          Execute a query above to view the tabular results and metadata. Double-click any cell to edit.
+      <div className="flex-1 bg-canvas border border-hairline rounded-2xl flex flex-col items-center justify-center p-8 select-none shadow-2xs">
+        <div className="w-10 h-10 bg-surface-card rounded-2xl flex items-center justify-center text-muted mb-3 border border-hairline">
+          <Search className="w-5 h-5 text-primary" />
+        </div>
+        <p className="text-sm font-semibold text-ink">Ready to Query</p>
+        <p className="text-xs text-muted-soft mt-1 max-w-sm text-center">
+          Execute a query with <kbd className="font-mono bg-surface-card px-1.5 py-0.5 rounded border border-hairline text-ink">⌘ + Enter</kbd> to inspect and edit records.
         </p>
       </div>
     );
@@ -298,20 +303,19 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
   );
   const visibleRows = processedRows.slice(startIndex, endIndex);
   const topPadding = startIndex * ROW_HEIGHT;
-  const bottomPadding = (totalRows - endIndex) * ROW_HEIGHT;
 
   return (
     <div className="flex-1 bg-canvas border border-hairline rounded-2xl flex flex-col h-full overflow-hidden select-text shadow-2xs">
       {/* Compact Table Metadata Bar */}
-      <div className="h-8 bg-surface-soft/60 border-b border-hairline px-3 flex items-center justify-between text-xs text-muted select-none shrink-0">
+      <div className="h-9 bg-surface-soft/60 border-b border-hairline px-3 flex items-center justify-between text-xs text-muted select-none shrink-0">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-ink font-medium text-[11px]">
-            <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+          <div className="flex items-center gap-1.5 text-ink font-semibold text-xs">
+            <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
             <span>{processedRows.length} rows</span>
           </div>
 
           <span className="text-hairline">•</span>
-          <span className="text-[11px] text-muted-soft">{result.execution_time_ms} ms</span>
+          <span className="text-xs text-muted-soft">{result.execution_time_ms} ms</span>
         </div>
         <div className="flex items-center gap-2">
           {pendingUpdates.length > 0 && (
@@ -320,19 +324,21 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                 {pendingUpdates.length} staged change{pendingUpdates.length > 1 ? "s" : ""}
               </span>
               <button
+                type="button"
                 onClick={() => setPendingUpdates([])}
-                className="text-[11px] text-muted hover:text-ink flex items-center gap-1 transition-colors px-1"
+                className="text-xs text-muted hover:text-ink flex items-center gap-1 transition-colors px-1"
                 title="Discard staged changes"
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
                 Discard
               </button>
               <button
+                type="button"
                 onClick={handleSaveAll}
                 disabled={saving}
                 className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-3 py-1 rounded-lg transition-colors shadow-2xs"
               >
-                <Save className="w-3 h-3" />
+                <Save className="w-3.5 h-3.5" />
                 {saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
@@ -342,7 +348,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
             <div className="flex items-center gap-2">
               {/* Quick Filter */}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-muted" />
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted" />
                 <input
                   type="text"
                   placeholder="Filter table..."
@@ -352,12 +358,15 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                 />
               </div>
 
+              {/* Export CSV */}
               <button
+                type="button"
                 onClick={exportCsv}
-                className="flex items-center gap-1 text-xs font-medium text-ink bg-surface-card hover:bg-surface-cream px-3 py-1 rounded-xl border border-hairline transition-colors shadow-2xs"
+                className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-3 py-1 rounded-xl border border-hairline transition-colors shadow-2xs"
+                title="Export Results to CSV"
               >
                 <Download className="w-3.5 h-3.5 text-primary" />
-                Export CSV
+                <span>Export CSV</span>
               </button>
             </div>
           )}
@@ -390,7 +399,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                     <th
                       key={col.name}
                       style={width ? { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` } : undefined}
-                      className="px-4 py-2.5 text-sm font-semibold text-ink border-r border-hairline whitespace-nowrap relative group cursor-pointer hover:bg-surface-cream transition-colors"
+                      className="px-4 py-2.5 text-[13px] font-semibold text-ink border-r border-hairline whitespace-nowrap relative group cursor-pointer hover:bg-surface-cream transition-colors"
                       onClick={(e) => toggleSort(colIdx, e)}
                       title="Click to sort (Shift+Click for multi-column sort)"
                     >
@@ -405,17 +414,17 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                                 <ArrowDown className="w-3.5 h-3.5" />
                               )}
                               {sortCriteria.length > 1 && (
-                                <span className="text-[9px] bg-primary/20 rounded-full px-1 py-0.2">
+                                <span className="text-[10px] bg-primary/20 rounded-full px-1.5 py-0.2">
                                   {sortRank}
                                 </span>
                               )}
                             </span>
                           ) : (
-                            <ArrowUpDown className="w-3 h-3 text-muted-soft opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                            <ArrowUpDown className="w-3.5 h-3.5 text-muted-soft opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}
                         </div>
 
-                        <span className="text-[11px] font-mono font-normal text-muted-soft uppercase bg-canvas px-1.5 py-0.5 rounded border border-hairline shrink-0">
+                        <span className="text-[10px] font-mono font-normal text-muted-soft uppercase bg-canvas px-1.5 py-0.5 rounded border border-hairline shrink-0">
                           {col.data_type}
                         </span>
                       </div>
@@ -469,7 +478,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                           key={colIdx}
                           style={width ? { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` } : undefined}
                           onDoubleClick={() => startEditing(globalRowIdx, colIdx, cell)}
-                          className={`px-4 py-2 text-[13.5px] border-r border-hairline whitespace-nowrap font-mono transition-colors relative cursor-pointer truncate ${
+                          className={`px-4 py-2 text-[14px] border-r border-hairline whitespace-nowrap font-mono transition-colors relative cursor-pointer truncate ${
                             isNumber ? "text-right" : "text-left"
                           } ${
                             pending ? "bg-[#fff7ed] text-primary font-semibold" : "text-body"
@@ -489,52 +498,18 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                                     cancelEdit();
                                   }
                                 }}
-                                className="w-full bg-canvas text-ink border-2 border-primary rounded-md px-2 py-0.5 text-xs font-mono outline-none shadow-xs"
+                                onBlur={() => commitEdit(globalRowIdx, colIdx, cell, row)}
+                                className="w-full bg-canvas border-2 border-primary rounded px-2 py-1 text-xs text-ink font-mono focus:outline-none shadow-xs"
                               />
-                              <button
-                                onClick={() => commitEdit(globalRowIdx, colIdx, cell, row)}
-                                className="text-success hover:bg-surface-cream p-1 rounded"
-                                title="Confirm edit (Enter)"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="text-muted hover:bg-surface-cream p-1 rounded"
-                                title="Cancel (Esc)"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
                             </div>
                           ) : (
-                            <div className={`flex items-center gap-2 ${isNumber ? "justify-end" : "justify-between"}`}>
-                              <span className="truncate">
-                                {displayVal === null ? (
-                                  <span className="text-[11px] text-muted-soft italic bg-surface-soft px-1.5 py-0.2 rounded border border-hairline">
-                                    NULL
-                                  </span>
-                                ) : typeof displayVal === "boolean" ? (
-                                  <span
-                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
-                                      displayVal
-                                        ? "bg-success/15 text-success border-success/30"
-                                        : "bg-surface-cream text-muted border-hairline"
-                                    }`}
-                                  >
-                                    {displayVal ? "TRUE" : "FALSE"}
-                                  </span>
-                                ) : typeof displayVal === "number" ? (
-                                  <span className="text-accent-teal font-semibold">{displayVal}</span>
-                                ) : (
-                                  <span>{String(displayVal)}</span>
-                                )}
-                              </span>
-                              {pending && (
-                                <span className="text-[10px] bg-primary text-on-primary px-1.5 py-0.2 rounded uppercase tracking-wider font-sans shrink-0">
-                                  edited
-                                </span>
+                            <span className="truncate">
+                              {displayVal === null || displayVal === undefined ? (
+                                <span className="text-muted-soft/60 italic text-xs">NULL</span>
+                              ) : (
+                                String(displayVal)
                               )}
-                            </div>
+                            </span>
                           )}
                         </td>
                       );
@@ -542,12 +517,6 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                   </tr>
                 );
               })}
-
-              {bottomPadding > 0 && (
-                <tr>
-                  <td colSpan={result.columns.length + 1} style={{ height: `${bottomPadding}px` }} />
-                </tr>
-              )}
             </tbody>
           </table>
         )}
