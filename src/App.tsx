@@ -328,8 +328,7 @@ function MainWorkspace() {
         onOpenNewConnection={() => setIsModalOpen(true)}
         onLoadSampleDb={handleLoadSampleDb}
         onRefreshSchema={() => activeConnection && refreshSchema(activeConnection.id)}
-        activeView={activeView}
-        onSelectView={setActiveView}
+
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
@@ -348,6 +347,8 @@ function MainWorkspace() {
         {/* Left Schema Sidebar */}
         {isSidebarOpen && (
           <Sidebar
+            activeView={activeView}
+            onSelectView={setActiveView}
             activeOrModule={activeOrModule}
             onSelectOrModule={(mod) => {
               setActiveOrModule(mod);

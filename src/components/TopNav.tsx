@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Sparkles, Network, Terminal, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download, TrendingUp, Camera } from "lucide-react";
+import { Plus, Sparkles, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download, Camera } from "lucide-react";
 import { ConnectionConfig } from "../types";
 interface TopNavProps {
   activeConnection: ConnectionConfig | null;
@@ -8,8 +8,6 @@ interface TopNavProps {
   onOpenNewConnection: () => void;
   onLoadSampleDb: () => void;
   onRefreshSchema: () => void;
-  activeView: "editor" | "diagram" | "ai" | "or";
-  onSelectView: (view: "editor" | "diagram" | "ai" | "or") => void;
   onImportSpreadsheet: (file: File) => void;
   onOpenHistory: () => void;
   isSidebarOpen?: boolean;
@@ -26,8 +24,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenNewConnection,
   onLoadSampleDb,
   onRefreshSchema,
-  activeView,
-  onSelectView,
+
   onImportSpreadsheet,
   onOpenHistory,
   isSidebarOpen = true,
@@ -68,61 +65,6 @@ export const TopNav: React.FC<TopNavProps> = ({
             )}
           </button>
         )}
-
-        {/* Apple Segmented Control View Switcher */}
-        <div className="flex items-center bg-surface-soft p-1 rounded-lg border border-hairline ml-3 gap-1 shadow-2xs">
-          {/* Query Editor Tab */}
-          <button
-            onClick={() => onSelectView("editor")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
-              activeView === "editor"
-                ? "bg-surface-card text-ink font-semibold shadow-xs border border-hairline"
-                : "text-muted hover:text-ink hover:bg-surface-cream/50"
-            }`}
-          >
-            <Terminal className={`w-3.5 h-3.5 shrink-0 ${activeView === "editor" ? "text-primary" : "text-muted"}`} />
-            <span>Query Editor</span>
-          </button>
-
-          {/* Schema Visualizer Tab */}
-          <button
-            onClick={() => onSelectView("diagram")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
-              activeView === "diagram"
-                ? "bg-surface-card text-ink font-semibold shadow-xs border border-hairline"
-                : "text-muted hover:text-ink hover:bg-surface-cream/50"
-            }`}
-          >
-            <Network className={`w-3.5 h-3.5 shrink-0 ${activeView === "diagram" ? "text-primary" : "text-muted"}`} />
-            <span>Schema Visualizer</span>
-          </button>
-
-          {/* AI Assistant Tab */}
-          <button
-            onClick={() => onSelectView("ai")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
-              activeView === "ai"
-                ? "bg-surface-card text-primary font-semibold shadow-xs border border-hairline"
-                : "text-muted hover:text-primary hover:bg-surface-cream/50"
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0 text-primary" />
-            <span>AI Assistant</span>
-          </button>
-
-          {/* TORA Solvers Tab */}
-          <button
-            onClick={() => onSelectView("or")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
-              activeView === "or"
-                ? "bg-surface-card text-primary font-semibold shadow-xs border border-hairline"
-                : "text-muted hover:text-primary hover:bg-surface-cream/50"
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5 shrink-0 text-primary" />
-            <span>TORA Solvers</span>
-          </button>
-        </div>
       </div>
 
       {/* Connection & Actions Cluster */}

@@ -14,6 +14,7 @@ import {
   Moon,
   Laptop,
   Sparkles,
+  Terminal,
 } from "lucide-react";
 import { OrModule } from "../services/or/types";
 import {
@@ -24,12 +25,16 @@ import {
 } from "../services/theme";
 
 interface SidebarProps {
+  activeView: "editor" | "diagram" | "ai" | "or";
+  onSelectView: (view: "editor" | "diagram" | "ai" | "or") => void;
   activeOrModule: OrModule;
   onSelectOrModule: (module: OrModule) => void;
   onToggle?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  activeView,
+  onSelectView,
   activeOrModule,
   onSelectOrModule,
   onToggle,
@@ -59,6 +64,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords, desc: "Minimax & Saddle Points" },
     { id: "linear-equations", name: "Linear Equations", icon: Calculator, desc: "Gauss-Jordan Ax = b" },
   ];
+
+  const views = [
+    { id: "editor", name: "Query Editor", icon: Terminal },
+    { id: "diagram", name: "Schema Visualizer", icon: Network },
+    { id: "ai", name: "AI Assistant", icon: Sparkles },
+    { id: "or", name: "TORA Solvers", icon: TrendingUp },
+  ] as const;
 
   const filteredOrModules = orModules.filter(
     (m) =>
@@ -109,12 +121,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {filteredOrModules.map((m) => {
           const Icon = m.icon;
-          const isActive = activeOrModule === m.id;
+          const isActive = activeView === "or" && activeOrModule === m.id;
 
           return (
             <button
               key={m.id}
-              onClick={() => onSelectOrModule(m.id as OrModule)}
+              onClick={() => {
+                onSelectOrModule(m.id as OrModule);
+                onSelectView("or");
+              }}
               className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-all duration-150 ${
                 isActive
                   ? "bg-canvas text-ink border border-hairline shadow-xs font-semibold ring-1 ring-primary/20"
@@ -133,6 +148,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           );
         })}
+      </div>
+
+      {/* Main Workspace Views Relocated to Bottom of Sidebar */}
+      <div className="p-2 border-t border-hairline bg-surface-soft shrink-0 space-y-1 select-none">
+        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted mb-0.5">
+          Workspace Views
+        </div>
+
+        <div className="grid grid-cols-2 gap-1">
+          {views.map((v) => {
+            const Icon = v.icon;
+            const isActive = activeView === v.id;
+
+            return (
+              <button
+                key={v.id}
+                onClick={() => onSelectView(v.id)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 text-left truncate ${
+                  isActive
+                    ? "bg-surface-card text-ink font-semibold shadow-xs border border-hairline"
+                    : "text-muted hover:text-ink hover:bg-surface-cream/50"
+                }`}
+              >
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-primary" : "text-muted"}`} />
+                <span className="truncate text-[11px]">{v.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Theme Mode Switcher Pinned to Sidebar Bottom */}
