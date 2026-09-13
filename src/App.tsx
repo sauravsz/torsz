@@ -466,6 +466,7 @@ function MainWorkspace() {
                 if (mod) setActiveOrModule(mod as any);
                 setActiveView("or");
               }}
+              onPopulateAndSolveOr={handleOcrSelectAndSolve}
               initialPrompt={aiInitialPrompt}
             />
           ) : (
