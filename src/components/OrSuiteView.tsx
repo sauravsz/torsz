@@ -4,7 +4,7 @@ import {
   CheckCircle2,
   Plus,
   Trash2,
-  FileText,
+
   Sparkles,
   Camera,
   ArrowUp,
@@ -52,6 +52,7 @@ import {
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
 import { NetworkGraphCanvas } from "./NetworkGraphCanvas";
+import { HungarianMatrixViewer } from "./HungarianMatrixViewer";
 import { BranchAndBoundTree } from "./BranchAndBoundTree";
 import { MultiScenarioSensitivitySweep } from "./MultiScenarioSensitivitySweep";
 import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
@@ -82,7 +83,7 @@ interface OrSuiteViewProps {
 }
 
 export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
-  onOpenInSql,
+  onOpenInSql: _onOpenInSql,
   onAskAi,
   onOpenOcr,
   activeModule: controlledModule,
@@ -753,35 +754,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                           <span>Ask AI Advisor</span>
                         </button>
                       )}
-                      <button
-                        onClick={() =>
-                          onOpenInSql(`-- Transportation Model
--- Total Supply: ${transProblem.supply.reduce((a, b) => a + b, 0)} | Total Demand: ${transProblem.demand.reduce((a, b) => a + b, 0)}
 
-CREATE TABLE IF NOT EXISTS transportation_costs (
-  source_name VARCHAR(50),
-  destination_name VARCHAR(50),
-  unit_cost DOUBLE PRECISION,
-  PRIMARY KEY (source_name, destination_name)
-);
-
--- Sample shipping route costs
-INSERT OR REPLACE INTO transportation_costs VALUES
-${transProblem.sources
-  .map((s, r) =>
-    transProblem.destinations
-      .map((d, c) => `  ('${s}', '${d}', ${transProblem.costs[r][c]})`)
-      .join(",\n")
-  )
-  .join(",\n")};
-
-SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
-                        }
-                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
-                      >
-                        <FileText className="w-3.5 h-3.5 text-primary" />
-                        <span>Save to SQL</span>
-                      </button>
                       <button
                         onClick={addTransSource}
                         className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
@@ -1044,31 +1017,14 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                     </table>
                   </div>
 
-                  {/* Solution Output */}
+                  {/* Hungarian Reduction & Solution Matrix Viewer */}
                   {assignSol && (
-                    <div className="bg-surface-card text-ink p-5 rounded-2xl border border-hairline space-y-4 animate-keyframe-fade-up shadow-sm">
-                      <div className="flex items-center justify-between border-b border-hairline pb-2">
-                        <span className="font-semibold text-base">Optimal One-to-One Matchings</span>
-                        <span className="text-lg font-mono font-bold text-primary">
-                          Total Assignment Cost: ${assignSol.totalCost}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {assignSol.assignments.map((a, i) => (
-                          <div
-                            key={i}
-                            className="bg-canvas p-3 rounded-xl border border-hairline flex items-center justify-between text-xs"
-                          >
-                            <span className="font-semibold text-ink">
-                              {a.worker} → {a.job}
-                            </span>
-                            <span className="font-mono text-accent-teal font-bold">
-                              ${a.cost}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <HungarianMatrixViewer
+                      workers={assignProblem.workers}
+                      jobs={assignProblem.jobs}
+                      costs={assignProblem.costs}
+                      solution={assignSol}
+                    />
                   )}
                 </div>
               )}
@@ -1134,32 +1090,8 @@ SELECT * FROM transportation_costs ORDER BY unit_cost ASC;`)
                         <span>Ask AI Advisor</span>
                       </button>
                     )}
-                    <button
-                      onClick={() =>
-                        onOpenInSql(`-- Linear Programming Formulation (Maximize Profit)
-CREATE TABLE IF NOT EXISTS lp_variables (
-  variable_name VARCHAR(10) PRIMARY KEY,
-  optimal_units DOUBLE PRECISION,
-  unit_profit DOUBLE PRECISION
-);
 
-INSERT OR REPLACE INTO lp_variables VALUES
-  ('x1', ${lpSol?.variableValues.find((v) => v.name === "x1")?.value || 3.0}, ${lpProblem.objectiveCoefficients[0]}),
-  ('x2', ${lpSol?.variableValues.find((v) => v.name === "x2")?.value || 1.5}, ${lpProblem.objectiveCoefficients[1]});
 
-SELECT 
-  variable_name,
-  optimal_units,
-  unit_profit,
-  (optimal_units * unit_profit) AS total_revenue,
-  (SELECT SUM(optimal_units * unit_profit) FROM lp_variables) AS optimal_Z
-FROM lp_variables;`)
-                      }
-                      className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-3 py-2 rounded-xl border border-hairline transition-colors shadow-2xs"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-primary" />
-                      <span>Save to SQL</span>
-                    </button>
                     <button
                       onClick={handleSolveLp}
                       className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"

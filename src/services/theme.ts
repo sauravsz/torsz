@@ -19,12 +19,20 @@ export function applyTheme(mode: ThemeMode) {
       mode === "dark" ||
       (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.setAttribute("data-theme", "dark");
+    const updateDom = () => {
+      if (isDark) {
+        document.documentElement.classList.add("dark");
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        document.documentElement.setAttribute("data-theme", "light");
+      }
+    };
+
+    if ("startViewTransition" in document) {
+      (document as any).startViewTransition(updateDom);
     } else {
-      document.documentElement.classList.remove("dark");
-      document.documentElement.setAttribute("data-theme", "light");
+      updateDom();
     }
   } catch (e) {
     console.warn("Failed to apply theme:", e);

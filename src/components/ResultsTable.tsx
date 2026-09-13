@@ -30,8 +30,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
   const [editValue, setEditValue] = useState("");
   const [pendingUpdates, setPendingUpdates] = useState<PendingCellUpdate[]>([]);
   const [saving, setSaving] = useState(false);
-  const [sortCol, setSortCol] = useState<number | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortCriteria, setSortCriteria] = useState<{ colIdx: number; dir: "asc" | "desc" }[]>([]);
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [scrollTop, setScrollTop] = useState(0);
   const [containerHeight, setContainerHeight] = useState(400);
@@ -44,7 +43,7 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
   useEffect(() => {
     setPendingUpdates([]);
     setEditingCell(null);
-    setSortCol(null);
+    setSortCriteria([]);
   }, [result]);
 
   // Focus input when editing starts
@@ -91,41 +90,56 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
       });
     }
 
-    // Sort
-    if (sortCol !== null && sortCol >= 0) {
+    // Multi-Column Sorting
+    if (sortCriteria.length > 0) {
       rowsWithIndex.sort((a, b) => {
-        const valA = a.row[sortCol];
-        const valB = b.row[sortCol];
-
-        if (valA === valB) return 0;
-        if (valA === null || valA === undefined) return 1;
-        if (valB === null || valB === undefined) return -1;
-
-        if (typeof valA === "number" && typeof valB === "number") {
-          return sortDir === "asc" ? valA - valB : valB - valA;
+        for (const criterion of sortCriteria) {
+          const valA = a.row[criterion.colIdx];
+          const valB = b.row[criterion.colIdx];
+          if (valA === valB) continue;
+          if (valA === null || valA === undefined) return 1;
+          if (valB === null || valB === undefined) return -1;
+          if (typeof valA === "number" && typeof valB === "number") {
+            return criterion.dir === "asc" ? valA - valB : valB - valA;
+          }
+          const strA = String(valA).toLowerCase();
+          const strB = String(valB).toLowerCase();
+          const cmp = strA.localeCompare(strB);
+          if (cmp !== 0) {
+            return criterion.dir === "asc" ? cmp : -cmp;
+          }
         }
-
-        const strA = String(valA).toLowerCase();
-        const strB = String(valB).toLowerCase();
-        return sortDir === "asc" ? strA.localeCompare(strB) : strB.localeCompare(strA);
+        return 0;
       });
     }
 
     return rowsWithIndex;
-  }, [result, filterText, sortCol, sortDir, pendingUpdates]);
+  }, [result, filterText, sortCriteria, pendingUpdates]);
 
-  const toggleSort = (colIdx: number) => {
-    if (sortCol === colIdx) {
-      if (sortDir === "asc") {
-        setSortDir("desc");
-      } else {
-        setSortCol(null);
-        setSortDir("asc");
+  const toggleSort = (colIdx: number, e?: React.MouseEvent) => {
+    const isShift = e?.shiftKey;
+    setSortCriteria((prev) => {
+      const existingIdx = prev.findIndex((s) => s.colIdx === colIdx);
+      if (!isShift) {
+        if (existingIdx !== -1) {
+          return prev[existingIdx].dir === "asc"
+            ? [{ colIdx, dir: "desc" }]
+            : [];
+        }
+        return [{ colIdx, dir: "asc" }];
       }
-    } else {
-      setSortCol(colIdx);
-      setSortDir("asc");
-    }
+
+      if (existingIdx !== -1) {
+        if (prev[existingIdx].dir === "asc") {
+          const next = [...prev];
+          next[existingIdx] = { colIdx, dir: "desc" };
+          return next;
+        } else {
+          return prev.filter((s) => s.colIdx !== colIdx);
+        }
+      }
+      return [...prev, { colIdx, dir: "asc" }];
+    });
   };
 
   // Column Resizing Handlers
@@ -387,24 +401,33 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
                 </th>
                 {result.columns.map((col, colIdx) => {
                   const width = columnWidths[colIdx];
-                  const isSorted = sortCol === colIdx;
+                  const sortItem = sortCriteria.find((s) => s.colIdx === colIdx);
+                  const sortRank = sortCriteria.findIndex((s) => s.colIdx === colIdx) + 1;
 
                   return (
                     <th
                       key={col.name}
                       style={width ? { width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` } : undefined}
                       className="px-4 py-2.5 text-sm font-semibold text-ink border-r border-hairline whitespace-nowrap relative group cursor-pointer hover:bg-surface-cream transition-colors"
-                      onClick={() => toggleSort(colIdx)}
+                      onClick={(e) => toggleSort(colIdx, e)}
+                      title="Click to sort (Shift+Click for multi-column sort)"
                     >
                       <div className="flex items-center justify-between gap-3 pr-2">
                         <div className="flex items-center gap-1.5 truncate">
                           <span>{col.name}</span>
-                          {isSorted ? (
-                            sortDir === "asc" ? (
-                              <ArrowUp className="w-3.5 h-3.5 text-primary shrink-0" />
-                            ) : (
-                              <ArrowDown className="w-3.5 h-3.5 text-primary shrink-0" />
-                            )
+                          {sortItem ? (
+                            <span className="flex items-center text-primary font-bold text-xs gap-0.5">
+                              {sortItem.dir === "asc" ? (
+                                <ArrowUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ArrowDown className="w-3.5 h-3.5" />
+                              )}
+                              {sortCriteria.length > 1 && (
+                                <span className="text-[9px] bg-primary/20 rounded-full px-1 py-0.2">
+                                  {sortRank}
+                                </span>
+                              )}
+                            </span>
                           ) : (
                             <ArrowUpDown className="w-3 h-3 text-muted-soft opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                           )}

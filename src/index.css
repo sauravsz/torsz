@@ -57,6 +57,11 @@
   body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  table, input, textarea, pre, code {
+    font-variant-numeric: tabular-nums lining-nums;
   }
 }
 

@@ -8,10 +8,19 @@ export interface ToastMessage {
   title?: string;
   message: string;
   type: ToastType;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: ToastType, title?: string) => void;
+  showToast: (
+    message: string,
+    type?: ToastType,
+    title?: string,
+    action?: { label: string; onClick: () => void }
+  ) => void;
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
@@ -19,15 +28,23 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = "info", title?: string) => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-    const newToast: ToastMessage = { id, message, type, title };
-    setToasts((prev) => [...prev, newToast]);
+  const showToast = useCallback(
+    (
+      message: string,
+      type: ToastType = "info",
+      title?: string,
+      action?: { label: string; onClick: () => void }
+    ) => {
+      const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+      const newToast: ToastMessage = { id, message, type, title, action };
+      setToasts((prev) => [...prev, newToast]);
 
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
-  }, []);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4500);
+    },
+    []
+  );
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -62,8 +79,19 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 <h5 className="text-xs font-semibold text-ink mb-0.5">{t.title}</h5>
               )}
               <p className="text-xs text-body leading-relaxed break-words">{t.message}</p>
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action?.onClick();
+                    removeToast(t.id);
+                  }}
+                  className="mt-2 text-xs font-semibold text-primary hover:underline flex items-center gap-1 bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20 transition-colors"
+                >
+                  <span>{t.action.label}</span>
+                  <span>→</span>
+                </button>
+              )}
             </div>
-
             <button
               onClick={() => removeToast(t.id)}
               className="text-muted hover:text-ink p-1 rounded transition-colors"
