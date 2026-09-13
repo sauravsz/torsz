@@ -13,8 +13,8 @@ import {
   Sun,
   Moon,
   Laptop,
-  Sparkles,
   Terminal,
+  Sparkles,
 } from "lucide-react";
 import { OrModule } from "../services/or/types";
 import {
@@ -108,14 +108,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const orModules = [
-    { id: "linear-programming", name: "Linear Programming", icon: TrendingUp, desc: "Simplex & 2D Graphical" },
-    { id: "transportation-assignment", name: "Transportation & Assignment", icon: Truck, desc: "VAM & Hungarian" },
-    { id: "network-models", name: "Network Models", icon: Network, desc: "Dijkstra, MST, Max Flow" },
-    { id: "project-planning", name: "Project Planning (CPM/PERT)", icon: Calendar, desc: "Critical Path & Float" },
-    { id: "inventory-control", name: "Inventory Control (EOQ)", icon: Package, desc: "Order Qty & Cycle Times" },
-    { id: "queuing-models", name: "Queuing Analysis", icon: Clock, desc: "M/M/1 & M/M/c Waiting" },
-    { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords, desc: "Minimax & Saddle Points" },
-    { id: "linear-equations", name: "Linear Equations", icon: Calculator, desc: "Gauss-Jordan Ax = b" },
+    { id: "linear-programming", name: "Linear Programming", icon: TrendingUp },
+    { id: "transportation-assignment", name: "Transportation & Assignment", icon: Truck },
+    { id: "network-models", name: "Network Models", icon: Network },
+    { id: "project-planning", name: "Project Planning (CPM/PERT)", icon: Calendar },
+    { id: "inventory-control", name: "Inventory Control (EOQ)", icon: Package },
+    { id: "queuing-models", name: "Queuing Analysis", icon: Clock },
+    { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords },
+    { id: "linear-equations", name: "Linear Equations", icon: Calculator },
   ];
 
   const views = [
@@ -125,10 +125,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "or", name: "TORA Solvers", icon: TrendingUp },
   ] as const;
 
-  const filteredOrModules = orModules.filter(
-    (m) =>
-      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.desc.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredOrModules = orModules.filter((m) =>
+    m.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const isCompact = width < 230;
@@ -141,9 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }`}
     >
       {/* 1. TOP: Workspace Views Section */}
-      <div className="p-3 border-b border-hairline bg-surface-soft shrink-0 space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted truncate">
+      <div className="p-2.5 border-b border-hairline bg-surface-soft shrink-0 space-y-1.5">
+        <div className="flex items-center justify-between gap-2 px-0.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted truncate">
             Views
           </span>
           {onToggle && (
@@ -166,7 +164,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={v.id}
                 onClick={() => onSelectView(v.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all duration-150 text-left min-w-0 truncate ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors text-left min-w-0 truncate ${
                   isActive
                     ? "bg-canvas text-ink font-semibold shadow-xs border border-hairline ring-1 ring-primary/20"
                     : "text-muted hover:text-ink hover:bg-surface-cream/70"
@@ -182,30 +180,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* 2. MIDDLE: Conditional TORA Optimization Models (Only visible when TORA Solvers view is active) */}
+      {/* 2. MIDDLE: Conditional TORA Optimization Models */}
       {activeView === "or" ? (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 animate-keyframe-fade-up">
           {/* Solvers Search Header */}
-          <div className="p-3 border-b border-hairline bg-surface-soft/60 shrink-0">
+          <div className="p-2 border-b border-hairline bg-surface-soft/60 shrink-0">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted shrink-0" />
+              <Search className="w-3 h-3 absolute left-2.5 top-2 text-muted shrink-0" />
               <input
                 type="text"
-                placeholder={isCompact ? "Search..." : "Search optimization models..."}
+                placeholder={isCompact ? "Search..." : "Filter solvers..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-canvas border border-hairline rounded-md pl-8 pr-3 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors"
+                className="w-full bg-canvas border border-hairline rounded-md pl-7 pr-2.5 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors"
               />
             </div>
           </div>
 
           {/* Solvers Vertical Navigation List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            <div className="px-2 py-1 text-xs font-semibold text-primary mb-1 truncate flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Models</span>
-            </div>
-
+          <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
             {filteredOrModules.map((m) => {
               const Icon = m.icon;
               const isActive = activeOrModule === m.id;
@@ -214,23 +207,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={m.id}
                   onClick={() => onSelectOrModule(m.id as OrModule)}
-                  className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-all duration-150 min-w-0 ${
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors min-w-0 ${
                     isActive
                       ? "bg-canvas text-ink border border-hairline shadow-xs font-semibold ring-1 ring-primary/30"
                       : "text-body hover:text-ink hover:bg-surface-cream/70"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted"}`} />
-                  <div className="flex-1 min-w-0 truncate">
-                    <div className={`text-xs truncate ${isActive ? "text-primary font-semibold" : "text-ink font-medium"}`}>
-                      {m.name}
-                    </div>
-                    {!isCompact && (
-                      <div className="text-[10px] text-muted-soft truncate">
-                        {m.desc}
-                      </div>
-                    )}
-                  </div>
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted"}`} />
+                  <span className={`text-xs truncate ${isActive ? "text-primary font-semibold" : "text-ink font-medium"}`}>
+                    {m.name}
+                  </span>
                 </button>
               );
             })}
@@ -240,53 +226,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1" />
       )}
 
-      {/* 3. BOTTOM: Theme Switcher Pinned to Sidebar Bottom */}
-      <div className="p-2.5 border-t border-hairline bg-surface-soft shrink-0 select-none">
-        <div className="flex items-center justify-between text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5 px-1">
-          <span>Theme</span>
-          <span className="text-[10px] text-primary capitalize font-medium">{themeMode}</span>
-        </div>
-        <div className="grid grid-cols-3 gap-1 bg-canvas p-1 rounded-xl border border-hairline">
+      {/* 3. BOTTOM: Compact Theme Switcher */}
+      <div className="p-2 border-t border-hairline bg-surface-soft shrink-0 select-none">
+        <div className="grid grid-cols-3 gap-1 bg-canvas p-0.5 rounded-lg border border-hairline">
           <button
             type="button"
             onClick={() => handleThemeChange("light")}
-            className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 truncate ${
+            className={`flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-semibold transition-colors truncate ${
               themeMode === "light"
-                ? "bg-surface-card text-ink shadow-xs border border-hairline font-bold"
-                : "text-muted hover:text-ink hover:bg-surface-soft"
+                ? "bg-surface-card text-ink shadow-2xs border border-hairline font-bold"
+                : "text-muted hover:text-ink"
             }`}
-            title="Light Mode (Default)"
+            title="Light Mode"
           >
-            <Sun className="w-3.5 h-3.5 text-accent-amber shrink-0" />
-            <span className="text-[11px] truncate">{isCompact ? "L" : "Light"}</span>
+            <Sun className="w-3 h-3 text-accent-amber shrink-0" />
+            <span>Light</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleThemeChange("dark")}
-            className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 truncate ${
+            className={`flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-semibold transition-colors truncate ${
               themeMode === "dark"
-                ? "bg-surface-card text-ink shadow-xs border border-hairline font-bold"
-                : "text-muted hover:text-ink hover:bg-surface-soft"
+                ? "bg-surface-card text-ink shadow-2xs border border-hairline font-bold"
+                : "text-muted hover:text-ink"
             }`}
             title="Dark Mode"
           >
-            <Moon className="w-3.5 h-3.5 text-accent-teal shrink-0" />
-            <span className="text-[11px] truncate">{isCompact ? "D" : "Dark"}</span>
+            <Moon className="w-3 h-3 text-accent-teal shrink-0" />
+            <span>Dark</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleThemeChange("system")}
-            className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 truncate ${
+            className={`flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-semibold transition-colors truncate ${
               themeMode === "system"
-                ? "bg-surface-card text-ink shadow-xs border border-hairline font-bold"
-                : "text-muted hover:text-ink hover:bg-surface-soft"
+                ? "bg-surface-card text-ink shadow-2xs border border-hairline font-bold"
+                : "text-muted hover:text-ink"
             }`}
-            title="Auto / System Preference"
+            title="Auto"
           >
-            <Laptop className="w-3.5 h-3.5 shrink-0" />
-            <span className="text-[11px] truncate">{isCompact ? "Auto" : "Auto"}</span>
+            <Laptop className="w-3 h-3 shrink-0" />
+            <span>Auto</span>
           </button>
         </div>
       </div>

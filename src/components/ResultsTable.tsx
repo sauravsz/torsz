@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Download, AlertCircle, CheckCircle2, Clock, Hash, Search, Save, RotateCcw, Check, X, Edit2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, AlertCircle, CheckCircle2, Search, Save, RotateCcw, Check, X, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { QueryResult } from "../types";
 
 export interface PendingCellUpdate {
@@ -302,35 +302,17 @@ export const ResultsTable: React.FC<ResultsTableProps> = ({
 
   return (
     <div className="flex-1 bg-canvas border border-hairline rounded-2xl flex flex-col h-full overflow-hidden select-text shadow-2xs">
-      {/* Table Metadata Bar */}
-      <div className="h-10 bg-surface-soft border-b border-hairline px-4 flex items-center justify-between text-xs text-muted select-none shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-ink font-medium">
-            <CheckCircle2 className="w-4 h-4 text-success" />
-            <span>Success</span>
+      {/* Compact Table Metadata Bar */}
+      <div className="h-8 bg-surface-soft/60 border-b border-hairline px-3 flex items-center justify-between text-xs text-muted select-none shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-ink font-medium text-[11px]">
+            <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+            <span>{processedRows.length} rows</span>
           </div>
 
-          <div className="flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5 text-muted" />
-            <span>{result.execution_time_ms} ms</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <Hash className="w-3.5 h-3.5 text-muted" />
-            <span>
-              {result.affected_rows !== null && result.affected_rows !== undefined
-                ? `${result.affected_rows} rows affected`
-                : `${processedRows.length} rows`}
-            </span>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-1 text-[11px] text-muted-soft bg-canvas px-2.5 py-0.5 rounded-full border border-hairline">
-            <Edit2 className="w-3 h-3 text-primary" />
-            <span>Double-click cell to edit • Click header to sort</span>
-          </div>
+          <span className="text-hairline">•</span>
+          <span className="text-[11px] text-muted-soft">{result.execution_time_ms} ms</span>
         </div>
-
-        {/* Staged Changes Actions or Quick Search */}
         <div className="flex items-center gap-2">
           {pendingUpdates.length > 0 && (
             <div className="flex items-center gap-2 bg-surface-cream px-3 py-1 rounded-xl border border-hairline">

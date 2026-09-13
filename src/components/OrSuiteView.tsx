@@ -645,46 +645,43 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Main Module Solver Content */}
-      <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-6">
-        {/* Top Solver Utility Actions Bar */}
-        <div className="bg-surface-card border border-hairline rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs text-xs">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleOpenDbImport}
-              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
-              title="Import active SQLite database table into this solver"
-            >
-              <Database className="w-3.5 h-3.5 text-primary" />
-              <span>Import from DB Table</span>
-            </button>
-          </div>
+      <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-28">
+        <div className="flex items-center justify-between gap-3 text-xs shrink-0 pb-1 border-b border-hairline-soft">
+          <button
+            onClick={handleOpenDbImport}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-card px-2.5 py-1 rounded-lg border border-hairline transition-colors"
+            title="Import active SQLite database table into this solver"
+          >
+            <Database className="w-3.5 h-3.5 text-primary" />
+            <span>Import Table</span>
+          </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={handleExportLatex}
-              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-2 py-1 rounded-md border border-hairline transition-colors"
               title="Copy LaTeX Mathematical Model"
             >
-              <FileCode className="w-3.5 h-3.5 text-accent-teal" />
-              <span>{copiedLatex ? "LaTeX Copied! ★" : "Copy LaTeX"}</span>
+              <FileCode className="w-3 h-3 text-accent-teal" />
+              <span>{copiedLatex ? "Copied!" : "LaTeX"}</span>
             </button>
 
             <button
               onClick={handleExportExcel}
-              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-2 py-1 rounded-md border border-hairline transition-colors"
               title="Export Formatted Excel Spreadsheet (.xlsx)"
             >
-              <Download className="w-3.5 h-3.5 text-success" />
-              <span>Export Excel (.xlsx)</span>
+              <Download className="w-3 h-3 text-success" />
+              <span>Excel</span>
             </button>
 
             <button
               onClick={handlePrintBriefing}
-              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-2 py-1 rounded-md border border-hairline transition-colors"
               title="Print / PDF Executive Briefing Report"
             >
-              <Printer className="w-3.5 h-3.5 text-accent-amber" />
-              <span>Print Report</span>
+              <Printer className="w-3 h-3 text-accent-amber" />
+              <span>Print</span>
             </button>
           </div>
         </div>
@@ -696,19 +693,19 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 <h3 className="font-editorial-serif text-2xl font-medium text-ink">
                   Transportation & Assignment Models
                 </h3>
-                <div className="flex items-center bg-surface-card border border-hairline p-1 rounded-xl">
+                <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
                   <button
                     onClick={() => setTransSubtype("transportation")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      transSubtype === "transportation" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      transSubtype === "transportation" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
-                    Transportation Model (VAM)
+                    Transportation (VAM)
                   </button>
                   <button
                     onClick={() => setTransSubtype("hungarian-assignment")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      transSubtype === "hungarian-assignment" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      transSubtype === "hungarian-assignment" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
                     Hungarian Assignment
@@ -722,7 +719,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
                       Shipping Cost Matrix
                     </h4>
-
                     <div className="flex items-center gap-2">
                       {onAskAi && (
                         <button
@@ -812,17 +808,14 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                             </td>
                             {transProblem.destinations.map((_, c) => (
                               <td key={c} className="p-2">
-                                <div className="relative flex items-center">
-                                  <span className="absolute left-2 text-muted text-xs">$</span>
-                                  <input
-                                    type="number"
-                                    value={transProblem.costs[r][c]}
-                                    onChange={(e) =>
-                                      updateTransCost(r, c, parseFloat(e.target.value) || 0)
-                                    }
-                                    className="pl-5 pr-1.5 py-1 w-20 bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-right"
-                                  />
-                                </div>
+                                <input
+                                  type="number"
+                                  value={transProblem.costs[r][c]}
+                                  onChange={(e) =>
+                                    updateTransCost(r, c, parseFloat(e.target.value) || 0)
+                                  }
+                                  className="px-2 py-1 w-20 bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-right"
+                                />
                               </td>
                             ))}
                             <td className="p-2">
@@ -982,17 +975,14 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                             </td>
                             {assignProblem.jobs.map((_, c) => (
                               <td key={c} className="p-2">
-                                <div className="relative flex items-center">
-                                  <span className="absolute left-2 text-muted text-xs">$</span>
-                                  <input
-                                    type="number"
-                                    value={assignProblem.costs[r][c]}
-                                    onChange={(e) =>
-                                      updateAssignCost(r, c, parseFloat(e.target.value) || 0)
-                                    }
-                                    className="pl-5 pr-1.5 py-1 w-20 bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-right"
-                                  />
-                                </div>
+                                <input
+                                  type="number"
+                                  value={assignProblem.costs[r][c]}
+                                  onChange={(e) =>
+                                    updateAssignCost(r, c, parseFloat(e.target.value) || 0)
+                                  }
+                                  className="px-2 py-1 w-20 bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-right"
+                                />
                               </td>
                             ))}
                           </tr>
@@ -1024,27 +1014,25 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 <h3 className="font-editorial-serif text-2xl font-medium text-ink">
                   Linear Programming
                 </h3>
-                <div className="flex items-center bg-surface-card border border-hairline p-1 rounded-xl">
+                <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
                   <button
                     onClick={() => setLpMode("graphical-2d")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      lpMode === "graphical-2d" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      lpMode === "graphical-2d" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
-                    2D Graphical Solver
+                    2D Graphical
                   </button>
                   <button
                     onClick={() => setLpMode("simplex-tableau")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      lpMode === "simplex-tableau" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      lpMode === "simplex-tableau" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
                     Simplex Tableaus
                   </button>
                 </div>
               </div>
-
-              {/* Formulation Summary (Editable) */}
               <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
@@ -1246,27 +1234,27 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 <h3 className="font-editorial-serif text-2xl font-medium text-ink">
                   Network Models
                 </h3>
-                <div className="flex items-center bg-surface-card border border-hairline p-1 rounded-xl">
+                <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
                   <button
                     onClick={() => setNetworkSubtype("shortest-route")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      networkSubtype === "shortest-route" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      networkSubtype === "shortest-route" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
                     Shortest Route
                   </button>
                   <button
                     onClick={() => setNetworkSubtype("minimum-spanning-tree")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      networkSubtype === "minimum-spanning-tree" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      networkSubtype === "minimum-spanning-tree" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
                     Minimum Spanning Tree
                   </button>
                   <button
                     onClick={() => setNetworkSubtype("maximal-flow")}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                      networkSubtype === "maximal-flow" ? "bg-primary text-on-primary shadow-xs" : "text-muted hover:text-ink"
+                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+                      networkSubtype === "maximal-flow" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
                   >
                     Maximal Flow
@@ -1324,56 +1312,70 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-56 overflow-y-auto p-1">
-                  {networkEdges.map((e, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-canvas border border-hairline p-2 rounded-xl flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={e.from}
-                          onChange={(ev) => {
-                            const next = [...networkEdges];
-                            next[idx] = { ...next[idx], from: ev.target.value };
-                            setNetworkEdges(next);
-                          }}
-                          className="w-10 px-1 py-0.5 bg-surface-card border border-hairline rounded text-center font-bold text-ink"
-                        />
-                        <span>↔</span>
-                        <input
-                          type="text"
-                          value={e.to}
-                          onChange={(ev) => {
-                            const next = [...networkEdges];
-                            next[idx] = { ...next[idx], to: ev.target.value };
-                            setNetworkEdges(next);
-                          }}
-                          className="w-10 px-1 py-0.5 bg-surface-card border border-hairline rounded text-center font-bold text-ink"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          value={e.cost}
-                          onChange={(ev) => {
-                            const next = [...networkEdges];
-                            next[idx] = { ...next[idx], cost: parseFloat(ev.target.value) || 0 };
-                            setNetworkEdges(next);
-                          }}
-                          className="w-16 px-1.5 py-0.5 bg-surface-card border border-hairline rounded text-right font-mono font-bold text-primary"
-                        />
-                        <button
-                          onClick={() => setNetworkEdges(networkEdges.filter((_, i) => i !== idx))}
-                          className="text-muted hover:text-error p-0.5"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto max-h-60 bg-canvas rounded-xl border border-hairline p-1">
+                  <table className="w-full text-left font-sans text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-hairline bg-surface-soft/60 text-muted">
+                        <th className="p-2 w-12 text-center">#</th>
+                        <th className="p-2">From Node</th>
+                        <th className="p-2">To Node</th>
+                        <th className="p-2 text-right">Cost / Weight</th>
+                        <th className="w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {networkEdges.map((e, idx) => (
+                        <tr key={idx} className="border-b border-hairline-soft hover:bg-surface-soft/30 transition-colors">
+                          <td className="p-2 text-center text-muted font-mono">{idx + 1}</td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={e.from}
+                              onChange={(ev) => {
+                                const next = [...networkEdges];
+                                next[idx] = { ...next[idx], from: ev.target.value };
+                                setNetworkEdges(next);
+                              }}
+                              className="w-20 px-2 py-0.5 bg-surface-card border border-hairline rounded font-bold text-ink"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={e.to}
+                              onChange={(ev) => {
+                                 const next = [...networkEdges];
+                                 next[idx] = { ...next[idx], to: ev.target.value };
+                                 setNetworkEdges(next);
+                               }}
+                              className="w-20 px-2 py-0.5 bg-surface-card border border-hairline rounded font-bold text-ink"
+                            />
+                          </td>
+                          <td className="p-2 text-right">
+                            <input
+                              type="number"
+                              value={e.cost}
+                              onChange={(ev) => {
+                                const next = [...networkEdges];
+                                next[idx] = { ...next[idx], cost: parseFloat(ev.target.value) || 0 };
+                                setNetworkEdges(next);
+                              }}
+                              className="w-24 px-2 py-0.5 bg-surface-card border border-hairline rounded text-right font-mono font-bold text-primary"
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              onClick={() => setNetworkEdges(networkEdges.filter((_, i) => i !== idx))}
+                              className="text-muted hover:text-error p-1 rounded"
+                              title="Delete route"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
               {/* Interactive Visual Network Topology Graph */}
