@@ -9,21 +9,12 @@ import {
   Database,
   Layers,
   PanelLeftClose,
-  TrendingUp,
-  Truck,
-  Network,
-  Calendar,
-  Package,
-  Clock,
-  Swords,
-  Calculator,
 } from "lucide-react";
 import { DatabaseSchema } from "../types";
 
 interface SidebarProps {
   schema: DatabaseSchema | null;
   onSelectTable: (tableName: string) => void;
-  onSelectOrModule?: (module: string) => void;
   onToggle?: () => void;
   loading: boolean;
 }
@@ -31,13 +22,11 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   schema,
   onSelectTable,
-  onSelectOrModule,
   onToggle,
   loading,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
-  const [isOrExpanded, setIsOrExpanded] = useState(true);
 
   const toggleTable = (name: string) => {
     setExpandedTables((prev) => ({
@@ -56,22 +45,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     v.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const orModules = [
-    { id: "linear-programming", name: "Linear Programming", icon: TrendingUp, tableName: "lp_variables" },
-    { id: "transportation-assignment", name: "Transportation & Assignment", icon: Truck, tableName: "transportation_costs" },
-    { id: "network-models", name: "Network Models", icon: Network, tableName: "network_topology" },
-    { id: "project-planning", name: "Project Planning (CPM/PERT)", icon: Calendar, tableName: "project_activities" },
-    { id: "inventory-control", name: "Inventory Control (EOQ)", icon: Package, tableName: "inventory_parameters" },
-    { id: "queuing-models", name: "Queuing Analysis", icon: Clock, tableName: "queuing_metrics" },
-    { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords, tableName: "game_payoff_matrix" },
-    { id: "linear-equations", name: "Linear Equations", icon: Calculator, tableName: "linear_equations" },
-  ];
-
-  const filteredOrModules = orModules.filter((m) =>
-    m.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const existingTableNames = new Set(tables.map((t) => t.name.toLowerCase()));
 
   return (
     <aside className="w-64 bg-surface-card border-r border-hairline flex flex-col h-[calc(100vh-3.5rem)] select-none text-body">
@@ -213,52 +186,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
 
-            {/* Integrated TORA Optimization Models Group */}
-            {onSelectOrModule && (
-              <div className="pt-2 border-t border-hairline">
-                <div
-                  onClick={() => setIsOrExpanded(!isOrExpanded)}
-                  className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary cursor-pointer hover:bg-surface-cream rounded-md transition-colors"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Calculator className="w-3.5 h-3.5" />
-                    <span>TORA Solvers ({filteredOrModules.length})</span>
-                  </div>
-                  {isOrExpanded ? (
-                    <ChevronDown className="w-3.5 h-3.5 text-muted" />
-                  ) : (
-                    <ChevronRight className="w-3.5 h-3.5 text-muted" />
-                  )}
-                </div>
-
-                {isOrExpanded && (
-                  <div className="space-y-0.5 mt-1">
-                    {filteredOrModules.map((m) => {
-                      const Icon = m.icon;
-                      const hasLiveTable = existingTableNames.has(m.tableName.toLowerCase());
-
-                      return (
-                        <div
-                          key={m.id}
-                          onClick={() => onSelectOrModule(m.id)}
-                          className="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-surface-cream text-xs text-body hover:text-ink cursor-pointer transition-colors group"
-                        >
-                          <div className="flex items-center gap-2 truncate">
-                            <Icon className="w-3.5 h-3.5 text-muted group-hover:text-primary shrink-0 transition-colors" />
-                            <span className="truncate">{m.name}</span>
-                          </div>
-                          {hasLiveTable && (
-                            <span className="text-[9px] font-semibold bg-accent-teal/10 text-accent-teal px-1.5 py-0.2 rounded border border-accent-teal/20 shrink-0">
-                              In DB
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
           </>
         )}
       </div>

@@ -25,6 +25,7 @@ import {
 import { importSpreadsheetToDb } from "./services/spreadsheet";
 import { convertTextToSql } from "./services/aiAssistant";
 import { addHistoryItem } from "./services/history";
+import { OcrProblemClassification } from "./services/ocr";
 
 const LOCAL_STORAGE_SAVED_CONNS = "torsz_saved_connections";
 
@@ -52,7 +53,7 @@ function MainWorkspace() {
     module: OrModule;
     networkSubtype?: NetworkSubtype;
     transSubtype?: TransSubtype;
-    data?: any;
+    data?: Record<string, unknown>;
     rawText?: string;
   } | null>(null);
   useEffect(() => {
@@ -299,11 +300,10 @@ function MainWorkspace() {
       showToast(msg, "error", "Update Error");
     }
   };
-
   const handleOcrSelectAndSolve = (
     module: OrModule,
     subtypes?: { network?: NetworkSubtype; trans?: TransSubtype },
-    parsedData?: any,
+    parsedData?: OcrProblemClassification["parsedData"],
     rawText?: string
   ) => {
     setImportedOcrData({
@@ -349,10 +349,6 @@ function MainWorkspace() {
           <Sidebar
             schema={schema}
             onSelectTable={handleSelectTable}
-            onSelectOrModule={(mod) => {
-              setActiveOrModule(mod as any);
-              setActiveView("or");
-            }}
             onToggle={() => setIsSidebarOpen(false)}
             loading={loadingSchema}
           />
@@ -402,8 +398,9 @@ function MainWorkspace() {
           ) : (
             <OrSuiteView
               activeModule={activeOrModule}
+              onSelectModule={setActiveOrModule}
               importedOcrData={importedOcrData}
-              onAskAi={(promptText) => {
+              onAskAi={(promptText: string) => {
                 setAiInitialPrompt(promptText);
                 setActiveView("ai");
               }}

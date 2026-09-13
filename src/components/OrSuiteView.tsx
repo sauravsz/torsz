@@ -8,6 +8,14 @@ import {
   Sparkles,
   Camera,
   ArrowUp,
+  TrendingUp,
+  Truck,
+  Network,
+  Calendar,
+  Package,
+  Clock,
+  Swords,
+  Calculator,
 } from "lucide-react";
 import {
   OrModule,
@@ -46,18 +54,19 @@ import {
 } from "../services/or/solvers";
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
-import { extractNetworkEdges } from "../services/ocr";
+import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
 
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
   onAskAi?: (prompt: string) => void;
   onOpenOcr?: (initialText?: string, initialMode?: "image" | "text") => void;
   activeModule?: OrModule;
+  onSelectModule?: (module: OrModule) => void;
   importedOcrData?: {
     module: OrModule;
     networkSubtype?: NetworkSubtype;
     transSubtype?: TransSubtype;
-    data?: any;
+    data?: OcrProblemClassification["parsedData"];
     rawText?: string;
   } | null;
 }
@@ -67,6 +76,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   onAskAi,
   onOpenOcr,
   activeModule: controlledModule,
+  onSelectModule,
   importedOcrData,
 }) => {
   const activeModule = controlledModule || "transportation-assignment";
@@ -521,6 +531,37 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
+      {/* Browser-like TORA Solver Tabs Bar */}
+      <div className="h-10 bg-surface-soft border-b border-hairline px-3 flex items-center gap-1 overflow-x-auto select-none shrink-0">
+        {[
+          { id: "linear-programming", name: "Linear Programming", icon: TrendingUp },
+          { id: "transportation-assignment", name: "Transportation & Assignment", icon: Truck },
+          { id: "network-models", name: "Network Models", icon: Network },
+          { id: "project-planning", name: "Project Planning (CPM/PERT)", icon: Calendar },
+          { id: "inventory-control", name: "Inventory Control (EOQ)", icon: Package },
+          { id: "queuing-models", name: "Queuing Analysis", icon: Clock },
+          { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords },
+          { id: "linear-equations", name: "Linear Equations", icon: Calculator },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeModule === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => (onSelectModule ? onSelectModule(tab.id as OrModule) : null)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-xs font-medium transition-all duration-150 border-t-2 shrink-0 ${
+                isActive
+                  ? "bg-canvas text-ink border-primary font-semibold shadow-2xs"
+                  : "text-muted hover:text-ink hover:bg-surface-card border-transparent"
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${isActive ? "text-primary" : "text-muted"}`} />
+              <span>{tab.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Main Module Solver Content */}
       <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-6">
           {/* ========================================== */}
