@@ -900,6 +900,73 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
   const h = problem.holdingCostH;
   const c = problem.unitPriceC;
 
+  if (problem.model === "quantity-discounts" && problem.priceBreaks && problem.priceBreaks.length > 0) {
+    const tiers = problem.priceBreaks.map((tier, idx) => {
+      const tierPrice = tier.unitPrice;
+      const tierHolding = tier.holdingCostH || (h / c) * tierPrice || h;
+      const calculatedEoq = Math.sqrt((2 * K * D) / tierHolding);
+
+      let feasibleQty = calculatedEoq;
+      let isFeasible = true;
+
+      if (calculatedEoq < tier.minQty) {
+        feasibleQty = tier.minQty;
+        isFeasible = false;
+      } else if (tier.maxQty !== undefined && calculatedEoq > tier.maxQty) {
+        feasibleQty = tier.maxQty;
+        isFeasible = false;
+      }
+
+      const annualOrdering = (K * D) / feasibleQty;
+      const annualHolding = (tierHolding * feasibleQty) / 2;
+      const totalCost = tierPrice * D + annualOrdering + annualHolding;
+
+      return {
+        tierIndex: idx + 1,
+        minQty: tier.minQty,
+        maxQty: tier.maxQty,
+        unitPrice: tierPrice,
+        holdingCostH: tierHolding,
+        eoqCalculated: Math.round(calculatedEoq),
+        isFeasible,
+        totalCost: Math.round(totalCost * 100) / 100,
+        orderQty: Math.round(feasibleQty),
+      };
+    });
+
+    // Find tier with lowest total cost
+    let bestTier = tiers[0];
+    for (const t of tiers) {
+      if (t.totalCost < bestTier.totalCost) {
+        bestTier = t;
+      }
+    }
+
+    const optimalOrderQtyY = bestTier.orderQty;
+    const t0Days = (optimalOrderQtyY / D) * 365;
+    const annualOrderingCost = (K * D) / optimalOrderQtyY;
+    const annualHoldingCost = ((bestTier.holdingCostH || h) * optimalOrderQtyY) / 2;
+
+    return {
+      optimalOrderQtyY,
+      cycleTimeT0Days: Math.round(t0Days * 10) / 10,
+      annualOrderingCost: Math.round(annualOrderingCost * 100) / 100,
+      annualHoldingCost: Math.round(annualHoldingCost * 100) / 100,
+      totalAnnualCost: bestTier.totalCost,
+      selectedPriceBreakTier: bestTier.tierIndex,
+      priceBreakAnalysis: tiers.map((t) => ({
+        tierIndex: t.tierIndex,
+        minQty: t.minQty,
+        maxQty: t.maxQty,
+        unitPrice: t.unitPrice,
+        holdingCostH: t.holdingCostH,
+        eoqCalculated: t.eoqCalculated,
+        isFeasible: t.isFeasible,
+        totalCost: t.totalCost,
+      })),
+    };
+  }
+
   if (problem.model === "classic-eoq" || !problem.shortageCostP) {
     const yStar = Math.sqrt((2 * K * D) / h);
     const t0Days = (yStar / D) * 365;
@@ -938,12 +1005,53 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
 }
 
 // ==========================================
-// 7. Queuing Analysis (M/M/1 & M/M/c)
+// 7. Queuing Analysis (M/M/1 & M/M/c & M/M/c/K)
 // ==========================================
 export function solveQueuing(problem: QueuingProblem): QueuingSolution {
   const lambda = problem.arrivalRateLambda;
   const mu = problem.serviceRateMu;
   const c = problem.serversCountC || 1;
+  const K = problem.systemCapacityK;
+
+  // Finite Capacity Queue (M/M/1/K or M/M/c/K)
+  if (K !== undefined && K > 0) {
+    const r = lambda / mu;
+
+    if (c === 1) {
+      const rho = r;
+      let p0: number;
+      if (Math.abs(rho - 1) < 1e-6) {
+        p0 = 1 / (K + 1);
+      } else {
+        p0 = (1 - rho) / (1 - Math.pow(rho, K + 1));
+      }
+
+      const pK = p0 * Math.pow(rho, K);
+      const lambdaEff = lambda * (1 - pK);
+
+      let Ls: number;
+      if (Math.abs(rho - 1) < 1e-6) {
+        Ls = K / 2;
+      } else {
+        Ls = (rho * (1 - (K + 1) * Math.pow(rho, K) + K * Math.pow(rho, K + 1))) / ((1 - rho) * (1 - Math.pow(rho, K + 1)));
+      }
+
+      const Lq = Ls - (1 - p0);
+      const Ws = Ls / lambdaEff;
+      const Wq = Lq / lambdaEff;
+
+      return {
+        utilizationRho: Math.round((1 - p0) * 1000) / 1000,
+        probZeroP0: Math.round(p0 * 1000) / 1000,
+        avgInQueueLq: Math.round(Math.max(0, Lq) * 1000) / 1000,
+        avgInSystemLs: Math.round(Ls * 1000) / 1000,
+        avgWaitQueueWq: Math.round(Math.max(0, Wq) * 1000) / 1000,
+        avgWaitSystemWs: Math.round(Ws * 1000) / 1000,
+        blockingProbabilityPk: Math.round(pK * 1000) / 1000,
+        effectiveArrivalRate: Math.round(lambdaEff * 1000) / 1000,
+      };
+    }
+  }
 
   if (lambda >= c * mu) {
     throw new Error(`Unstable queue: Arrival rate (λ=${lambda}) exceeds service capacity (c*μ=${c * mu}).`);

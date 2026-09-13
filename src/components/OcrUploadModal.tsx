@@ -585,7 +585,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto p-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto p-1">
                 {problemTypes.map((pt, idx) => {
                   const Icon = pt.icon;
                   const isSelected =
@@ -603,26 +603,18 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                         if (pt.transSubtype) setSelectedTransSubtype(pt.transSubtype);
                         setTargetHintKey(pt.key);
 
-                        // Re-trigger extraction specifically for chosen model
                         if (ocrText.trim()) {
                           handleAnalyzeText(ocrText, pt.key);
                         }
                       }}
-                      className={`p-3 rounded-2xl border text-left transition-all duration-200 ease-apple-snappy active:scale-[0.98] ${
+                      className={`p-2.5 px-3 rounded-xl border text-left transition-all duration-150 flex items-center gap-2 ${
                         isSelected
-                          ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/40"
-                          : "bg-canvas border-hairline hover:bg-surface-cream"
+                          ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/40 text-primary font-semibold"
+                          : "bg-canvas border-hairline hover:bg-surface-cream text-ink font-medium"
                       }`}
                     >
-                      <div className="flex items-center gap-2 mb-1">
-                        <Icon className={`w-4 h-4 ${isSelected ? "text-primary font-bold" : "text-muted"}`} />
-                        <span className={`text-xs font-semibold ${isSelected ? "text-primary" : "text-ink"}`}>
-                          {pt.name}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-muted leading-tight">
-                        {pt.description}
-                      </p>
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-primary" : "text-muted"}`} />
+                      <span className="text-xs truncate">{pt.name}</span>
                     </button>
                   );
                 })}

@@ -112,12 +112,14 @@ export const ErDiagram: React.FC<ErDiagramProps> = ({ schema, onSelectTable }) =
                 key={table.name}
                 onMouseEnter={() => setHoveredTable(table.name)}
                 onMouseLeave={() => setHoveredTable(null)}
-                className={`bg-surface-card border rounded-xl shadow-sm transition-all duration-200 overflow-hidden flex flex-col ${
+                className={`bg-surface-card border rounded-2xl shadow-sm transition-all duration-200 overflow-hidden flex flex-col ${
                   isHovered
-                    ? "border-primary ring-2 ring-primary/20 shadow-md scale-[1.02]"
+                    ? "border-primary ring-4 ring-primary/25 shadow-xl scale-[1.03] z-20 opacity-100"
                     : isRelated
-                    ? "border-accent-teal ring-2 ring-accent-teal/20"
-                    : "border-hairline hover:border-primary"
+                    ? "border-accent-teal ring-2 ring-accent-teal/40 shadow-md scale-[1.01] z-10 opacity-100"
+                    : hoveredTable !== null
+                    ? "border-hairline opacity-30 blur-[0.2px] scale-[0.98]"
+                    : "border-hairline hover:border-primary/60"
                 }`}
               >
                 {/* Card Header */}

@@ -154,7 +154,8 @@ export interface QueuingProblem {
   model: "M/M/1" | "M/M/c";
   arrivalRateLambda: number;
   serviceRateMu: number;
-  serversCountC: number;
+  serversCountC?: number;
+  systemCapacityK?: number;
 }
 
 export interface QueuingSolution {
@@ -164,6 +165,8 @@ export interface QueuingSolution {
   avgInSystemLs: number;
   avgWaitQueueWq: number;
   avgWaitSystemWs: number;
+  blockingProbabilityPk?: number;
+  effectiveArrivalRate?: number;
 }
 
 export interface ZeroSumGameProblem {
@@ -182,13 +185,25 @@ export interface ZeroSumGameSolution {
   player2Probabilities?: number[];
 }
 
+export interface PriceBreakTier {
+  tierIndex: number;
+  minQty: number;
+  maxQty?: number;
+  unitPrice: number;
+  holdingCostH?: number;
+  eoqCalculated?: number;
+  isFeasible?: boolean;
+  totalCost?: number;
+}
+
 export interface InventoryProblem {
-  model: "classic-eoq" | "eoq-with-backorders";
+  model: "classic-eoq" | "eoq-with-backorders" | "quantity-discounts";
   annualDemandD: number;
   orderingCostK: number;
   holdingCostH: number;
   unitPriceC: number;
   shortageCostP?: number;
+  priceBreaks?: PriceBreakTier[];
 }
 
 export interface InventorySolution {
@@ -200,4 +215,6 @@ export interface InventorySolution {
   annualShortageCost?: number;
   totalAnnualCost: number;
   reorderPointR?: number;
+  selectedPriceBreakTier?: number;
+  priceBreakAnalysis?: PriceBreakTier[];
 }

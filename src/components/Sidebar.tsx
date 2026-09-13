@@ -143,8 +143,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 1. TOP: Workspace Views Section */}
       <div className="p-3 border-b border-hairline bg-surface-soft shrink-0 space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">
-            Workspace Views
+          <span className="text-xs font-medium text-muted truncate">
+            Views
           </span>
           {onToggle && (
             <button
@@ -201,11 +201,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Solvers Vertical Navigation List */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary mb-1 truncate flex items-center gap-1.5">
+            <div className="px-2 py-1 text-xs font-semibold text-primary mb-1 truncate flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>
-                {isCompact ? `Models (${filteredOrModules.length})` : `Optimization Models (${filteredOrModules.length})`}
-              </span>
+              <span>Models</span>
             </div>
 
             {filteredOrModules.map((m) => {
@@ -239,32 +237,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       ) : (
-        /* Empty / Contextual State when not in TORA Solvers */
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted select-none">
-          <div className="w-10 h-10 rounded-2xl bg-surface-soft border border-hairline flex items-center justify-center text-muted-soft mb-2.5 shadow-2xs">
-            {activeView === "editor" ? (
-              <Terminal className="w-5 h-5 text-primary" />
-            ) : activeView === "diagram" ? (
-              <Network className="w-5 h-5 text-accent-teal" />
-            ) : (
-              <Sparkles className="w-5 h-5 text-accent-amber" />
-            )}
-          </div>
-          <p className="text-xs font-semibold text-ink capitalize mb-1">
-            {activeView === "editor"
-              ? "Query Editor Mode"
-              : activeView === "diagram"
-              ? "Schema Visualizer Mode"
-              : "AI Assistant Mode"}
-          </p>
-          <p className="text-[11px] text-muted-soft leading-relaxed max-w-[190px]">
-            {activeView === "editor"
-              ? "Use the top tables bar to query database relations."
-              : activeView === "diagram"
-              ? "Inspect live ER relationships & foreign key maps."
-              : "Ask questions or formulate queries with AI."}
-          </p>
-        </div>
+        <div className="flex-1" />
       )}
 
       {/* 3. BOTTOM: Theme Switcher Pinned to Sidebar Bottom */}

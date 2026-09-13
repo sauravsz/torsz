@@ -10,6 +10,7 @@ import { OrSuiteView } from "./components/OrSuiteView";
 import { HistoryModal } from "./components/HistoryModal";
 import { ConnectionModal } from "./components/ConnectionModal";
 import { OcrUploadModal } from "./components/OcrUploadModal";
+import { SqlProfilerModal, QueryPlanStep } from "./components/SqlProfilerModal";
 import { ToastProvider, useToast } from "./components/Toast";
 import { ConnectionConfig, DatabaseSchema, QueryResult, TableSchema, ColumnSchema } from "./types";
 import { OrModule, NetworkSubtype, TransSubtype } from "./services/or/types";
@@ -50,6 +51,8 @@ function MainWorkspace() {
   const [isOcrOpen, setIsOcrOpen] = useState(false);
   const [ocrInitialText, setOcrInitialText] = useState("");
   const [ocrInitialMode, setOcrInitialMode] = useState<"image" | "text">("image");
+  const [isProfilerOpen, setIsProfilerOpen] = useState(false);
+  const [profilerSteps, setProfilerSteps] = useState<QueryPlanStep[]>([]);
   const [importedOcrData, setImportedOcrData] = useState<{
     module: OrModule;
     networkSubtype?: NetworkSubtype;
@@ -250,12 +253,38 @@ function MainWorkspace() {
   };
 
   const handleExplainPlan = async () => {
-    if (!sql.trim()) return;
-    const explainSql = `EXPLAIN QUERY PLAN ${sql.replace(/;+\s*$/, "")};`;
-    await handleExecuteQuery(undefined, explainSql);
-    showToast("Query plan generated!", "success", "EXPLAIN Execution Plan");
+    if (!sql.trim() || !activeConnection) return;
+    try {
+      const explainSql = `EXPLAIN QUERY PLAN ${sql.replace(/;+\s*$/, "")};`;
+      const res = await executeQuery(activeConnection.id, explainSql);
+      if (res.rows.length > 0) {
+        const steps: QueryPlanStep[] = res.rows.map((r) => ({
+          id: Number(r[0] || 0),
+          parent: Number(r[1] || 0),
+          detail: String(r[3] || r[2] || r[0]),
+        }));
+        setProfilerSteps(steps);
+        setIsProfilerOpen(true);
+      } else {
+        showToast("No query plan steps returned", "info");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg, "error", "Explain Plan Error");
+    }
   };
 
+  const handleApplyIndexSql = async (indexSql: string) => {
+    if (!activeConnection) return;
+    try {
+      await executeQuery(activeConnection.id, indexSql);
+      await refreshSchema(activeConnection.id);
+      showToast("Index created and applied to SQLite database!", "success", "Index Applied");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast(msg, "error", "Index Creation Error");
+    }
+  };
   const handleInlineAiConvert = async (aiPrompt: string) => {
     try {
       const gen = await convertTextToSql(aiPrompt, schema);
@@ -460,6 +489,15 @@ function MainWorkspace() {
         onSelectAndSolve={handleOcrSelectAndSolve}
         initialText={ocrInitialText}
         initialMode={ocrInitialMode}
+      />
+
+      {/* SQL Query Plan & Index Profiler Modal */}
+      <SqlProfilerModal
+        isOpen={isProfilerOpen}
+        onClose={() => setIsProfilerOpen(false)}
+        querySql={sql}
+        planSteps={profilerSteps}
+        onApplyIndexSql={handleApplyIndexSql}
       />
     </div>
   );

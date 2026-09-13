@@ -693,15 +693,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "transportation-assignment" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Transportation & Assignment Models
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Minimizes shipping costs using Vogel's Approximation Method (VAM) or Hungarian Assignment.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Transportation & Assignment Models
+                </h3>
                 <div className="flex items-center bg-surface-card border border-hairline p-1 rounded-xl">
                   <button
                     onClick={() => setTransSubtype("transportation")}
@@ -725,14 +719,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               {transSubtype === "transportation" ? (
                 <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                        Transportation Shipping Matrix (Editable)
-                      </h4>
-                      <span className="text-[11px] text-muted">
-                        Click any cell, supply, or demand value to edit.
-                      </span>
-                    </div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
+                      Shipping Cost Matrix
+                    </h4>
 
                     <div className="flex items-center gap-2">
                       {onAskAi && (
@@ -933,14 +922,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               ) : (
                 <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                        Hungarian Assignment Cost Matrix (Editable)
-                      </h4>
-                      <span className="text-[11px] text-muted">
-                        Edit worker names, job names, and assignment cost coefficients.
-                      </span>
-                    </div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
+                      Assignment Cost Matrix
+                    </h4>
 
                     <div className="flex items-center gap-2">
                       <button
@@ -1037,15 +1021,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "linear-programming" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Linear Programming
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Solve linear programs via 2D Graphical polygon analysis or Step-by-Step Simplex Tableaus.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Linear Programming
+                </h3>
                 <div className="flex items-center bg-surface-card border border-hairline p-1 rounded-xl">
                   <button
                     onClick={() => setLpMode("graphical-2d")}
@@ -1070,7 +1048,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                    Model Formulation (Editable)
+                    Model Formulation
                   </h4>
                   <div className="flex items-center gap-2">
                     {onAskAi && (
@@ -1265,15 +1243,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "network-models" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Network Models
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Dijkstra Shortest Route, Kruskal/Prim Minimum Spanning Tree, and Maximal Flow.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Network Models
+                </h3>
                 <div className="flex items-center bg-surface-card border border-hairline p-1 rounded-xl">
                   <button
                     onClick={() => setNetworkSubtype("shortest-route")}
@@ -1446,15 +1418,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "project-planning" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Project Planning (CPM / PERT)
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Computes Critical Path, Earliest & Latest Start dates, Slack floats, and 3-Time PERT variances.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Project Planning (CPM / PERT)
+                </h3>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() =>
@@ -1486,7 +1452,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               {/* Editable Activities Table */}
               <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                  Activity Network Specification (Editable)
+                  Activity Network Specification
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left font-sans text-xs">
@@ -1632,15 +1598,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "inventory-control" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Inventory Control (EOQ Models)
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Computes Economic Order Quantity (EOQ), optimal cycle time, and backorder shortage levels.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Inventory Control (EOQ Models)
+                </h3>
                 <button
                   onClick={handleSolveInventory}
                   className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"
@@ -1746,15 +1706,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "queuing-models" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Queuing Models
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Computes queue length (Lq), system length (Ls), waiting times, and server utilization (ρ).
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Queuing Models
+                </h3>
                 <button
                   onClick={handleSolveQueuing}
                   className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"
@@ -1845,15 +1799,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "zero-sum-games" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Zero-Sum Game Theory
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Evaluates Minimax / Maximin payoff matrices and identifies pure strategy saddle points.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Zero-Sum Game Theory
+                </h3>
                 <button
                   onClick={handleSolveGame}
                   className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"
@@ -1934,15 +1882,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {activeModule === "linear-equations" && (
             <div className="space-y-6 animate-in fade-in duration-150">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-editorial-serif text-2xl font-medium text-ink mb-1">
-                    Linear Equations
-                  </h3>
-                  <p className="text-xs text-muted">
-                    Solves simultaneous linear systems of equations Ax = b via Gauss-Jordan elimination.
-                  </p>
-                </div>
-
+                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
+                  Linear Equations
+                </h3>
                 <button
                   onClick={handleSolveLinearEq}
                   className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-colors shadow-2xs"

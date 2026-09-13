@@ -102,19 +102,14 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-y-auto p-6 max-w-4xl mx-auto w-full select-text">
       {/* Hero Header */}
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <h2 className="font-editorial-serif text-3xl font-medium text-ink">
-              AI Database & Optimization Assistant
-            </h2>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="p-2 bg-primary/10 rounded-lg text-primary">
+            <Sparkles className="w-5 h-5" />
           </div>
-          <p className="text-sm text-body leading-relaxed">
-            Ask questions in plain English or formulate operations research models. <span className="font-semibold text-ink">torsz</span> translates your request into accurate SQL and mathematical formulations.
-          </p>
+          <h2 className="font-editorial-serif text-2xl font-medium text-ink">
+            AI Database & Optimization Assistant
+          </h2>
         </div>
 
         <button

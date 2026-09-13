@@ -300,4 +300,41 @@ describe("TORA Operations Research Solvers", () => {
     expect(sol.totalMetric).toBe(401.3);
     expect(sol.selectedEdges.length).toBe(24);
   });
+
+  // 16. Quantity Discount Multi-Price Break EOQ Model
+  it("solves Multi-Price Break Quantity Discount EOQ", () => {
+    const problem: InventoryProblem = {
+      model: "quantity-discounts",
+      annualDemandD: 10000,
+      orderingCostK: 50,
+      holdingCostH: 2,
+      unitPriceC: 10,
+      priceBreaks: [
+        { tierIndex: 1, minQty: 0, maxQty: 999, unitPrice: 10.0, holdingCostH: 2.0 },
+        { tierIndex: 2, minQty: 1000, maxQty: 1999, unitPrice: 9.5, holdingCostH: 1.9 },
+        { tierIndex: 3, minQty: 2000, unitPrice: 9.0, holdingCostH: 1.8 },
+      ],
+    };
+
+    const sol = solveInventoryControl(problem);
+    expect(sol.selectedPriceBreakTier).toBeDefined();
+    expect(sol.totalAnnualCost).toBeLessThan(100000);
+    expect(sol.priceBreakAnalysis?.length).toBe(3);
+  });
+
+  // 17. Finite Capacity Queuing Model (M/M/1/K)
+  it("solves M/M/1/K Finite Capacity Queuing with blocking probability", () => {
+    const problem: QueuingProblem = {
+      model: "M/M/1",
+      arrivalRateLambda: 3,
+      serviceRateMu: 4,
+      systemCapacityK: 5,
+    };
+
+    const sol = solveQueuing(problem);
+    expect(sol.blockingProbabilityPk).toBeDefined();
+    expect(sol.blockingProbabilityPk).toBeGreaterThan(0);
+    expect(sol.effectiveArrivalRate).toBeLessThan(3);
+    expect(sol.avgInSystemLs).toBeGreaterThan(0);
+  });
 });
