@@ -654,11 +654,26 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 
 
   // Linear Programming Dynamic Variables & Constraints
+  const getFormattedVarName = (idx: number, customName?: string) => {
+    if (!customName || customName === "x" || customName.startsWith("w83")) {
+      return `x_${idx + 1}`;
+    }
+    const xMatch = customName.match(/^x(\d+)$/i);
+    if (xMatch) {
+      return `x_${xMatch[1]}`;
+    }
+    const wMatch = customName.match(/^w(\d+)$/i);
+    if (wMatch) {
+      return `w_${wMatch[1]}`;
+    }
+    return customName;
+  };
+
   const addLpVariable = () => {
     const nextIdx = lpProblem.objectiveCoefficients.length + 1;
-    const nextNames = lpProblem.variableNames
-      ? [...lpProblem.variableNames, `x${nextIdx}`]
-      : Array.from({ length: nextIdx }, (_, i) => `x${i + 1}`);
+    const nextNames = Array.from({ length: nextIdx }, (_, i) =>
+      getFormattedVarName(i, lpProblem.variableNames?.[i])
+    );
     const nextObj = [...lpProblem.objectiveCoefficients, 1];
     const nextConstraints = lpProblem.constraints.map((c) => ({
       ...c,
@@ -691,13 +706,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
     });
   };
 
-  const updateLpVariableName = (varIdx: number, name: string) => {
-    const nextNames = lpProblem.variableNames
-      ? [...lpProblem.variableNames]
-      : Array.from({ length: lpProblem.objectiveCoefficients.length }, (_, i) => `x${i + 1}`);
-    nextNames[varIdx] = name;
-    setLpProblem({ ...lpProblem, variableNames: nextNames });
-  };
 
   const addLpConstraint = () => {
     const numVars = lpProblem.objectiveCoefficients.length;
@@ -1305,11 +1313,10 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 
                   <div className="flex flex-wrap items-center gap-2 font-mono overflow-x-auto p-1">
                     {lpProblem.objectiveCoefficients.map((coef, varIdx) => {
-                      const vName = lpProblem.variableNames?.[varIdx] || `x${varIdx + 1}`;
                       const isLast = varIdx === lpProblem.objectiveCoefficients.length - 1;
 
                       return (
-                        <div key={varIdx} className="flex items-center gap-1.5 bg-surface-card px-2 py-1 rounded-lg border border-hairline">
+                        <div key={varIdx} className="flex items-center gap-1.5 bg-surface-card px-2.5 py-1.5 rounded-xl border border-hairline">
                           <input
                             type="number"
                             value={coef}
@@ -1321,13 +1328,10 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                             }}
                             className="w-14 px-1.5 py-0.5 bg-canvas border border-hairline rounded text-right font-bold text-ink text-xs outline-none focus:border-primary"
                           />
-                          <input
-                            type="text"
-                            value={vName}
-                            onChange={(e) => updateLpVariableName(varIdx, e.target.value)}
-                            className="w-14 px-1 py-0.5 bg-canvas border border-hairline rounded text-center text-primary font-bold text-xs outline-none focus:border-primary"
-                          />
-                          {!isLast && <span className="text-muted font-bold">+</span>}
+                          <span className="font-editorial-serif text-xs font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 select-none">
+                            {getFormattedVarName(varIdx, lpProblem.variableNames?.[varIdx])}
+                          </span>
+                          {!isLast && <span className="text-muted font-bold text-xs">+</span>}
                         </div>
                       );
                     })}
@@ -1347,7 +1351,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                       <span className="text-muted w-7 font-bold">C{idx + 1}:</span>
                       <div className="flex flex-wrap items-center gap-1.5 flex-1 overflow-x-auto">
                         {lpProblem.objectiveCoefficients.map((_, varIdx) => {
-                          const vName = lpProblem.variableNames?.[varIdx] || `x${varIdx + 1}`;
                           const isLast = varIdx === lpProblem.objectiveCoefficients.length - 1;
                           const coefVal = c.coefficients[varIdx] !== undefined ? c.coefficients[varIdx] : 0;
 
@@ -1367,8 +1370,10 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                                 }}
                                 className="w-14 px-1.5 py-1 bg-surface-card border border-hairline rounded text-right text-ink outline-none focus:border-primary text-xs"
                               />
-                              <span className="text-[11px] text-muted">{vName}</span>
-                              {!isLast && <span className="text-muted font-bold">+</span>}
+                              <span className="font-editorial-serif text-[11px] font-semibold text-primary px-1.5 py-0.5 bg-primary/10 rounded border border-primary/20 select-none">
+                                {getFormattedVarName(varIdx, lpProblem.variableNames?.[varIdx])}
+                              </span>
+                              {!isLast && <span className="text-muted font-bold text-xs">+</span>}
                             </div>
                           );
                         })}
