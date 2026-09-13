@@ -325,18 +325,14 @@ function MainWorkspace() {
         activeConnection={activeConnection}
         savedConnections={savedConnections}
         onSelectConnection={handleConnect}
-        onOpenNewConnection={() => setIsModalOpen(true)}
+
         onLoadSampleDb={handleLoadSampleDb}
         onRefreshSchema={() => activeConnection && refreshSchema(activeConnection.id)}
 
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
-        onOpenOcr={() => {
-          setOcrInitialText("");
-          setOcrInitialMode("image");
-          setIsOcrOpen(true);
-        }}
+
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         loading={loadingSchema}

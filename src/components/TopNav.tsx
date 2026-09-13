@@ -1,11 +1,11 @@
 import React from "react";
-import { Plus, Sparkles, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download, Camera } from "lucide-react";
+import { Sparkles, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download } from "lucide-react";
 import { ConnectionConfig } from "../types";
 interface TopNavProps {
   activeConnection: ConnectionConfig | null;
   savedConnections: ConnectionConfig[];
   onSelectConnection: (conn: ConnectionConfig) => void;
-  onOpenNewConnection: () => void;
+
   onLoadSampleDb: () => void;
   onRefreshSchema: () => void;
   onImportSpreadsheet: (file: File) => void;
@@ -13,7 +13,7 @@ interface TopNavProps {
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onExportDatabase?: () => void;
-  onOpenOcr?: () => void;
+
   loading: boolean;
 }
 
@@ -21,7 +21,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   activeConnection,
   savedConnections,
   onSelectConnection,
-  onOpenNewConnection,
+
   onLoadSampleDb,
   onRefreshSchema,
 
@@ -30,7 +30,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   isSidebarOpen = true,
   onToggleSidebar,
   onExportDatabase,
-  onOpenOcr,
+
   loading,
 }) => {
   return (
@@ -146,17 +146,6 @@ export const TopNav: React.FC<TopNavProps> = ({
             className="hidden"
           />
         </label>
-        {/* OCR Scan Paper Question Button */}
-        {onOpenOcr && (
-          <button
-            onClick={onOpenOcr}
-            className="p-2 text-muted hover:text-ink hover:bg-surface-cream rounded-md border border-hairline transition-colors shadow-2xs"
-            title="OCR Scan Operations Research Question"
-          >
-            <Camera className="w-4 h-4 text-primary" />
-          </button>
-        )}
-
         {/* Export Full Database Button */}
         {onExportDatabase && (
           <button
@@ -167,13 +156,6 @@ export const TopNav: React.FC<TopNavProps> = ({
             <Download className="w-4 h-4 text-primary" />
           </button>
         )}
-        <button
-          onClick={onOpenNewConnection}
-          className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-3.5 py-1.5 rounded-md transition-colors shadow-2xs"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          New Connection
-        </button>
       </div>
     </header>
   );
