@@ -69,62 +69,58 @@ export const TopNav: React.FC<TopNavProps> = ({
           </button>
         )}
 
-        {/* Expandable View Switcher Tabs */}
-        <div className="flex items-center bg-surface-soft p-1 rounded-md border border-hairline ml-3 gap-0.5">
+        {/* Apple Segmented Control View Switcher */}
+        <div className="flex items-center bg-surface-soft p-1 rounded-lg border border-hairline ml-3 gap-1 shadow-2xs">
           {/* Query Editor Tab */}
           <button
             onClick={() => onSelectView("editor")}
-            title="Query Editor"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
               activeView === "editor"
-                ? "bg-surface-card text-ink font-semibold shadow-2xs border border-hairline px-3"
-                : "text-muted hover:text-ink hover:bg-surface-cream px-2"
+                ? "bg-surface-card text-ink font-semibold shadow-xs border border-hairline"
+                : "text-muted hover:text-ink hover:bg-surface-cream/50"
             }`}
           >
-            <Terminal className={`w-3.5 h-3.5 shrink-0 ${activeView === "editor" ? "text-primary" : ""}`} />
-            {activeView === "editor" && <span className="whitespace-nowrap animate-keyframe-scale">Query Editor</span>}
+            <Terminal className={`w-3.5 h-3.5 shrink-0 ${activeView === "editor" ? "text-primary" : "text-muted"}`} />
+            <span>Query Editor</span>
           </button>
 
           {/* Schema Visualizer Tab */}
           <button
             onClick={() => onSelectView("diagram")}
-            title="Schema Visualizer"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
               activeView === "diagram"
-                ? "bg-surface-card text-ink font-semibold shadow-2xs border border-hairline px-3"
-                : "text-muted hover:text-ink hover:bg-surface-cream px-2"
+                ? "bg-surface-card text-ink font-semibold shadow-xs border border-hairline"
+                : "text-muted hover:text-ink hover:bg-surface-cream/50"
             }`}
           >
-            <Network className={`w-3.5 h-3.5 shrink-0 ${activeView === "diagram" ? "text-primary" : ""}`} />
-            {activeView === "diagram" && <span className="whitespace-nowrap animate-keyframe-scale">Schema Visualizer</span>}
+            <Network className={`w-3.5 h-3.5 shrink-0 ${activeView === "diagram" ? "text-primary" : "text-muted"}`} />
+            <span>Schema Visualizer</span>
           </button>
 
           {/* AI Assistant Tab */}
           <button
             onClick={() => onSelectView("ai")}
-            title="AI Assistant"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
               activeView === "ai"
-                ? "bg-surface-card text-primary font-semibold shadow-2xs border border-hairline px-3"
-                : "text-muted hover:text-primary hover:bg-surface-cream px-2"
+                ? "bg-surface-card text-primary font-semibold shadow-xs border border-hairline"
+                : "text-muted hover:text-primary hover:bg-surface-cream/50"
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 shrink-0 text-primary" />
-            {activeView === "ai" && <span className="whitespace-nowrap animate-keyframe-scale">AI Assistant</span>}
+            <span>AI Assistant</span>
           </button>
 
           {/* TORA Solvers Tab */}
           <button
             onClick={() => onSelectView("or")}
-            title="TORA Operations Research Suite"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all duration-150 ${
               activeView === "or"
-                ? "bg-surface-card text-primary font-semibold shadow-2xs border border-hairline px-3"
-                : "text-muted hover:text-primary hover:bg-surface-cream px-2"
+                ? "bg-surface-card text-primary font-semibold shadow-xs border border-hairline"
+                : "text-muted hover:text-primary hover:bg-surface-cream/50"
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5 shrink-0 text-primary" />
-            {activeView === "or" && <span className="whitespace-nowrap animate-keyframe-scale">TORA Solvers</span>}
+            <span>TORA Solvers</span>
           </button>
         </div>
       </div>
