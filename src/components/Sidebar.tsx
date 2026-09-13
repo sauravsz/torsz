@@ -306,19 +306,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ) : activeView === "or" ? (
         /* TORA Solvers: Optimization Models Navigation */
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 animate-keyframe-fade-up">
-          <div className="p-2.5 border-b border-hairline bg-surface-soft/60 shrink-0">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-muted shrink-0" />
-              <input
-                type="text"
-                placeholder={isCompact ? "Search..." : "Filter solvers..."}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-canvas border border-hairline rounded-lg pl-8 pr-3 py-1.5 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors"
-              />
-            </div>
-          </div>
-
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredOrModules.map((m) => {
               const Icon = m.icon;
@@ -347,49 +334,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1" />
       )}
 
-      {/* 3. BOTTOM: Compact Theme Switcher */}
-      <div className="p-2.5 border-t border-hairline bg-surface-soft shrink-0 select-none">
-        <div className="grid grid-cols-3 gap-1 bg-canvas p-1 rounded-xl border border-hairline">
+      {/* 3. BOTTOM: Compact Icon-Only Theme Switcher */}
+      <div className="p-2 border-t border-hairline bg-surface-soft shrink-0 select-none">
+        <div className="grid grid-cols-3 gap-1 bg-canvas p-0.5 rounded-lg border border-hairline">
           <button
             type="button"
             onClick={() => handleThemeChange("light")}
-            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-colors truncate ${
+            className={`flex items-center justify-center py-1.5 rounded-md transition-colors ${
               themeMode === "light"
                 ? "bg-surface-card text-ink shadow-2xs border border-hairline font-bold"
-                : "text-muted hover:text-ink"
+                : "text-muted hover:text-ink hover:bg-surface-cream/60"
             }`}
-            title="Light Mode"
+            title="Light Theme"
           >
-            <Sun className="w-3.5 h-3.5 text-accent-amber shrink-0" />
-            <span>Light</span>
+            <Sun className="w-4 h-4 text-accent-amber shrink-0" />
           </button>
 
           <button
             type="button"
             onClick={() => handleThemeChange("dark")}
-            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-colors truncate ${
+            className={`flex items-center justify-center py-1.5 rounded-md transition-colors ${
               themeMode === "dark"
                 ? "bg-surface-card text-ink shadow-2xs border border-hairline font-bold"
-                : "text-muted hover:text-ink"
+                : "text-muted hover:text-ink hover:bg-surface-cream/60"
             }`}
-            title="Dark Mode"
+            title="Dark Theme"
           >
-            <Moon className="w-3.5 h-3.5 text-accent-teal shrink-0" />
-            <span>Dark</span>
+            <Moon className="w-4 h-4 text-accent-teal shrink-0" />
           </button>
 
           <button
             type="button"
             onClick={() => handleThemeChange("system")}
-            className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-colors truncate ${
+            className={`flex items-center justify-center py-1.5 rounded-md transition-colors ${
               themeMode === "system"
                 ? "bg-surface-card text-ink shadow-2xs border border-hairline font-bold"
-                : "text-muted hover:text-ink"
+                : "text-muted hover:text-ink hover:bg-surface-cream/60"
             }`}
-            title="Auto"
+            title="Auto (System Theme)"
           >
-            <Laptop className="w-3.5 h-3.5 shrink-0" />
-            <span>Auto</span>
+            <Laptop className="w-4 h-4 text-muted-soft shrink-0" />
           </button>
         </div>
       </div>
