@@ -15,7 +15,13 @@ import {
   Laptop,
   Terminal,
   Sparkles,
+  Table,
+  Eye,
+  ChevronRight,
+  ChevronDown,
+  Key,
 } from "lucide-react";
+import { DatabaseSchema } from "../types";
 import { OrModule } from "../services/or/types";
 import {
   getThemePreference,
@@ -32,6 +38,10 @@ const MAX_WIDTH = 480;
 interface SidebarProps {
   activeView: "editor" | "diagram" | "ai" | "or";
   onSelectView: (view: "editor" | "diagram" | "ai" | "or") => void;
+  schema: DatabaseSchema | null;
+  selectedTable?: string | null;
+  onSelectTable: (tableName: string) => void;
+  loadingSchema?: boolean;
   activeOrModule: OrModule;
   onSelectOrModule: (module: OrModule) => void;
   onToggle?: () => void;
@@ -40,12 +50,16 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   activeView,
   onSelectView,
+  schema,
+  onSelectTable,
+  loadingSchema = false,
   activeOrModule,
   onSelectOrModule,
   onToggle,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [themeMode, setThemeMode] = useState<ThemeMode>(getThemePreference);
+  const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
   const [width, setWidth] = useState<number>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_WIDTH_KEY);
@@ -73,6 +87,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       localStorage.setItem(STORAGE_WIDTH_KEY, String(width));
     } catch {}
   }, [width]);
+
+  const toggleTable = (name: string) => {
+    setExpandedTables((prev) => ({
+      ...prev,
+      [name]: !prev[name],
+    }));
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -124,6 +145,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: "ai", name: "AI Assistant", icon: Sparkles },
     { id: "or", name: "TORA Solvers", icon: TrendingUp },
   ] as const;
+
+  const tables = schema?.tables.filter((t) => t.table_type === "table") || [];
+  const viewsList = schema?.tables.filter((t) => t.table_type === "view") || [];
+
+  const filteredTables = tables.filter((t) =>
+    t.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const filteredViews = viewsList.filter((v) =>
+    v.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const filteredOrModules = orModules.filter((m) =>
     m.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -180,10 +211,113 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* 2. MIDDLE: Conditional TORA Optimization Models */}
-      {activeView === "or" ? (
+      {/* 2. MIDDLE: Context-Aware Section */}
+      {activeView === "editor" ? (
+        /* Query Editor: Database Tables & Schema Trees */
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 animate-keyframe-fade-up">
-          {/* Solvers Search Header */}
+          <div className="p-2 border-b border-hairline bg-surface-soft/60 shrink-0">
+            <div className="relative">
+              <Search className="w-3 h-3 absolute left-2.5 top-2 text-muted shrink-0" />
+              <input
+                type="text"
+                placeholder={isCompact ? "Filter..." : "Filter tables..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-canvas border border-hairline rounded-md pl-7 pr-2.5 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
+            {loadingSchema ? (
+              <div className="p-4 text-center text-xs text-muted">
+                <div className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mb-1" />
+                <p className="text-[11px]">Loading schema...</p>
+              </div>
+            ) : !schema || filteredTables.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted italic">
+                No database tables found
+              </div>
+            ) : (
+              <>
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted mb-0.5">
+                  Tables ({filteredTables.length})
+                </div>
+
+                {filteredTables.map((table) => (
+                  <div key={table.name} className="group">
+                    <div
+                      onClick={() => toggleTable(table.name)}
+                      className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-surface-cream text-xs text-ink cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        {expandedTables[table.name] ? (
+                          <ChevronDown className="w-3 h-3 text-muted shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-3 h-3 text-muted shrink-0" />
+                        )}
+                        <Table className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <span className="font-semibold text-[11px] truncate">{table.name}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectTable(table.name);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-[10px] font-semibold text-primary hover:underline px-1 py-0.2"
+                      >
+                        SELECT
+                      </button>
+                    </div>
+
+                    {/* Columns Subtree */}
+                    {expandedTables[table.name] && (
+                      <div className="pl-5 pr-1 py-0.5 space-y-0.5 border-l border-hairline ml-3 my-0.5">
+                        {table.columns.map((col) => (
+                          <div
+                            key={col.name}
+                            className="flex items-center justify-between text-[10px] text-body py-0.2"
+                          >
+                            <div className="flex items-center gap-1 truncate">
+                              {col.is_primary_key && (
+                                <Key className="w-2.5 h-2.5 text-accent-amber shrink-0" />
+                              )}
+                              <span className="truncate">{col.name}</span>
+                            </div>
+                            <span className="text-[9px] font-mono text-muted-soft bg-canvas px-1 rounded border border-hairline-soft shrink-0">
+                              {col.data_type}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {filteredViews.length > 0 && (
+                  <div className="pt-2 border-t border-hairline-soft mt-2">
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted mb-0.5">
+                      Views ({filteredViews.length})
+                    </div>
+                    {filteredViews.map((view) => (
+                      <div
+                        key={view.name}
+                        onClick={() => onSelectTable(view.name)}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-surface-cream text-xs text-ink cursor-pointer transition-colors"
+                      >
+                        <Eye className="w-3.5 h-3.5 text-accent-teal opacity-80 shrink-0" />
+                        <span className="text-[11px] truncate">{view.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      ) : activeView === "or" ? (
+        /* TORA Solvers: Optimization Models Navigation */
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0 animate-keyframe-fade-up">
           <div className="p-2 border-b border-hairline bg-surface-soft/60 shrink-0">
             <div className="relative">
               <Search className="w-3 h-3 absolute left-2.5 top-2 text-muted shrink-0" />
@@ -197,7 +331,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* Solvers Vertical Navigation List */}
           <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
             {filteredOrModules.map((m) => {
               const Icon = m.icon;
