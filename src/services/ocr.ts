@@ -15,6 +15,14 @@ import {
 } from "./or/types";
 import { AiSettings, getStoredAiSettings } from "./aiAssistant";
 import { extractTransportationProblem, extractAssignmentProblem } from "./ocrMatrixParser";
+import {
+  extractLinearProgramming,
+  extractCpmActivities,
+  extractInventoryProblem,
+  extractQueuingProblem,
+  extractZeroSumGame,
+  extractLinearEquations,
+} from "./orTextParsers";
 export interface OcrProblemClassification {
   detectedModule: OrModule;
   confidence: number;
@@ -447,59 +455,63 @@ export function classifyOrProblemFromText(
       };
     }
     if (targetHint.module === "linear-programming") {
+      const lp = extractLinearProgramming(text);
       return {
         detectedModule: "linear-programming",
         confidence: 1.0,
         reason: "User selected Linear Programming.",
         transcription: text,
+        parsedData: { lp: lp || undefined },
       };
     }
     if (targetHint.module === "project-planning") {
+      const cpm = extractCpmActivities(text);
       return {
         detectedModule: "project-planning",
         confidence: 1.0,
         reason: "User selected Project Planning (CPM/PERT).",
         transcription: text,
+        parsedData: { cpm: cpm || undefined },
       };
     }
     if (targetHint.module === "inventory-control") {
-      const numbers = text.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+      const inv = extractInventoryProblem(text);
       return {
         detectedModule: "inventory-control",
         confidence: 1.0,
         reason: "User selected Inventory Control.",
         transcription: text,
-        parsedData: {
-          inventory: {
-            annualDemandD: numbers[0] || 1000,
-            orderingCostK: numbers[1] || 100,
-            holdingCostH: numbers[2] || 2,
-          },
-        },
+        parsedData: { inventory: inv || undefined },
       };
     }
     if (targetHint.module === "queuing-models") {
+      const queue = extractQueuingProblem(text);
       return {
         detectedModule: "queuing-models",
         confidence: 1.0,
         reason: "User selected Queuing Analysis.",
         transcription: text,
+        parsedData: { queuing: queue || undefined },
       };
     }
     if (targetHint.module === "zero-sum-games") {
+      const game = extractZeroSumGame(text);
       return {
         detectedModule: "zero-sum-games",
         confidence: 1.0,
         reason: "User selected Zero-Sum Games.",
         transcription: text,
+        parsedData: { game: game || undefined },
       };
     }
     if (targetHint.module === "linear-equations") {
+      const eq = extractLinearEquations(text);
       return {
         detectedModule: "linear-equations",
         confidence: 1.0,
         reason: "User selected Linear Equations.",
         transcription: text,
+        parsedData: eq ? { linearEqA: eq.matrixA, linearEqB: eq.vectorB } : undefined,
       };
     }
   }
