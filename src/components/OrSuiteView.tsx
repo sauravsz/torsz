@@ -1907,13 +1907,14 @@ FROM lp_variables;`)
         </main>
 
         {/* Claude-style Bottom Chat & Problem Input Bar */}
+        {/* Light Mode Bottom Chat & Problem Input Bar */}
         <div className="p-4 bg-gradient-to-t from-canvas via-canvas/95 to-transparent border-t border-hairline/60 shrink-0 select-none">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleQuickQuestionSubmit(e);
             }}
-            className="max-w-3xl mx-auto w-full bg-[#181715] text-[#faf9f5] rounded-2xl border border-[#252320] shadow-xl p-2 px-3 flex items-center gap-2.5 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20"
+            className="max-w-3xl mx-auto w-full bg-surface-card text-ink rounded-2xl border border-hairline shadow-md p-2 px-3 flex items-center gap-2.5 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20"
           >
             {/* Plus / Category Option Button */}
             <button
@@ -1921,7 +1922,7 @@ FROM lp_variables;`)
               onClick={() => {
                 if (onOpenOcr) onOpenOcr(quickQuestionText, "text");
               }}
-              className="p-1.5 text-[#a09d96] hover:text-[#faf9f5] hover:bg-[#252320] rounded-lg transition-colors shrink-0"
+              className="p-1.5 text-muted hover:text-ink hover:bg-surface-cream rounded-lg transition-colors shrink-0"
               title="Choose Problem Category & Solvers"
             >
               <Plus className="w-4 h-4" />
@@ -1943,7 +1944,7 @@ FROM lp_variables;`)
                 }
               }}
               placeholder="Write a message, paste problem text, or markdown table..."
-              className="flex-1 bg-transparent text-xs text-[#faf9f5] placeholder:text-[#6c6a64] focus:outline-none resize-none py-1.5 font-sans leading-relaxed max-h-32"
+              className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none resize-none py-1.5 font-sans leading-relaxed max-h-32"
             />
 
             {/* Camera Icon Button (replaces voice icon) */}
@@ -1951,7 +1952,7 @@ FROM lp_variables;`)
               <button
                 type="button"
                 onClick={() => onOpenOcr("", "image")}
-                className="p-1.5 text-[#a09d96] hover:text-primary hover:bg-[#252320] rounded-lg transition-colors shrink-0"
+                className="p-1.5 text-muted hover:text-primary hover:bg-surface-cream rounded-lg transition-colors shrink-0"
                 title="OCR Scan Question Image (Camera)"
               >
                 <Camera className="w-4 h-4" />
@@ -1962,14 +1963,14 @@ FROM lp_variables;`)
             <button
               type="submit"
               disabled={!quickQuestionText.trim()}
-              className="p-1.5 bg-primary hover:bg-primary-active disabled:bg-[#252320] disabled:text-[#6c6a64] text-on-primary rounded-xl transition-colors shrink-0 shadow-2xs"
+              className="p-1.5 bg-primary hover:bg-primary-active disabled:bg-surface-soft disabled:text-muted-soft text-on-primary rounded-xl transition-colors shrink-0 shadow-2xs"
               title="Confirm Problem Type & Solve"
             >
               <ArrowUp className="w-4 h-4" />
             </button>
           </form>
 
-          <div className="text-center text-[11px] text-[#6c6a64] mt-1.5 font-sans">
+          <div className="text-center text-[11px] text-muted-soft mt-1.5 font-sans">
             torsz is AI and can make mistakes. Verify mathematical parameters.
           </div>
         </div>
