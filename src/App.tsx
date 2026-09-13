@@ -404,7 +404,7 @@ function MainWorkspace() {
 
         {/* Left Schema Sidebar */}
         {isSidebarOpen && (
-          <div className="fixed md:static inset-y-14 left-0 z-40 md:z-auto h-[calc(100vh-3.5rem)] shadow-2xl md:shadow-none">
+          <div className="fixed md:static inset-y-14 left-0 z-40 md:z-auto h-[calc(100vh-3.5rem)] shadow-2xl md:shadow-none p-2.5 pr-0 bg-surface-soft">
             <Sidebar
               activeView={activeView}
               onSelectView={(v) => {

@@ -162,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside
       style={{ width: `${width}px` }}
-      className={`relative bg-surface-card border-r border-hairline flex flex-col h-[calc(100vh-3.5rem)] select-none text-body shrink-0 transition-none ${
+      className={`relative bg-surface-card border border-hairline rounded-2xl flex flex-col h-full select-none text-body shrink-0 overflow-hidden shadow-2xs transition-none ${
         isDragging ? "cursor-col-resize select-none" : ""
       }`}
     >
