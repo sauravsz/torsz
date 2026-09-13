@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
-import type * as Monaco from "monaco-editor";
-import { Play, RotateCcw, Plus, X, FileCode, SearchCheck, MoreHorizontal, ChevronDown } from "lucide-react";
+import {
+  Play,
+  RotateCcw,
+  Plus,
+  X,
+  FileCode,
+  SearchCheck,
+  MoreHorizontal,
+  ChevronDown,
+  Sparkles,
+  ArrowUp,
+} from "lucide-react";
 import { DatabaseSchema } from "../types";
 
 const LOCAL_STORAGE_WORKSHEETS_KEY = "torsz_monaco_worksheets";
@@ -28,10 +38,13 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   onChangeSql,
   onExecute,
   onExplainPlan,
+  onGenerateFromPrompt,
   loading,
 }) => {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  const [promptText, setPromptText] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
   const [tabs, setTabs] = useState<WorksheetTab[]>(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_WORKSHEETS_KEY);
@@ -72,8 +85,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
       name: `Worksheet ${nextIdx}`,
       sql: `-- Worksheet ${nextIdx}\nSELECT * FROM products LIMIT 50;\n`,
     };
-    const nextTabs = [...tabs, newTab];
-    setTabs(nextTabs);
+    setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTab.id);
     onChangeSql(newTab.sql);
   };
@@ -84,9 +96,9 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     const nextTabs = tabs.filter((t) => t.id !== tabId);
     setTabs(nextTabs);
     if (activeTabId === tabId) {
-      const fallback = nextTabs[0];
-      setActiveTabId(fallback.id);
-      onChangeSql(fallback.sql);
+      const nextActive = nextTabs[nextTabs.length - 1];
+      setActiveTabId(nextActive.id);
+      onChangeSql(nextActive.sql);
     }
   };
 
@@ -98,53 +110,69 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   const commitRenameTab = () => {
     if (editingTabId && tabRenameValue.trim()) {
       setTabs((prev) =>
-        prev.map((t) => (t.id === editingTabId ? { ...t, name: tabRenameValue.trim() } : t))
+        prev.map((t) =>
+          t.id === editingTabId ? { ...t, name: tabRenameValue.trim() } : t
+        )
       );
     }
     setEditingTabId(null);
   };
 
-  const handleEditorMount: OnMount = (editor, monaco: typeof Monaco) => {
-    monaco.editor.defineTheme("torsz-editorial-dark", {
+  const handleEditorMount: OnMount = (editor, monaco) => {
+    monaco.editor.defineTheme("torsz-dark-editorial", {
       base: "vs-dark",
       inherit: true,
       rules: [
-        { token: "", foreground: "faf9f5", background: "181715" },
         { token: "keyword", foreground: "cc785c", fontStyle: "bold" },
-        { token: "string", foreground: "5db872" },
+        { token: "string", foreground: "5db8a6" },
         { token: "number", foreground: "e8a55a" },
         { token: "comment", foreground: "6c6a64", fontStyle: "italic" },
-        { token: "operator", foreground: "5db8a6" },
-        { token: "identifier", foreground: "faf9f5" },
         { token: "type", foreground: "e8a55a" },
+        { token: "identifier", foreground: "faf9f5" },
+        { token: "delimiter", foreground: "8e8b82" },
       ],
       colors: {
         "editor.background": "#181715",
         "editor.foreground": "#faf9f5",
-        "editorCursor.foreground": "#cc785c",
         "editor.lineHighlightBackground": "#252320",
+        "editorCursor.foreground": "#cc785c",
         "editorLineNumber.foreground": "#6c6a64",
         "editorLineNumber.activeForeground": "#cc785c",
-        "editor.selectionBackground": "#3d3834",
-        "editor.inactiveSelectionBackground": "#2a2724",
+        "editor.selectionBackground": "#3d3d3a80",
+        "editor.inactiveSelectionBackground": "#25252380",
       },
     });
-
-    monaco.editor.setTheme("torsz-editorial-dark");
+    monaco.editor.setTheme("torsz-dark-editorial");
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       onExecute();
     });
   };
 
+  const handlePromptSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promptText.trim() || !onGenerateFromPrompt) return;
+    setIsGenerating(true);
+    try {
+      await onGenerateFromPrompt(promptText.trim());
+      setPromptText("");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const templates = [
     {
-      title: "Linear Programming Model",
-      sql: `-- Linear Programming Optimization Problem\nCREATE TABLE IF NOT EXISTS lp_variables (\n  var_name VARCHAR(10) PRIMARY KEY,\n  optimal_units DOUBLE PRECISION,\n  unit_profit DOUBLE PRECISION\n);\n\nINSERT OR REPLACE INTO lp_variables VALUES ('x1', 3.0, 5.0), ('x2', 1.5, 4.0);\nSELECT var_name, optimal_units, unit_profit, (optimal_units * unit_profit) AS total_revenue FROM lp_variables;`,
+      title: "Active Products by Category",
+      sql: `-- Products Grouped by Category with Aggregations\nSELECT \n  c.name AS category_name,\n  COUNT(p.id) AS total_products,\n  ROUND(AVG(p.price), 2) AS avg_price,\n  SUM(p.stock) AS total_units_in_stock\nFROM products p\nJOIN categories c ON p.category_id = c.id\nGROUP BY c.id, c.name\nORDER BY total_products DESC;`,
+    },
+    {
+      title: "Top Spending Customers",
+      sql: `-- High Value Customers with Lifetime Spend\nSELECT \n  c.id,\n  c.first_name || ' ' || c.last_name AS customer_name,\n  c.email,\n  COUNT(o.id) AS total_orders,\n  COALESCE(SUM(o.total_amount), 0.0) AS lifetime_spent\nFROM customers c\nLEFT JOIN orders o ON c.id = o.customer_id\nGROUP BY c.id\nORDER BY lifetime_spent DESC\nLIMIT 10;`,
     },
     {
       title: "Transportation Shipping Matrix",
-      sql: `-- Transportation Problem Matrix\nCREATE TABLE IF NOT EXISTS shipping_costs (\n  source_plant VARCHAR(50),\n  destination_market VARCHAR(50),\n  unit_cost DOUBLE PRECISION,\n  allocated_units INTEGER,\n  PRIMARY KEY (source_plant, destination_market)\n);\n\nINSERT OR REPLACE INTO shipping_costs VALUES\n  ('Plant 1', 'Market 1', 10.0, 0),\n  ('Plant 1', 'Market 2', 2.0, 15),\n  ('Plant 2', 'Market 3', 9.0, 15),\n  ('Plant 2', 'Market 4', 20.0, 10);\n\nSELECT * FROM shipping_costs WHERE allocated_units > 0;`,
+      sql: `-- Shipping Cost Matrix & Route Constraints\nCREATE TABLE IF NOT EXISTS shipping_costs (\n  origin VARCHAR(50),\n  destination VARCHAR(50),\n  cost_per_unit REAL,\n  capacity_units INTEGER\n);\n\nINSERT OR REPLACE INTO shipping_costs VALUES\n  ('Plant A', 'Warehouse 1', 10.0, 100),\n  ('Plant A', 'Warehouse 2', 20.0, 150),\n  ('Plant B', 'Warehouse 1', 12.0, 80),\n  ('Plant B', 'Warehouse 2', 15.0, 200);\n\nSELECT * FROM shipping_costs;`,
     },
     {
       title: "Project CPM Schedule",
@@ -267,8 +295,8 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
                     }}
                     className="w-full flex items-center gap-1.5 p-2 rounded-lg hover:bg-surface-dark-elevated text-on-dark transition-colors"
                   >
-                    <SearchCheck className="w-3.5 h-3.5 text-accent-amber" />
-                    <span>Explain Plan</span>
+                    <SearchCheck className="w-3.5 h-3.5 text-accent-teal" />
+                    <span>Explain Plan & Profiler</span>
                   </button>
                 )}
                 <button
@@ -317,7 +345,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
             scrollBeyondLastLine: false,
             automaticLayout: true,
             tabSize: 2,
-            padding: { top: 8, bottom: 8 },
+            padding: { top: 8, bottom: 44 }, // padding at bottom to clear floating AI input
             overviewRulerBorder: false,
             hideCursorInOverviewRuler: true,
             renderLineHighlight: "all",
@@ -326,6 +354,33 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
             cursorSmoothCaretAnimation: "on",
           }}
         />
+
+        {/* Small Floating AI Prompt Box */}
+        {onGenerateFromPrompt && (
+          <div className="absolute bottom-2.5 left-4 right-4 max-w-xl z-20">
+            <form
+              onSubmit={handlePromptSubmit}
+              className="bg-[#1f1e1b]/95 backdrop-blur-md border border-surface-dark-elevated rounded-xl px-2.5 py-1.5 flex items-center gap-2 shadow-xl focus-within:border-primary/60 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+              <input
+                type="text"
+                value={promptText}
+                onChange={(e) => setPromptText(e.target.value)}
+                placeholder="Ask AI to generate, optimize, or fix SQL..."
+                className="flex-1 bg-transparent text-xs text-on-dark placeholder:text-muted-soft focus:outline-none font-sans"
+              />
+              <button
+                type="submit"
+                disabled={!promptText.trim() || isGenerating}
+                className="p-1 bg-primary hover:bg-primary-active disabled:bg-surface-dark disabled:text-muted-soft text-on-primary rounded-lg transition-colors shadow-2xs shrink-0"
+                title="Generate SQL with AI"
+              >
+                <ArrowUp className={`w-3 h-3 ${isGenerating ? "animate-spin" : ""}`} />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

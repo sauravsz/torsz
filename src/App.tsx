@@ -41,7 +41,7 @@ function MainWorkspace() {
   const [queryResult, setQueryResult] = useState<QueryResult | null>(null);
   const [loadingQuery, setLoadingQuery] = useState(false);
   const [loadingSchema, setLoadingSchema] = useState(false);
-  const [activeView, setActiveView] = useState<"editor" | "diagram" | "ai" | "or">("editor");
+  const [activeView, setActiveView] = useState<"editor" | "diagram" | "ai" | "or">("or");
   const [activeOrModule, setActiveOrModule] = useState<any>("transportation-assignment");
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string>("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
