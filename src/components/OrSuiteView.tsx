@@ -263,10 +263,12 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
     } else if (activeModule === "linear-programming") {
       setLpProblem(b.data);
+      if (b.data.objectiveCoefficients.length > 2) {
+        setLpMode("simplex-tableau");
+      }
       const sol = solveLinearProgramming(b.data);
       setLpSol(sol);
     } else if (activeModule === "network-models") {
-      setNetworkEdges(b.data.edges);
       if (b.data.startNode) setNetStartNode(b.data.startNode);
       if (b.data.endNode) setNetEndNode(b.data.endNode);
       const sol = networkSubtype === "minimum-spanning-tree" ? solveNetworkMst(b.data.edges) : networkSubtype === "maximal-flow" ? solveNetworkMaxFlow(b.data.edges, b.data.startNode || "1", b.data.endNode || "5") : solveNetworkShortestRoute(b.data.edges, b.data.startNode || "1", b.data.endNode || "5");
@@ -1422,6 +1424,72 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               {/* Graphical or Simplex Tableau Solution */}
               {lpSol && (
                 <div className="space-y-4">
+                  {/* Optimal Decision Variables & Error Deviations Summary Card */}
+                  <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between border-b border-hairline pb-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
+                        <div>
+                          <h4 className="font-editorial-serif text-lg font-semibold text-ink">
+                            Optimal Solution: {lpProblem.objective === "max" ? "Max" : "Min"} Z = {lpSol.objectiveValue.toLocaleString()}
+                          </h4>
+                          <span className="text-[11px] text-muted">
+                            Status: <span className="font-semibold text-success uppercase">{lpSol.status}</span> ({lpSol.iterationsCount || lpSol.tableaus.length} iterations)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Decision Variables & Error Deviations Grid */}
+                    <div className="space-y-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                        Decision Variables & Deviations:
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+                        {lpSol.variableValues.map((v, vIdx) => {
+                          const isNonZero = v.value > 1e-4;
+                          const isWeight = v.name.startsWith("w") || v.name.startsWith("x");
+                          const isPositiveError = v.name.includes("pos") || v.name.includes("+");
+                          const isNegativeError = v.name.includes("neg") || v.name.includes("-");
+
+                          return (
+                            <div
+                              key={vIdx}
+                              className={`p-3 rounded-xl border flex flex-col justify-between transition-colors ${
+                                isNonZero
+                                  ? "bg-canvas border-primary/40 shadow-xs ring-1 ring-primary/20"
+                                  : "bg-surface-soft/60 border-hairline opacity-75"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between text-xs font-semibold mb-1">
+                                <span className="text-muted font-mono">{v.name}</span>
+                                {isNonZero ? (
+                                  <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.2 rounded font-bold">
+                                    Basic
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-soft">0</span>
+                                )}
+                              </div>
+                              <div className="text-base font-mono font-bold text-ink">
+                                {v.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}
+                              </div>
+                              <div className="text-[10px] text-muted-soft mt-0.5 truncate">
+                                {isWeight
+                                  ? "Weight Parameter"
+                                  : isPositiveError
+                                  ? "Overestimate (+)"
+                                  : isNegativeError
+                                  ? "Underestimate (-)"
+                                  : "Decision Var"}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
                   {lpMode === "graphical-2d" && lpSol.graphical ? (
                     <GraphicalLpCanvas
                       solution={lpSol.graphical}
