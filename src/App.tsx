@@ -427,8 +427,8 @@ function MainWorkspace() {
           </div>
         )}
         {/* Center Canvas Area */}
-        <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft/40">
-          <main className="flex-1 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft p-2.5 pl-2">
+          <main className="flex-1 flex flex-col h-full overflow-hidden bg-canvas rounded-2xl border border-hairline shadow-2xs">
             {activeView === "editor" ? (
               <div className="flex flex-col h-full overflow-hidden p-3 gap-3">
               <div className="h-[44%] min-h-[200px] shrink-0">
