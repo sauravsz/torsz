@@ -521,18 +521,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
-      {/* Module Header Bar */}
-      <div className="h-14 bg-surface-card border-b border-hairline px-6 flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-center gap-2.5">
-          <span className="font-editorial-serif text-2xl font-normal text-ink">
-            TORA Optimization Suite
-          </span>
-          <span className="text-xs font-semibold text-muted bg-surface-soft px-2.5 py-0.5 rounded-full border border-hairline">
-            Operations Research & Mathematical Solvers
-          </span>
-        </div>
-      </div>
-
       {/* Main Module Solver Content */}
       <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-6">
           {/* ========================================== */}
@@ -1969,10 +1957,6 @@ FROM lp_variables;`)
               <ArrowUp className="w-4 h-4" />
             </button>
           </form>
-
-          <div className="text-center text-[11px] text-muted-soft mt-1.5 font-sans">
-            torsz is AI and can make mistakes. Verify mathematical parameters.
-          </div>
         </div>
       </div>
     );
