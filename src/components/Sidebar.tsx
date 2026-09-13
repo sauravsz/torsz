@@ -140,15 +140,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isDragging ? "cursor-col-resize select-none" : ""
       }`}
     >
-      {/* Sidebar Header */}
-      <div className="p-3 border-b border-hairline bg-surface-soft shrink-0">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2 truncate min-w-0">
-            <Sparkles className="w-4 h-4 text-primary shrink-0" />
-            <span className="font-editorial-serif text-lg font-medium text-ink truncate">
-              TORA Solvers
-            </span>
-          </div>
+      {/* 1. TOP: Workspace Views Section */}
+      <div className="p-3 border-b border-hairline bg-surface-soft shrink-0 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted truncate">
+            Workspace Views
+          </span>
           {onToggle && (
             <button
               onClick={onToggle}
@@ -160,64 +157,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Search Solvers */}
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted shrink-0" />
-          <input
-            type="text"
-            placeholder={isCompact ? "Search..." : "Search optimization models..."}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-canvas border border-hairline rounded-md pl-8 pr-3 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Solvers Vertical Navigation List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted mb-1 truncate">
-          {isCompact ? `Models (${filteredOrModules.length})` : `Optimization Models (${filteredOrModules.length})`}
-        </div>
-
-        {filteredOrModules.map((m) => {
-          const Icon = m.icon;
-          const isActive = activeView === "or" && activeOrModule === m.id;
-
-          return (
-            <button
-              key={m.id}
-              onClick={() => {
-                onSelectOrModule(m.id as OrModule);
-                onSelectView("or");
-              }}
-              className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-all duration-150 min-w-0 ${
-                isActive
-                  ? "bg-canvas text-ink border border-hairline shadow-xs font-semibold ring-1 ring-primary/20"
-                  : "text-body hover:text-ink hover:bg-surface-cream/70"
-              }`}
-            >
-              <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted"}`} />
-              <div className="flex-1 min-w-0 truncate">
-                <div className={`text-xs truncate ${isActive ? "text-primary font-semibold" : "text-ink font-medium"}`}>
-                  {m.name}
-                </div>
-                {!isCompact && (
-                  <div className="text-[10px] text-muted-soft truncate">
-                    {m.desc}
-                  </div>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Main Workspace Views Relocated to Bottom of Sidebar */}
-      <div className="p-2 border-t border-hairline bg-surface-soft shrink-0 space-y-1 select-none">
-        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted mb-0.5 truncate">
-          Workspace Views
-        </div>
-
         <div className={`grid gap-1 ${isCompact ? "grid-cols-1" : "grid-cols-2"}`}>
           {views.map((v) => {
             const Icon = v.icon;
@@ -227,21 +166,108 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={v.id}
                 onClick={() => onSelectView(v.id)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 text-left min-w-0 truncate ${
+                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-all duration-150 text-left min-w-0 truncate ${
                   isActive
-                    ? "bg-surface-card text-ink font-semibold shadow-xs border border-hairline"
-                    : "text-muted hover:text-ink hover:bg-surface-cream/50"
+                    ? "bg-canvas text-ink font-semibold shadow-xs border border-hairline ring-1 ring-primary/20"
+                    : "text-muted hover:text-ink hover:bg-surface-cream/70"
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-primary" : "text-muted"}`} />
-                <span className="truncate text-[11px]">{v.name}</span>
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted"}`} />
+                <span className={`truncate text-[11px] ${isActive ? "text-ink font-semibold" : ""}`}>
+                  {v.name}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Theme Mode Switcher Pinned to Sidebar Bottom */}
+      {/* 2. MIDDLE: Conditional TORA Optimization Models (Only visible when TORA Solvers view is active) */}
+      {activeView === "or" ? (
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0 animate-keyframe-fade-up">
+          {/* Solvers Search Header */}
+          <div className="p-3 border-b border-hairline bg-surface-soft/60 shrink-0">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted shrink-0" />
+              <input
+                type="text"
+                placeholder={isCompact ? "Search..." : "Search optimization models..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-canvas border border-hairline rounded-md pl-8 pr-3 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Solvers Vertical Navigation List */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-primary mb-1 truncate flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>
+                {isCompact ? `Models (${filteredOrModules.length})` : `Optimization Models (${filteredOrModules.length})`}
+              </span>
+            </div>
+
+            {filteredOrModules.map((m) => {
+              const Icon = m.icon;
+              const isActive = activeOrModule === m.id;
+
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => onSelectOrModule(m.id as OrModule)}
+                  className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-all duration-150 min-w-0 ${
+                    isActive
+                      ? "bg-canvas text-ink border border-hairline shadow-xs font-semibold ring-1 ring-primary/30"
+                      : "text-body hover:text-ink hover:bg-surface-cream/70"
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted"}`} />
+                  <div className="flex-1 min-w-0 truncate">
+                    <div className={`text-xs truncate ${isActive ? "text-primary font-semibold" : "text-ink font-medium"}`}>
+                      {m.name}
+                    </div>
+                    {!isCompact && (
+                      <div className="text-[10px] text-muted-soft truncate">
+                        {m.desc}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        /* Empty / Contextual State when not in TORA Solvers */
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted select-none">
+          <div className="w-10 h-10 rounded-2xl bg-surface-soft border border-hairline flex items-center justify-center text-muted-soft mb-2.5 shadow-2xs">
+            {activeView === "editor" ? (
+              <Terminal className="w-5 h-5 text-primary" />
+            ) : activeView === "diagram" ? (
+              <Network className="w-5 h-5 text-accent-teal" />
+            ) : (
+              <Sparkles className="w-5 h-5 text-accent-amber" />
+            )}
+          </div>
+          <p className="text-xs font-semibold text-ink capitalize mb-1">
+            {activeView === "editor"
+              ? "Query Editor Mode"
+              : activeView === "diagram"
+              ? "Schema Visualizer Mode"
+              : "AI Assistant Mode"}
+          </p>
+          <p className="text-[11px] text-muted-soft leading-relaxed max-w-[190px]">
+            {activeView === "editor"
+              ? "Use the top tables bar to query database relations."
+              : activeView === "diagram"
+              ? "Inspect live ER relationships & foreign key maps."
+              : "Ask questions or formulate queries with AI."}
+          </p>
+        </div>
+      )}
+
+      {/* 3. BOTTOM: Theme Switcher Pinned to Sidebar Bottom */}
       <div className="p-2.5 border-t border-hairline bg-surface-soft shrink-0 select-none">
         <div className="flex items-center justify-between text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5 px-1">
           <span>Theme</span>
