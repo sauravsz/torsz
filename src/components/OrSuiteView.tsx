@@ -1460,11 +1460,15 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     </div>
                   )}
 
-                  {/* Multi-Scenario Sensitivity Sweep */}
-                  <MultiScenarioSensitivitySweep baseProblem={lpProblem} />
+                  {/* Multi-Scenario Sensitivity Sweep (2-variable models) */}
+                  {lpProblem.objectiveCoefficients.length === 2 && (
+                    <MultiScenarioSensitivitySweep baseProblem={lpProblem} />
+                  )}
 
-                  {/* Branch and Bound Integer Programming Tree */}
-                  <BranchAndBoundTree objectiveCoeffs={lpProblem.objectiveCoefficients} />
+                  {/* Branch and Bound Integer Programming Tree (2-variable models) */}
+                  {lpProblem.objectiveCoefficients.length === 2 && (
+                    <BranchAndBoundTree objectiveCoeffs={lpProblem.objectiveCoefficients} />
+                  )}
                 </div>
               )}
             </div>

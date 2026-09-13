@@ -35,20 +35,18 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 
   interface ColInfo {
     name: string;
-    cost: number;
     isArtificial: boolean;
   }
 
-  const cols: ColInfo[] = varNames.map((name, i) => ({
+  const cols: ColInfo[] = varNames.map((name) => ({
     name,
-    cost: userObj[i] || 0,
     isArtificial: false,
   }));
 
   const A_rows: number[][] = [];
   const b_vec: number[] = [];
   const basicIndices: number[] = [];
-  const BIG_M = 1e4;
+  const artificialCols: number[] = [];
 
   for (let i = 0; i < numConstraints; i++) {
     let { coefficients, operator, rhs } = problem.constraints[i];
@@ -65,28 +63,30 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     if (operator === "<=") {
       // Add slack (+1)
       const slackCol = cols.length;
-      cols.push({ name: `s${i + 1}`, cost: 0, isArtificial: false });
+      cols.push({ name: `s${i + 1}`, isArtificial: false });
       row.push(1);
       for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
       basicIndices.push(slackCol);
     } else if (operator === ">=") {
       // Add surplus (-1) and artificial (+1)
-      cols.push({ name: `e${i + 1}`, cost: 0, isArtificial: false });
+      cols.push({ name: `e${i + 1}`, isArtificial: false });
       row.push(-1);
       for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
 
       const artCol = cols.length;
-      cols.push({ name: `a${i + 1}`, cost: BIG_M, isArtificial: true });
+      cols.push({ name: `a${i + 1}`, isArtificial: true });
       row.push(1);
       for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
       basicIndices.push(artCol);
+      artificialCols.push(artCol);
     } else {
       // Equality: Add artificial (+1)
       const artCol = cols.length;
-      cols.push({ name: `a${i + 1}`, cost: BIG_M, isArtificial: true });
+      cols.push({ name: `a${i + 1}`, isArtificial: true });
       row.push(1);
       for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
       basicIndices.push(artCol);
+      artificialCols.push(artCol);
     }
 
     while (row.length < cols.length) {
@@ -102,44 +102,147 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     while (r.length < totalCols) r.push(0);
   }
 
-  // Build tableau: (numConstraints + 1) rows, (totalCols + 1) cols
-  const tableau = Array.from({ length: numConstraints + 1 }, () => Array(totalCols + 1).fill(0));
+  const tableaus: SimplexTableauIteration[] = [];
+  let isUnbounded = false;
+  let iterations = 0;
 
-  for (let i = 0; i < numConstraints; i++) {
-    for (let j = 0; j < totalCols; j++) {
-      tableau[i][j] = A_rows[i][j];
+  // -------------------------------------------------------------
+  // PHASE 1 (If artificial variables exist, minimize W = sum(a_i))
+  // -------------------------------------------------------------
+  if (artificialCols.length > 0) {
+    const p1Tableau = Array.from({ length: numConstraints + 1 }, () => Array(totalCols + 1).fill(0));
+    for (let i = 0; i < numConstraints; i++) {
+      for (let j = 0; j < totalCols; j++) p1Tableau[i][j] = A_rows[i][j];
+      p1Tableau[i][totalCols] = b_vec[i];
     }
-    tableau[i][totalCols] = b_vec[i];
+
+    for (let j = 0; j < totalCols; j++) {
+      let sum = 0;
+      for (let i = 0; i < numConstraints; i++) {
+        if (cols[basicIndices[i]].isArtificial) sum += p1Tableau[i][j];
+      }
+      p1Tableau[numConstraints][j] = (cols[j].isArtificial ? 1 : 0) - sum;
+    }
+    let p1SumRhs = 0;
+    for (let i = 0; i < numConstraints; i++) {
+      if (cols[basicIndices[i]].isArtificial) p1SumRhs += b_vec[i];
+    }
+    p1Tableau[numConstraints][totalCols] = -p1SumRhs;
+
+    let p1Iter = 0;
+    const p1Headers = [...cols.map((c) => c.name), "RHS"];
+
+    while (p1Iter < 50) {
+      let pivotCol = -1;
+      let minVal = -1e-5;
+      for (let j = 0; j < totalCols; j++) {
+        if (p1Tableau[numConstraints][j] < minVal) {
+          minVal = p1Tableau[numConstraints][j];
+          pivotCol = j;
+        }
+      }
+
+      const ratios: (number | null)[] = [];
+      let pivotRow = -1;
+      let minRatio = Infinity;
+      if (pivotCol !== -1) {
+        for (let i = 0; i < numConstraints; i++) {
+          const a_ij = p1Tableau[i][pivotCol];
+          if (a_ij > 1e-5) {
+            const ratio = p1Tableau[i][totalCols] / a_ij;
+            ratios.push(ratio);
+            if (ratio < minRatio) {
+              minRatio = ratio;
+              pivotRow = i;
+            }
+          } else {
+            ratios.push(null);
+          }
+        }
+      }
+
+      tableaus.push({
+        iteration: iterations,
+        basicVars: basicIndices.map((idx) => cols[idx].name),
+        headers: [...p1Headers],
+        rows: p1Tableau.slice(0, numConstraints).map((r) => [...r]),
+        zRow: [...p1Tableau[numConstraints]],
+        enteringVar: pivotCol !== -1 ? p1Headers[pivotCol] : undefined,
+        leavingVar: pivotRow !== -1 ? cols[basicIndices[pivotRow]].name : undefined,
+        pivotRowIdx: pivotRow !== -1 ? pivotRow : undefined,
+        pivotColIdx: pivotCol !== -1 ? pivotCol : undefined,
+        ratios: ratios.length > 0 ? ratios : undefined,
+      });
+
+      if (pivotCol === -1 || pivotRow === -1) break;
+
+      const pVal = p1Tableau[pivotRow][pivotCol];
+      for (let j = 0; j <= totalCols; j++) p1Tableau[pivotRow][j] /= pVal;
+      basicIndices[pivotRow] = pivotCol;
+
+      for (let i = 0; i <= numConstraints; i++) {
+        if (i !== pivotRow) {
+          const factor = p1Tableau[i][pivotCol];
+          for (let j = 0; j <= totalCols; j++) p1Tableau[i][j] -= factor * p1Tableau[pivotRow][j];
+        }
+      }
+      p1Iter++;
+      iterations++;
+    }
+
+    for (let i = 0; i < numConstraints; i++) {
+      for (let j = 0; j < totalCols; j++) A_rows[i][j] = p1Tableau[i][j];
+      b_vec[i] = p1Tableau[i][totalCols];
+    }
   }
 
-  // Reduced costs in Z row: c_j - sum(c_B * A_ij)
-  for (let j = 0; j < totalCols; j++) {
+  // -------------------------------------------------------------
+  // PHASE 2 (Solve with real user objective)
+  // -------------------------------------------------------------
+  const nonArtIndices = cols.map((_, i) => i).filter((i) => !cols[i].isArtificial);
+  const p2Cols = nonArtIndices.map((i) => cols[i]);
+  const p2TotalCols = p2Cols.length;
+  const p2Headers = [...p2Cols.map((c) => c.name), "RHS"];
+
+  const tableau = Array.from({ length: numConstraints + 1 }, () => Array(p2TotalCols + 1).fill(0));
+  for (let i = 0; i < numConstraints; i++) {
+    for (let j = 0; j < p2TotalCols; j++) {
+      tableau[i][j] = A_rows[i][nonArtIndices[j]];
+    }
+    tableau[i][p2TotalCols] = b_vec[i];
+  }
+
+  const p2BasicIndices = basicIndices.map((bi) => {
+    const idx = nonArtIndices.indexOf(bi);
+    return idx !== -1 ? idx : 0;
+  });
+
+  // Calculate Phase 2 reduced costs: c_j - sum(c_B * A_ij)
+  for (let j = 0; j < p2TotalCols; j++) {
+    const origColIdx = nonArtIndices[j];
+    const userCost = origColIdx < numVars ? userObj[origColIdx] : 0;
     let sum = 0;
     for (let i = 0; i < numConstraints; i++) {
-      const basicCost = cols[basicIndices[i]].cost;
-      sum += basicCost * tableau[i][j];
+      const bOrigCol = nonArtIndices[p2BasicIndices[i]];
+      const bCost = bOrigCol < numVars ? userObj[bOrigCol] : 0;
+      sum += bCost * tableau[i][j];
     }
-    tableau[numConstraints][j] = cols[j].cost - sum;
+    tableau[numConstraints][j] = userCost - sum;
   }
 
-  // Initial objective RHS
-  let initialZ = 0;
+  let p2InitialZ = 0;
   for (let i = 0; i < numConstraints; i++) {
-    initialZ += cols[basicIndices[i]].cost * b_vec[i];
+    const bOrigCol = nonArtIndices[p2BasicIndices[i]];
+    const bCost = bOrigCol < numVars ? userObj[bOrigCol] : 0;
+    p2InitialZ += bCost * b_vec[i];
   }
-  tableau[numConstraints][totalCols] = -initialZ;
+  tableau[numConstraints][p2TotalCols] = -p2InitialZ;
 
-  const tableaus: SimplexTableauIteration[] = [];
-  const headers = [...cols.map((c) => c.name), "RHS"];
-  let iterations = 0;
-  const maxIterations = 80;
-  let isUnbounded = false;
-
-  while (iterations < maxIterations) {
-    // Entering variable (most negative reduced cost in min problem)
+  let p2Iter = 0;
+  while (p2Iter < 50) {
     let pivotCol = -1;
     let minVal = -1e-5;
-    for (let j = 0; j < totalCols; j++) {
+    for (let j = 0; j < p2TotalCols; j++) {
       if (tableau[numConstraints][j] < minVal) {
         minVal = tableau[numConstraints][j];
         pivotCol = j;
@@ -149,12 +252,11 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     const ratios: (number | null)[] = [];
     let pivotRow = -1;
     let minRatio = Infinity;
-
     if (pivotCol !== -1) {
       for (let i = 0; i < numConstraints; i++) {
         const a_ij = tableau[i][pivotCol];
         if (a_ij > 1e-5) {
-          const ratio = tableau[i][totalCols] / a_ij;
+          const ratio = tableau[i][p2TotalCols] / a_ij;
           ratios.push(ratio);
           if (ratio < minRatio) {
             minRatio = ratio;
@@ -166,15 +268,14 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       }
     }
 
-    // Record iteration tableau snapshot
     tableaus.push({
       iteration: iterations,
-      basicVars: basicIndices.map((idx) => cols[idx].name),
-      headers: [...headers],
+      basicVars: p2BasicIndices.map((idx) => p2Cols[idx]?.name || "b"),
+      headers: [...p2Headers],
       rows: tableau.slice(0, numConstraints).map((r) => [...r]),
       zRow: [...tableau[numConstraints]],
-      enteringVar: pivotCol !== -1 ? headers[pivotCol] : undefined,
-      leavingVar: pivotRow !== -1 ? cols[basicIndices[pivotRow]].name : undefined,
+      enteringVar: pivotCol !== -1 ? p2Headers[pivotCol] : undefined,
+      leavingVar: pivotRow !== -1 ? p2Cols[p2BasicIndices[pivotRow]]?.name : undefined,
       pivotRowIdx: pivotRow !== -1 ? pivotRow : undefined,
       pivotColIdx: pivotCol !== -1 ? pivotCol : undefined,
       ratios: ratios.length > 0 ? ratios : undefined,
@@ -188,23 +289,17 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       break; // Optimal
     }
 
-    // Pivot operation
-    const pivotVal = tableau[pivotRow][pivotCol];
-    for (let j = 0; j <= totalCols; j++) {
-      tableau[pivotRow][j] /= pivotVal;
-    }
-
-    basicIndices[pivotRow] = pivotCol;
+    const pVal = tableau[pivotRow][pivotCol];
+    for (let j = 0; j <= p2TotalCols; j++) tableau[pivotRow][j] /= pVal;
+    p2BasicIndices[pivotRow] = pivotCol;
 
     for (let i = 0; i <= numConstraints; i++) {
       if (i !== pivotRow) {
         const factor = tableau[i][pivotCol];
-        for (let j = 0; j <= totalCols; j++) {
-          tableau[i][j] -= factor * tableau[pivotRow][j];
-        }
+        for (let j = 0; j <= p2TotalCols; j++) tableau[i][j] -= factor * tableau[pivotRow][j];
       }
     }
-
+    p2Iter++;
     iterations++;
   }
 
@@ -213,10 +308,9 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   for (const name of varNames) varMap[name] = 0;
 
   for (let i = 0; i < numConstraints; i++) {
-    const colIdx = basicIndices[i];
-    const colName = cols[colIdx]?.name;
+    const colName = p2Cols[p2BasicIndices[i]]?.name;
     if (varNames.includes(colName)) {
-      varMap[colName] = Math.max(0, tableau[i][totalCols]);
+      varMap[colName] = Math.max(0, tableau[i][p2TotalCols]);
     }
   }
 

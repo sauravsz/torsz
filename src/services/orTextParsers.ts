@@ -138,8 +138,7 @@ export function extractLinearProgramming(text: string): LpProblem | null {
     if (line === objLine) continue;
     if (/subject to|s\.t\.|constraints/i.test(line) && !/[<>=≤≥]/.test(line)) continue;
     if (/non-negativity|all\s*>=0|\ball\s*≥\s*0\b/i.test(line)) continue;
-
-    // Handle compound inequality like "w3 >= w2 >= w1 >= 0"
+    if (line.includes(",") && (line.includes(">= 0") || line.includes("≥ 0") || line.includes(">=0") || line.includes("≥0"))) continue;
     if (line.includes(">=") || line.includes("≥") || line.includes("<=") || line.includes("≤")) {
       const parts = line.split(/(>=|<=|≥|≤)/).map((p) => p.trim()).filter(Boolean);
       if (parts.length >= 4) {
