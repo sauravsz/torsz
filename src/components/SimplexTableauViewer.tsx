@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { CheckCircle2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, GraduationCap } from "lucide-react";
 import { SimplexTableauIteration } from "../services/or/types";
 
 interface SimplexTableauViewerProps {
@@ -6,51 +7,152 @@ interface SimplexTableauViewerProps {
 }
 
 export const SimplexTableauViewer: React.FC<SimplexTableauViewerProps> = ({ tableaus }) => {
-  const [selectedIter, setSelectedIter] = React.useState(tableaus.length - 1);
+  const [selectedIter, setSelectedIter] = useState(tableaus.length - 1);
+  const [pedagogicalMode, setPedagogicalMode] = useState(false);
+  const [practiceFeedback, setPracticeFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+    row?: number;
+    col?: number;
+  } | null>(null);
 
   React.useEffect(() => {
     setSelectedIter(tableaus.length - 1);
+    setPracticeFeedback(null);
   }, [tableaus]);
 
   const current = tableaus[selectedIter] || tableaus[0];
   if (!current) return null;
 
+  const handleCellClick = (rowIdx: number, colIdx: number) => {
+    if (!pedagogicalMode) return;
+
+    const isPivotCol = current.pivotColIdx === colIdx;
+    const isPivotRow = current.pivotRowIdx === rowIdx;
+
+    if (isPivotCol && isPivotRow) {
+      setPracticeFeedback({
+        type: "success",
+        message: `Correct Pivot Element (${current.headers[colIdx]}, ${current.basicVars[rowIdx]})! Minimum ratio test passed (${current.ratios?.[rowIdx]}).`,
+        row: rowIdx,
+        col: colIdx,
+      });
+      if (selectedIter < tableaus.length - 1) {
+        setTimeout(() => {
+          setSelectedIter((prev) => prev + 1);
+          setPracticeFeedback(null);
+        }, 1200);
+      }
+    } else if (!isPivotCol) {
+      setPracticeFeedback({
+        type: "error",
+        message: `Incorrect column: Variable ${current.headers[colIdx]} does not have the most negative (c_j - z_j) reduced cost.`,
+        row: rowIdx,
+        col: colIdx,
+      });
+    } else {
+      setPracticeFeedback({
+        type: "error",
+        message: `Incorrect row: Row ${current.basicVars[rowIdx]} violated the minimum non-negative ratio test.`,
+        row: rowIdx,
+        col: colIdx,
+      });
+    }
+  };
+
   return (
-    <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4 animate-keyframe-fade-up text-ink">
-      <div className="flex items-center justify-between border-b border-hairline pb-3">
+    <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4 animate-keyframe-fade-up text-ink select-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-ink uppercase tracking-wider">
             Simplex Iteration:
           </span>
           <div className="flex items-center gap-1 bg-canvas p-1 rounded-lg border border-hairline">
+            <button
+              onClick={() => {
+                setSelectedIter((prev) => Math.max(0, prev - 1));
+                setPracticeFeedback(null);
+              }}
+              disabled={selectedIter === 0}
+              className="p-1 text-muted hover:text-ink disabled:opacity-30 rounded transition-colors"
+              title="Previous Iteration"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
             {tableaus.map((t, idx) => (
               <button
                 key={idx}
-                onClick={() => setSelectedIter(idx)}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-all duration-200 ease-apple-snappy active:scale-[0.97] ${
+                onClick={() => {
+                  setSelectedIter(idx);
+                  setPracticeFeedback(null);
+                }}
+                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-all duration-150 active:scale-[0.97] ${
                   selectedIter === idx
                     ? "bg-primary text-on-primary shadow-xs"
                     : "text-muted hover:text-ink hover:bg-surface-soft"
                 }`}
               >
-                Iteration {t.iteration}
+                {t.iteration}
               </button>
             ))}
+            <button
+              onClick={() => {
+                setSelectedIter((prev) => Math.min(tableaus.length - 1, prev + 1));
+                setPracticeFeedback(null);
+              }}
+              disabled={selectedIter === tableaus.length - 1}
+              className="p-1 text-muted hover:text-ink disabled:opacity-30 rounded transition-colors"
+              title="Next Iteration"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        {current.enteringVar && current.leavingVar && (
-          <div className="text-xs font-mono flex items-center gap-2 text-muted">
-            <span>
-              Entering: <span className="text-accent-teal font-bold">{current.enteringVar}</span>
-            </span>
-            <span>•</span>
-            <span>
-              Leaving: <span className="text-error font-bold">{current.leavingVar}</span>
-            </span>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPedagogicalMode(!pedagogicalMode);
+              setPracticeFeedback(null);
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+              pedagogicalMode
+                ? "bg-accent-teal/15 border-accent-teal text-accent-teal shadow-xs"
+                : "bg-canvas border-hairline text-muted hover:text-ink"
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>{pedagogicalMode ? "Practice Mode Active" : "Practice Mode"}</span>
+          </button>
+        </div>
       </div>
+
+      {/* Pedagogical Practice Mode Alert */}
+      {pedagogicalMode && (
+        <div className="p-3 bg-accent-teal/10 border border-accent-teal/30 rounded-xl flex items-center justify-between text-xs text-ink animate-keyframe-fade-up">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent-teal shrink-0" />
+            <span>Click any matrix cell in the tableau to test your entering/leaving pivot selection!</span>
+          </div>
+          {practiceFeedback && (
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                practiceFeedback.type === "success"
+                  ? "bg-success/20 text-success border border-success/30"
+                  : "bg-error/20 text-error border border-error/30"
+              }`}
+            >
+              {practiceFeedback.type === "success" ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5" />
+              )}
+              <span>{practiceFeedback.message}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tableau Matrix Grid */}
       <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-1">
@@ -92,7 +194,10 @@ export const SimplexTableauViewer: React.FC<SimplexTableauViewerProps> = ({ tabl
                     return (
                       <td
                         key={colIdx}
+                        onClick={() => handleCellClick(rowIdx, colIdx)}
                         className={`p-2.5 text-center border-r border-hairline ${
+                          pedagogicalMode ? "cursor-pointer hover:bg-primary/20 transition-colors" : ""
+                        } ${
                           isPivotCell
                             ? "bg-primary text-on-primary font-bold rounded-sm shadow-xs"
                             : current.pivotColIdx === colIdx

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import Editor, { OnMount } from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
-import { Play, RotateCcw, Sparkles, Plus, X, Terminal, Calculator, FileCode } from "lucide-react";
+import { Play, RotateCcw, Sparkles, Plus, X, Terminal, Calculator, FileCode, SearchCheck } from "lucide-react";
 import { DatabaseSchema } from "../types";
 
 export interface WorksheetTab {
@@ -16,6 +16,7 @@ interface SqlEditorProps {
   sql: string;
   onChangeSql: (val: string) => void;
   onExecute: () => void;
+  onExplainPlan?: () => void;
   onGenerateFromPrompt?: (prompt: string) => Promise<void>;
   onOpenOptimizationSuite?: (module?: string) => void;
   schema?: DatabaseSchema | null;
@@ -26,6 +27,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   sql,
   onChangeSql,
   onExecute,
+  onExplainPlan,
   onGenerateFromPrompt,
   onOpenOptimizationSuite,
   schema,
@@ -477,6 +479,19 @@ LIMIT 5;`)
             >
               <Calculator className="w-3.5 h-3.5" />
               <span>TORA Solvers</span>
+            </button>
+          )}
+
+          {/* Explain Plan Button */}
+          {onExplainPlan && (
+            <button
+              onClick={onExplainPlan}
+              disabled={loading || !sql.trim()}
+              className="flex items-center gap-1 text-[11px] text-on-dark-soft hover:text-on-dark bg-surface-dark hover:bg-surface-dark-elevated px-2.5 py-1.5 rounded-xl border border-surface-dark-elevated disabled:opacity-50 transition-colors"
+              title="Explain SQLite Query Execution Plan (EXPLAIN QUERY PLAN)"
+            >
+              <SearchCheck className="w-3.5 h-3.5 text-accent-amber" />
+              <span>Explain Plan</span>
             </button>
           )}
 

@@ -249,6 +249,13 @@ function MainWorkspace() {
     handleExecuteQuery(undefined, tableSql);
   };
 
+  const handleExplainPlan = async () => {
+    if (!sql.trim()) return;
+    const explainSql = `EXPLAIN QUERY PLAN ${sql.replace(/;+\s*$/, "")};`;
+    await handleExecuteQuery(undefined, explainSql);
+    showToast("Query plan generated!", "success", "EXPLAIN Execution Plan");
+  };
+
   const handleInlineAiConvert = async (aiPrompt: string) => {
     try {
       const gen = await convertTextToSql(aiPrompt, schema);
@@ -371,6 +378,7 @@ function MainWorkspace() {
                   sql={sql}
                   onChangeSql={setSql}
                   onExecute={() => handleExecuteQuery()}
+                  onExplainPlan={handleExplainPlan}
                   onGenerateFromPrompt={handleInlineAiConvert}
                   onOpenOptimizationSuite={(mod) => {
                     if (mod) setActiveOrModule(mod as any);

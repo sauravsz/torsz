@@ -8,6 +8,11 @@ import {
   Sparkles,
   Camera,
   ArrowUp,
+  Download,
+  Printer,
+  Database,
+  FileCode,
+  X,
 } from "lucide-react";
 import {
   OrModule,
@@ -46,8 +51,22 @@ import {
 } from "../services/or/solvers";
 import { GraphicalLpCanvas } from "./GraphicalLpCanvas";
 import { SimplexTableauViewer } from "./SimplexTableauViewer";
+import { NetworkGraphCanvas } from "./NetworkGraphCanvas";
+import { BranchAndBoundTree } from "./BranchAndBoundTree";
+import { MultiScenarioSensitivitySweep } from "./MultiScenarioSensitivitySweep";
 import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
-
+import {
+  detectImportableTables,
+  importNetworkEdgesFromDb,
+  importTransportationFromDb,
+  importCpmFromDb,
+  AvailableImportTable,
+} from "../services/or/dbImporter";
+import {
+  generateLatexReport,
+  exportSolutionToExcel,
+  printExecutiveReport,
+} from "../services/or/exporter";
 interface OrSuiteViewProps {
   onOpenInSql: (sql: string) => void;
   onAskAi?: (prompt: string) => void;
@@ -198,6 +217,109 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const [queuingSol, setQueuingSol] = useState<QueuingSolution | null>(null);
   const [gameSol, setGameSol] = useState<ZeroSumGameSolution | null>(null);
   const [inventorySol, setInventorySol] = useState<InventorySolution | null>(null);
+  // DB Table Import & Export States
+  const [isDbImportOpen, setIsDbImportOpen] = useState(false);
+  const [availableDbTables, setAvailableDbTables] = useState<AvailableImportTable[]>([]);
+  const [copiedLatex, setCopiedLatex] = useState(false);
+
+  const handleOpenDbImport = async () => {
+    const tables = await detectImportableTables();
+    setAvailableDbTables(tables);
+    setIsDbImportOpen(true);
+  };
+
+  const handleImportTable = async (t: AvailableImportTable) => {
+    try {
+      if (activeModule === "network-models") {
+        const edges = await importNetworkEdgesFromDb(t.name);
+        if (edges.length > 0) {
+          setNetworkEdges(edges);
+          setNetStartNode(String(edges[0].from));
+          setNetEndNode(String(edges[edges.length - 1].to));
+          const sol = solveNetworkMst(edges);
+          setNetworkSol(sol);
+        }
+      } else if (activeModule === "transportation-assignment") {
+        const trans = await importTransportationFromDb(t.name);
+        if (trans) {
+          setTransProblem(trans);
+          const sol = solveTransportation(trans);
+          setTransSol(sol);
+        }
+      } else if (activeModule === "project-planning") {
+        const cpm = await importCpmFromDb(t.name);
+        if (cpm.length > 0) {
+          setCpmActivities(cpm);
+          const sol = solveCpmPert(cpm);
+          setCpmSol(sol);
+        }
+      }
+      setIsDbImportOpen(false);
+    } catch (e) {
+      alert(`Failed to import table ${t.name}: ${e}`);
+    }
+  };
+
+  const handleExportLatex = () => {
+    const problemMap: any =
+      activeModule === "linear-programming"
+        ? lpProblem
+        : activeModule === "transportation-assignment"
+        ? transProblem
+        : activeModule === "project-planning"
+        ? cpmActivities
+        : {};
+    const solutionMap: any =
+      activeModule === "linear-programming"
+        ? lpSol
+        : activeModule === "transportation-assignment"
+        ? transSol
+        : activeModule === "project-planning"
+        ? cpmSol
+        : {};
+
+    const latex = generateLatexReport(activeModule, problemMap, solutionMap);
+    navigator.clipboard.writeText(latex);
+    setCopiedLatex(true);
+    setTimeout(() => setCopiedLatex(false), 2000);
+  };
+
+  const handleExportExcel = () => {
+    const problemMap: any =
+      activeModule === "transportation-assignment"
+        ? transProblem
+        : activeModule === "project-planning"
+        ? cpmActivities
+        : {};
+    const solutionMap: any =
+      activeModule === "transportation-assignment"
+        ? transSol
+        : activeModule === "project-planning"
+        ? cpmSol
+        : {};
+
+    exportSolutionToExcel(activeModule, problemMap, solutionMap);
+  };
+
+  const handlePrintBriefing = () => {
+    const content = `
+      <h2>Model: ${activeModule}</h2>
+      <p>Optimal Solution: <strong>${JSON.stringify(
+        activeModule === "linear-programming"
+          ? lpSol?.objectiveValue
+          : activeModule === "transportation-assignment"
+          ? transSol?.totalCost
+          : activeModule === "network-models"
+          ? networkSol?.totalMetric
+          : activeModule === "project-planning"
+          ? cpmSol?.projectDuration
+          : activeModule === "inventory-control"
+          ? inventorySol?.totalAnnualCost
+          : "Solved"
+      )}</strong></p>
+    `;
+    printExecutiveReport(activeModule, content);
+  };
   const [linearEqSol, setLinearEqSol] = useState<number[] | null>(null);
 
 
@@ -523,7 +645,48 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Main Module Solver Content */}
       <main className="flex-1 overflow-y-auto p-6 max-w-5xl mx-auto w-full space-y-6 pb-6">
-          {/* ========================================== */}
+        {/* Top Solver Utility Actions Bar */}
+        <div className="bg-surface-card border border-hairline rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs text-xs">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleOpenDbImport}
+              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              title="Import active SQLite database table into this solver"
+            >
+              <Database className="w-3.5 h-3.5 text-primary" />
+              <span>Import from DB Table</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportLatex}
+              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              title="Copy LaTeX Mathematical Model"
+            >
+              <FileCode className="w-3.5 h-3.5 text-accent-teal" />
+              <span>{copiedLatex ? "LaTeX Copied! ★" : "Copy LaTeX"}</span>
+            </button>
+
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              title="Export Formatted Excel Spreadsheet (.xlsx)"
+            >
+              <Download className="w-3.5 h-3.5 text-success" />
+              <span>Export Excel (.xlsx)</span>
+            </button>
+
+            <button
+              onClick={handlePrintBriefing}
+              className="flex items-center gap-1.5 bg-canvas hover:bg-surface-cream text-ink font-semibold px-3 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+              title="Print / PDF Executive Briefing Report"
+            >
+              <Printer className="w-3.5 h-3.5 text-accent-amber" />
+              <span>Print Report</span>
+            </button>
+          </div>
+        </div>
           {/* 1. TRANSPORTATION & ASSIGNMENT             */}
           {/* ========================================== */}
           {activeModule === "transportation-assignment" && (
@@ -1118,11 +1281,21 @@ FROM lp_variables;`)
               {lpSol && (
                 <div className="space-y-4">
                   {lpMode === "graphical-2d" && lpSol.graphical ? (
-                    <GraphicalLpCanvas solution={lpSol.graphical} />
+                    <GraphicalLpCanvas
+                      solution={lpSol.graphical}
+                      onUpdateConstraintRhs={(idx, newRhs) => {
+                        const next = [...lpProblem.constraints];
+                        next[idx] = { ...next[idx], rhs: newRhs };
+                        setLpProblem({ ...lpProblem, constraints: next });
+                        try {
+                          const updatedSol = solveLinearProgramming({ ...lpProblem, constraints: next });
+                          setLpSol(updatedSol);
+                        } catch {}
+                      }}
+                    />
                   ) : (
                     <SimplexTableauViewer tableaus={lpSol.tableaus} />
                   )}
-
                   {/* Dual Shadow Prices & Sensitivity */}
                   {lpSol.dualPrices && (
                     <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-3">
@@ -1144,11 +1317,16 @@ FROM lp_variables;`)
                       </div>
                     </div>
                   )}
+
+                  {/* Multi-Scenario Sensitivity Sweep */}
+                  <MultiScenarioSensitivitySweep baseProblem={lpProblem} />
+
+                  {/* Branch and Bound Integer Programming Tree */}
+                  <BranchAndBoundTree objectiveCoeffs={lpProblem.objectiveCoefficients} />
                 </div>
               )}
             </div>
           )}
-
           {/* ========================================== */}
           {/* 3. NETWORK MODELS                         */}
           {/* ========================================== */}
@@ -1294,6 +1472,14 @@ FROM lp_variables;`)
                   ))}
                 </div>
               </div>
+              {/* Interactive Visual Network Topology Graph */}
+              <NetworkGraphCanvas
+                edges={networkEdges}
+                selectedEdges={networkSol?.selectedEdges}
+                startNode={netStartNode}
+                endNode={netEndNode}
+                type={networkSubtype}
+              />
 
               {/* Solution Result Card */}
               {networkSol && (
@@ -1960,6 +2146,60 @@ FROM lp_variables;`)
             </button>
           </form>
         </div>
+        {/* Database Table Importer Modal */}
+        {isDbImportOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 select-none animate-keyframe-scale">
+            <div className="bg-surface-card border border-hairline rounded-3xl w-full max-w-lg p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-hairline pb-3">
+                <div className="flex items-center gap-2">
+                  <Database className="w-5 h-5 text-primary" />
+                  <h3 className="font-editorial-serif text-xl font-medium text-ink">
+                    Import from SQLite Table
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsDbImportOpen(false)}
+                  className="p-1 text-muted hover:text-ink rounded-lg"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-xs text-muted">
+                Select an active SQLite database table to import into <strong>{activeModule}</strong>:
+              </p>
+
+              <div className="max-h-60 overflow-y-auto space-y-2">
+                {availableDbTables.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted italic">
+                    No tables found in active SQLite database. Load the sample store or connect a database.
+                  </div>
+                ) : (
+                  availableDbTables.map((t) => (
+                    <div
+                      key={t.name}
+                      onClick={() => handleImportTable(t)}
+                      className="p-3 bg-canvas hover:bg-surface-cream border border-hairline rounded-xl flex items-center justify-between cursor-pointer transition-colors group"
+                    >
+                      <div>
+                        <span className="text-xs font-bold text-ink group-hover:text-primary">
+                          {t.name}
+                        </span>
+                        <div className="text-[11px] text-muted-soft">
+                          {t.rowCount} rows • {t.columns.join(", ")}
+                        </div>
+                      </div>
+
+                      <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-lg border border-primary/20">
+                        Import →
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
