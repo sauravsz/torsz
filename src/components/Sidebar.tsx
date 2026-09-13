@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   Eye,
@@ -9,8 +9,17 @@ import {
   Database,
   Layers,
   PanelLeftClose,
+  Sun,
+  Moon,
+  Laptop,
 } from "lucide-react";
 import { DatabaseSchema } from "../types";
+import {
+  getThemePreference,
+  applyTheme,
+  initThemeListener,
+  ThemeMode,
+} from "../services/theme";
 
 interface SidebarProps {
   schema: DatabaseSchema | null;
@@ -27,6 +36,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getThemePreference);
+
+  useEffect(() => {
+    applyTheme(themeMode);
+    return initThemeListener((mode) => {
+      setThemeMode(mode);
+    });
+  }, [themeMode]);
+
+  const handleThemeChange = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    applyTheme(mode);
+  };
 
   const toggleTable = (name: string) => {
     setExpandedTables((prev) => ({
@@ -44,7 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const filteredViews = views.filter((v) =>
     v.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
 
   return (
     <aside className="w-64 bg-surface-card border-r border-hairline flex flex-col h-[calc(100vh-3.5rem)] select-none text-body">
@@ -72,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted" />
           <input
             type="text"
-            placeholder="Search schema & models..."
+            placeholder="Search schema..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-canvas border border-hairline rounded-md pl-8 pr-3 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none"
@@ -80,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Schema Tree & Optimization Models */}
+      {/* Schema Tree */}
       <div className="flex-1 overflow-y-auto p-2 space-y-4">
         {loading ? (
           <div className="p-4 text-center text-xs text-muted">
@@ -104,14 +125,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="space-y-0.5 mt-1">
                 {filteredTables.map((table) => {
-                  const isOrTable =
-                    table.name.startsWith("lp_") ||
-                    table.name.startsWith("transportation_") ||
-                    table.name.startsWith("shipping_") ||
-                    table.name.startsWith("project_") ||
-                    table.name.startsWith("inventory_") ||
-                    table.name.startsWith("assignment_");
-
                   return (
                     <div key={table.name} className="group">
                       <div
@@ -124,7 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           ) : (
                             <ChevronRight className="w-3.5 h-3.5 text-muted shrink-0" />
                           )}
-                          <Table className={`w-3.5 h-3.5 shrink-0 ${isOrTable ? "text-accent-teal" : "text-primary"}`} />
+                          <Table className="w-3.5 h-3.5 shrink-0 text-primary" />
                           <span className="font-semibold truncate">{table.name}</span>
                         </div>
                         <button
@@ -185,9 +198,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
             )}
-
           </>
         )}
+      </div>
+
+      {/* Theme Mode Switcher Pinned to Sidebar Bottom */}
+      <div className="p-2.5 border-t border-hairline bg-surface-soft shrink-0 select-none">
+        <div className="flex items-center justify-between text-[11px] font-semibold text-muted uppercase tracking-wider mb-1.5 px-1">
+          <span>Theme</span>
+          <span className="text-[10px] text-primary capitalize font-medium">{themeMode}</span>
+        </div>
+        <div className="grid grid-cols-3 gap-1 bg-canvas p-1 rounded-xl border border-hairline">
+          <button
+            type="button"
+            onClick={() => handleThemeChange("light")}
+            className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              themeMode === "light"
+                ? "bg-surface-card text-ink shadow-xs border border-hairline font-bold"
+                : "text-muted hover:text-ink hover:bg-surface-soft"
+            }`}
+            title="Light Mode (Default)"
+          >
+            <Sun className="w-3.5 h-3.5 text-accent-amber" />
+            <span className="text-[11px]">Light</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleThemeChange("dark")}
+            className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              themeMode === "dark"
+                ? "bg-surface-card text-ink shadow-xs border border-hairline font-bold"
+                : "text-muted hover:text-ink hover:bg-surface-soft"
+            }`}
+            title="Dark Mode"
+          >
+            <Moon className="w-3.5 h-3.5 text-accent-teal" />
+            <span className="text-[11px]">Dark</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleThemeChange("system")}
+            className={`flex items-center justify-center gap-1 py-1 rounded-lg text-xs font-semibold transition-all duration-150 ${
+              themeMode === "system"
+                ? "bg-surface-card text-ink shadow-xs border border-hairline font-bold"
+                : "text-muted hover:text-ink hover:bg-surface-soft"
+            }`}
+            title="Auto / System Preference"
+          >
+            <Laptop className="w-3.5 h-3.5" />
+            <span className="text-[11px]">Auto</span>
+          </button>
+        </div>
       </div>
     </aside>
   );

@@ -21,8 +21,30 @@
     --color-surface-dark: #181715;
     --color-surface-dark-elevated: #252320;
     --color-surface-dark-soft: #1f1e1b;
+  }
 
-    /* Apple Keyframer Easing Curves */
+  .dark {
+    --color-primary: #cc785c;
+    --color-primary-active: #e28e73;
+    --color-primary-disabled: #3d3a36;
+    --color-ink: #faf9f5;
+    --color-body: #d5d3cc;
+    --color-body-strong: #faf9f5;
+    --color-muted: #a09d96;
+    --color-muted-soft: #6c6a64;
+    --color-hairline: #2e2c28;
+    --color-hairline-soft: #252320;
+    --color-canvas: #141312;
+    --color-surface-soft: #181715;
+    --color-surface-card: #1f1e1b;
+    --color-surface-cream-strong: #2a2825;
+    --color-surface-dark: #121110;
+    --color-surface-dark-elevated: #252320;
+    --color-surface-dark-soft: #1c1b18;
+  }
+
+  /* Apple Keyframer Easing Curves */
+  :root {
     --ease-apple-spring: cubic-bezier(0.32, 0.72, 0, 1);
     --ease-apple-ease: cubic-bezier(0.25, 1, 0.5, 1);
     --ease-apple-snappy: cubic-bezier(0.16, 1, 0.3, 1);
