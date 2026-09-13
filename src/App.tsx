@@ -48,6 +48,7 @@ function MainWorkspace() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isOcrOpen, setIsOcrOpen] = useState(false);
+  const [isFileImported, setIsFileImported] = useState(false);
   const [ocrInitialText, setOcrInitialText] = useState("");
   const [ocrInitialMode, setOcrInitialMode] = useState<"image" | "text">("image");
   const [isProfilerOpen, setIsProfilerOpen] = useState(false);
@@ -154,6 +155,7 @@ function MainWorkspace() {
         filepath: file.name,
       };
       setActiveConnection(updatedConfig);
+      setIsFileImported(true);
 
       const res = await importSpreadsheetToDb(updatedConfig.id, file);
       await refreshSchema(updatedConfig.id);
@@ -367,7 +369,7 @@ function MainWorkspace() {
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
-
+        isFileImported={isFileImported}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         loading={loadingSchema}

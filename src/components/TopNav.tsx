@@ -1,19 +1,19 @@
 import React from "react";
-import { Sparkles, RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download } from "lucide-react";
+import { RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download } from "lucide-react";
 import { ConnectionConfig } from "../types";
 interface TopNavProps {
   activeConnection: ConnectionConfig | null;
   savedConnections: ConnectionConfig[];
   onSelectConnection: (conn: ConnectionConfig) => void;
 
-  onLoadSampleDb: () => void;
+  onLoadSampleDb?: () => void;
   onRefreshSchema: () => void;
   onImportSpreadsheet: (file: File) => void;
   onOpenHistory: () => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   onExportDatabase?: () => void;
-
+  isFileImported?: boolean;
   loading: boolean;
 }
 
@@ -21,8 +21,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   activeConnection,
   savedConnections,
   onSelectConnection,
-
-  onLoadSampleDb,
+  onLoadSampleDb: _onLoadSampleDb,
   onRefreshSchema,
 
   onImportSpreadsheet,
@@ -30,7 +29,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   isSidebarOpen = true,
   onToggleSidebar,
   onExportDatabase,
-
+  isFileImported = false,
   loading,
 }) => {
   return (
@@ -69,14 +68,14 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Connection & Actions Cluster */}
       <div className="flex items-center gap-2">
-        {/* Connection Selector */}
-        {activeConnection ? (
-          <div className="flex items-center gap-2 bg-surface-card px-3 py-1.5 rounded-md border border-hairline">
+        {/* Active Database Badge - Only shown when a user imports a spreadsheet/file */}
+        {isFileImported && activeConnection && (
+          <div className="flex items-center gap-2 bg-surface-card px-3 py-1.5 rounded-md border border-hairline animate-keyframe-fade-up">
             <span className="w-2 h-2 rounded-full bg-accent-teal animate-pulse" />
-            <span className="text-xs font-medium text-ink max-w-[180px] truncate">
+            <span className="text-xs font-semibold text-ink max-w-[200px] truncate">
               {activeConnection.name}
             </span>
-            <span className="text-[10px] text-muted uppercase bg-canvas px-1.5 py-0.5 rounded-sm border border-hairline">
+            <span className="text-[10px] text-muted uppercase bg-canvas px-1.5 py-0.5 rounded-sm border border-hairline font-mono">
               {activeConnection.driver}
             </span>
             <button
@@ -88,15 +87,6 @@ export const TopNav: React.FC<TopNavProps> = ({
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             </button>
           </div>
-        ) : (
-          <button
-            onClick={onLoadSampleDb}
-            disabled={loading}
-            className="flex items-center gap-1.5 bg-surface-card hover:bg-surface-cream text-ink text-xs font-medium px-3 py-1.5 rounded-md border border-hairline transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            Load Sample SQLite DB
-          </button>
         )}
 
         {/* Saved Connections Dropdown if any */}
