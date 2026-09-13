@@ -437,6 +437,7 @@ function MainWorkspace() {
           ) : (
             <OrSuiteView
               activeModule={activeOrModule}
+              onSelectModule={setActiveOrModule}
               importedOcrData={importedOcrData}
               onAskAi={(promptText: string) => {
                 setAiInitialPrompt(promptText);

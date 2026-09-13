@@ -165,8 +165,13 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
     const pt = problemTypes.find((p) => p.key === key);
     if (!pt) return;
     setSelectedModule(pt.id);
-    if (pt.networkSubtype) setSelectedNetworkSubtype(pt.networkSubtype);
-    if (pt.transSubtype) setSelectedTransSubtype(pt.transSubtype);
+    if (pt.networkSubtype) {
+      setSelectedNetworkSubtype(pt.networkSubtype);
+    }
+    if (pt.transSubtype) {
+      setSelectedTransSubtype(pt.transSubtype);
+    }
+    setClassification(null);
   };
 
   useEffect(() => {
@@ -272,24 +277,27 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
       }
     }
   };
-
   const handleConfirmAndSolve = () => {
-    let finalParsedData = classification?.parsedData;
-    if (!finalParsedData || Object.keys(finalParsedData).length === 0) {
-      const hint = {
-        module: selectedModule,
-        networkSubtype: selectedNetworkSubtype,
-        transSubtype: selectedTransSubtype,
-      };
-      const fallback = classifyOrProblemFromText(ocrText, hint);
-      finalParsedData = fallback.parsedData;
-    }
+    const pt = problemTypes.find((p) => p.key === selectedKey);
+    const targetModule = pt?.id || selectedModule;
+    const targetNetSub = pt?.networkSubtype || selectedNetworkSubtype;
+    const targetTrSub = pt?.transSubtype || selectedTransSubtype;
+
+    const hint = {
+      module: targetModule,
+      networkSubtype: targetNetSub,
+      transSubtype: targetTrSub,
+    };
+    const fallback = classifyOrProblemFromText(ocrText, hint);
+    const finalParsedData = (classification?.parsedData && Object.keys(classification.parsedData).length > 0)
+      ? classification.parsedData
+      : fallback.parsedData;
 
     onSelectAndSolve(
-      selectedModule,
+      targetModule,
       {
-        network: selectedNetworkSubtype,
-        trans: selectedTransSubtype,
+        network: targetNetSub,
+        trans: targetTrSub,
       },
       finalParsedData,
       ocrText
@@ -543,7 +551,21 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                 rows={4}
                 value={ocrText}
                 onChange={(e) => {
-                  setOcrText(e.target.value);
+                  const val = e.target.value;
+                  setOcrText(val);
+                  if (autoAnalyze && val.trim().length > 10) {
+                    const fallback = classifyOrProblemFromText(val);
+                    if (fallback.detectedModule) {
+                      const matchedPt = problemTypes.find((p) =>
+                        p.id === fallback.detectedModule &&
+                        (!p.networkSubtype || p.networkSubtype === fallback.networkSubtype) &&
+                        (!p.transSubtype || p.transSubtype === fallback.transSubtype)
+                      );
+                      if (matchedPt) {
+                        applyProblemType(matchedPt.key);
+                      }
+                    }
+                  }
                 }}
                 placeholder="Paste or type question text, linear equations, network arcs, or cost matrix here..."
                 className="w-full bg-canvas border border-hairline rounded-xl p-3 text-xs text-ink placeholder:text-muted focus:border-primary outline-none transition-colors font-sans leading-relaxed"
@@ -634,7 +656,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
             type="button"
             onClick={handleConfirmAndSolve}
             disabled={(!imagePreview && !ocrText.trim()) || scanning}
-            className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled text-on-primary text-xs font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
+            className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-primary-disabled disabled:text-muted text-on-primary text-xs font-semibold px-5 py-2.5 rounded-xl transition-colors shadow-sm"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Populate & Solve in TORA</span>

@@ -73,6 +73,7 @@ interface OrSuiteViewProps {
   onAskAi?: (prompt: string) => void;
   onOpenOcr?: (initialText?: string, initialMode?: "image" | "text") => void;
   activeModule?: OrModule;
+  onSelectModule?: (mod: OrModule) => void;
   importedOcrData?: {
     module: OrModule;
     networkSubtype?: NetworkSubtype;
@@ -87,14 +88,22 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   onAskAi,
   onOpenOcr,
   activeModule: controlledModule,
+  onSelectModule,
   importedOcrData,
 }) => {
-  const activeModule = controlledModule || "transportation-assignment";
+  const [internalModule, setInternalModule] = useState<OrModule>(controlledModule || "transportation-assignment");
+  const activeModule = controlledModule || internalModule;
   const [quickQuestionText, setQuickQuestionText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
+
+  useEffect(() => {
+    if (controlledModule) {
+      setInternalModule(controlledModule);
+    }
+  }, [controlledModule]);
   // 1. Transportation & Assignment State (Editable)
   // ==========================================
   const [transProblem, setTransProblem] = useState<TransportationProblem>({
@@ -334,6 +343,11 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
         textareaRef.current.style.height = "auto";
       }
       const { module, networkSubtype: netSub, transSubtype: trSub, data, rawText } = importedOcrData;
+      if (module) {
+        setInternalModule(module);
+        if (onSelectModule) onSelectModule(module);
+      }
+      if (netSub) setNetworkSubtype(netSub);
       if (trSub) setTransSubtype(trSub);
       if (module === "network-models" || netSub) {
         const extracted = extractNetworkEdges(rawText || "");
@@ -1250,7 +1264,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 </h3>
                 <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
                   <button
-                    onClick={() => setNetworkSubtype("shortest-route")}
+                    onClick={() => {
+                      setNetworkSubtype("shortest-route");
+                      if (networkEdges.length > 0) {
+                        const sol = solveNetworkShortestRoute(networkEdges, netStartNode, netEndNode);
+                        setNetworkSol(sol);
+                      }
+                    }}
                     className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                       networkSubtype === "shortest-route" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
@@ -1258,7 +1278,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     Shortest Route
                   </button>
                   <button
-                    onClick={() => setNetworkSubtype("minimum-spanning-tree")}
+                    onClick={() => {
+                      setNetworkSubtype("minimum-spanning-tree");
+                      if (networkEdges.length > 0) {
+                        const sol = solveNetworkMst(networkEdges);
+                        setNetworkSol(sol);
+                      }
+                    }}
                     className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                       networkSubtype === "minimum-spanning-tree" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
@@ -1266,7 +1292,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     Minimum Spanning Tree
                   </button>
                   <button
-                    onClick={() => setNetworkSubtype("maximal-flow")}
+                    onClick={() => {
+                      setNetworkSubtype("maximal-flow");
+                      if (networkEdges.length > 0) {
+                        const sol = solveNetworkMaxFlow(networkEdges, netStartNode, netEndNode);
+                        setNetworkSol(sol);
+                      }
+                    }}
                     className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
                       networkSubtype === "maximal-flow" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
                     }`}
@@ -1275,7 +1307,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   </button>
                 </div>
               </div>
-
               {/* Network Edges Input Card (Editable) */}
               <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
