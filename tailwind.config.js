@@ -7,6 +7,17 @@ export default {
   ],
   theme: {
     extend: {
+      fontSize: {
+        "2xs": ["11px", "15px"],
+        "xs": ["13px", "18px"],
+        "sm": ["15px", "22px"],
+        "base": ["17px", "26px"],
+        "lg": ["19px", "28px"],
+        "xl": ["21px", "30px"],
+        "2xl": ["26px", "34px"],
+        "3xl": ["32px", "38px"],
+        "4xl": ["38px", "44px"],
+      },
       colors: {
         primary: {
           DEFAULT: "var(--color-primary)",

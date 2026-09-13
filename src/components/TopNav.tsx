@@ -46,7 +46,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           >
             <path d="M12 2C12.5523 2 13 6.02944 13 11H18C18 11.5523 13.9706 12 8.97056 12C13.9706 12 18 12.4477 18 13H13C13 17.9706 12.5523 22 12 22C11.4477 22 11 17.9706 11 13H6C6 12.4477 10.0294 12 15.0294 12C10.0294 12 6 11.5523 6 11H11C11 6.02944 11.4477 2 12 2Z" />
           </svg>
-          <span className="font-editorial-serif text-2xl font-normal tracking-tight text-ink">
+          <span className="font-editorial-serif text-[28px] font-bold tracking-tight text-ink">
             torsz
           </span>
         </div>

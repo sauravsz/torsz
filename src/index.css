@@ -50,6 +50,10 @@
     --color-surface-dark-soft: #1c1b18;
   }
 
+  html {
+    font-size: 16.5px;
+  }
+
   body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
