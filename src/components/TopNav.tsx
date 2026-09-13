@@ -1,5 +1,5 @@
 import React from "react";
-import { RefreshCw, FileSpreadsheet, History, Download } from "lucide-react";
+import { RefreshCw, FileSpreadsheet, History, Download, Search } from "lucide-react";
 import { ConnectionConfig } from "../types";
 interface TopNavProps {
   activeConnection: ConnectionConfig | null;
@@ -11,6 +11,7 @@ interface TopNavProps {
   onImportSpreadsheet: (file: File) => void;
   onOpenHistory: () => void;
   onExportDatabase?: () => void;
+  onOpenCommandPalette?: () => void;
   isFileImported?: boolean;
   loading: boolean;
 }
@@ -25,6 +26,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   onImportSpreadsheet,
   onOpenHistory,
   onExportDatabase,
+  onOpenCommandPalette,
   isFileImported = false,
   loading,
 }) => {
@@ -46,8 +48,26 @@ export const TopNav: React.FC<TopNavProps> = ({
           </span>
         </div>
       </div>
+
+      {/* Centered Omni-Search & Command Bar (⌘K) */}
+      <div className="flex-1 max-w-md mx-4 hidden sm:block">
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          className="w-full bg-surface-soft hover:bg-surface-card text-muted hover:text-ink border border-hairline hover:border-primary/40 rounded-xl px-3.5 py-1.5 flex items-center justify-between transition-all duration-150 shadow-2xs group cursor-pointer"
+          title="Search solvers, tables, queries or run actions (⌘K)"
+        >
+          <div className="flex items-center gap-2 text-xs truncate">
+            <Search className="w-3.5 h-3.5 text-muted group-hover:text-primary transition-colors shrink-0" />
+            <span className="truncate text-xs">Search solvers, queries, tables...</span>
+          </div>
+          <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] font-mono bg-canvas border border-hairline px-1.5 py-0.5 rounded text-muted-soft group-hover:text-ink shadow-2xs shrink-0">
+            <span className="text-[11px]">⌘</span>K
+          </kbd>
+        </button>
+      </div>
+
       <div className="flex items-center gap-2">
-        {/* Active Database Badge - Only shown when a user imports a spreadsheet/file */}
         {isFileImported && activeConnection && (
           <div className="flex items-center gap-2 bg-surface-card px-3 py-1.5 rounded-md border border-hairline animate-keyframe-fade-up">
             <span className="w-2 h-2 rounded-full bg-accent-teal animate-pulse" />

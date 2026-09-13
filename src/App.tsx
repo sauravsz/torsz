@@ -386,6 +386,7 @@ function MainWorkspace() {
 
         onImportSpreadsheet={handleImportSpreadsheet}
         onOpenHistory={() => setIsHistoryOpen(true)}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onExportDatabase={handleExportDatabase}
         isFileImported={isFileImported}
         loading={loadingSchema}
