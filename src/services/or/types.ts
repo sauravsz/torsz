@@ -118,6 +118,8 @@ export interface NetworkSolution {
   selectedEdges: { from: string; to: string; weight: number; stepReason?: string }[];
   totalMetric: number;
   pathString?: string;
+  flowBreakdown?: { from: string; to: string; flow: number; capacity: number }[];
+  minCut?: { sourceSet: string[]; sinkSet: string[]; cutCapacity: number };
 }
 
 export interface CpmActivity {

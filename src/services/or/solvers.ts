@@ -726,70 +726,144 @@ export function solveNetworkMaxFlow(
   source: string,
   sink: string
 ): NetworkSolution {
-  // Edmonds-Karp BFS implementation
-  const capacity: Record<string, Record<string, number>> = {};
+  const normSource = String(source).trim();
+  const normSink = String(sink).trim();
+
+  // Edmonds-Karp with residual graph tracking and initial capacity preservation
+  const originalCapacity: Record<string, Record<string, number>> = {};
+  const residualCapacity: Record<string, Record<string, number>> = {};
   const nodes = new Set<string>();
 
   for (const e of edges) {
-    const u = String(e.from);
-    const v = String(e.to);
-    const cap = e.capacity || e.cost;
+    const u = String(e.from).trim();
+    const v = String(e.to).trim();
+    const cap = Math.max(0, e.capacity !== undefined ? e.capacity : e.cost);
     nodes.add(u);
     nodes.add(v);
 
-    if (!capacity[u]) capacity[u] = {};
-    if (!capacity[v]) capacity[v] = {};
-    capacity[u][v] = (capacity[u][v] || 0) + cap;
-    if (capacity[v][u] === undefined) capacity[v][u] = 0;
+    if (!originalCapacity[u]) originalCapacity[u] = {};
+    if (!originalCapacity[v]) originalCapacity[v] = {};
+    if (!residualCapacity[u]) residualCapacity[u] = {};
+    if (!residualCapacity[v]) residualCapacity[v] = {};
+
+    originalCapacity[u][v] = (originalCapacity[u][v] || 0) + cap;
+    residualCapacity[u][v] = (residualCapacity[u][v] || 0) + cap;
+    if (residualCapacity[v][u] === undefined) residualCapacity[v][u] = 0;
+  }
+
+  // Handle case where source or sink are not in node set
+  if (!nodes.has(normSource) || !nodes.has(normSink) || normSource === normSink) {
+    return {
+      type: "maximal-flow",
+      selectedEdges: [],
+      totalMetric: 0,
+      pathString: "Source or Sink node invalid / disconnected in network topology.",
+      flowBreakdown: [],
+    };
   }
 
   let maxFlow = 0;
 
+  // Edmonds-Karp BFS to find shortest augmenting path in terms of edge count
   while (true) {
     const parent: Record<string, string | null> = {};
     for (const n of nodes) parent[n] = null;
-    const queue: string[] = [source];
+    const queue: string[] = [normSource];
 
     while (queue.length > 0) {
       const u = queue.shift()!;
-      if (u === sink) break;
+      if (u === normSink) break;
 
-      for (const v of Object.keys(capacity[u] || {})) {
-        if (parent[v] === null && v !== source && capacity[u][v] > 0) {
+      const neighbors = Object.keys(residualCapacity[u] || {});
+      for (const v of neighbors) {
+        if (parent[v] === null && v !== normSource && residualCapacity[u][v] > 0) {
           parent[v] = u;
           queue.push(v);
         }
       }
     }
 
-    if (parent[sink] === null) break;
+    if (parent[normSink] === null) break; // No augmenting path exists
 
-    // Find bottleneck
+    // Calculate bottleneck capacity along path
     let pathFlow = Infinity;
-    let curr = sink;
-    while (curr !== source) {
+    let curr = normSink;
+    while (curr !== normSource) {
       const p = parent[curr]!;
-      pathFlow = Math.min(pathFlow, capacity[p][curr]);
+      pathFlow = Math.min(pathFlow, residualCapacity[p][curr]);
       curr = p;
     }
 
-    // Update residual capacities
-    curr = sink;
-    while (curr !== source) {
+    // Augment flow and update forward/backward residual capacities
+    curr = normSink;
+    while (curr !== normSource) {
       const p = parent[curr]!;
-      capacity[p][curr] -= pathFlow;
-      capacity[curr][p] += pathFlow;
+      residualCapacity[p][curr] -= pathFlow;
+      residualCapacity[curr][p] += pathFlow;
       curr = p;
     }
 
     maxFlow += pathFlow;
   }
 
+  // Compute actual net flow along each original edge
+  const flowBreakdown: { from: string; to: string; flow: number; capacity: number }[] = [];
+  const selectedEdges: { from: string; to: string; weight: number; stepReason?: string }[] = [];
+
+  for (const u of Object.keys(originalCapacity)) {
+    for (const v of Object.keys(originalCapacity[u])) {
+      const origCap = originalCapacity[u][v];
+      if (origCap > 0) {
+        const remainingCap = residualCapacity[u]?.[v] || 0;
+        const actualFlow = Math.max(0, origCap - remainingCap);
+        flowBreakdown.push({
+          from: u,
+          to: v,
+          flow: actualFlow,
+          capacity: origCap,
+        });
+
+        if (actualFlow > 0) {
+          selectedEdges.push({
+            from: u,
+            to: v,
+            weight: actualFlow,
+            stepReason: `Flow: ${actualFlow} / ${origCap}`,
+          });
+        }
+      }
+    }
+  }
+
+  // Find Min-Cut partition using BFS on final residual graph from source
+  const reachableFromSource = new Set<string>();
+  const cutQueue = [normSource];
+  reachableFromSource.add(normSource);
+
+  while (cutQueue.length > 0) {
+    const u = cutQueue.shift()!;
+    for (const v of Object.keys(residualCapacity[u] || {})) {
+      if (!reachableFromSource.has(v) && residualCapacity[u][v] > 0) {
+        reachableFromSource.add(v);
+        cutQueue.push(v);
+      }
+    }
+  }
+
+  const sourceSet = Array.from(reachableFromSource).sort();
+  const sinkSet = Array.from(nodes).filter((n) => !reachableFromSource.has(n)).sort();
+
   return {
     type: "maximal-flow",
-    selectedEdges: [],
+    selectedEdges,
     totalMetric: maxFlow,
-    pathString: `Maximal Flow Capacity: ${maxFlow} units`,
+    pathString: `Maximal Throughput: ${maxFlow} units | Min-Cut: S = {${sourceSet.join(", ")}} | T = {${sinkSet.join(", ")}}`,
+    flowBreakdown,
+    minCut: {
+      sourceSet,
+      sinkSet,
+      cutCapacity: maxFlow,
+    },
   };
 }
 

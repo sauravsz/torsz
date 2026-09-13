@@ -129,7 +129,7 @@ describe("TORA Operations Research Solvers", () => {
   });
 
   // 6. Maximal Flow (Edmonds-Karp)
-  it("solves Maximal Flow network capacity", () => {
+  it("solves Maximal Flow network capacity and Min-Cut partition", () => {
     const edges: NetworkEdge[] = [
       { from: 1, to: 2, cost: 10 },
       { from: 1, to: 3, cost: 5 },
@@ -140,8 +140,10 @@ describe("TORA Operations Research Solvers", () => {
 
     const sol = solveNetworkMaxFlow(edges, "1", "4");
     expect(sol.totalMetric).toBe(15);
+    expect(sol.minCut?.cutCapacity).toBe(15);
+    expect(sol.minCut?.sourceSet).toContain("1");
+    expect(sol.flowBreakdown?.length).toBeGreaterThan(0);
   });
-
   // 7. CPM / PERT Project Planning
   it("computes Project Planning Critical Path and Durations", () => {
     const activities: CpmActivity[] = [

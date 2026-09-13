@@ -1447,13 +1447,62 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                       </h4>
                     </div>
                     <span className="text-lg font-mono font-bold text-primary">
-                      Total: {networkSol.totalMetric.toLocaleString()}
+                      {networkSubtype === "maximal-flow" ? "Max Flow: " : "Total: "}
+                      {networkSol.totalMetric.toLocaleString()}
                     </span>
                   </div>
 
                   <p className="text-xs text-muted font-mono">
-                    Sequence: <span className="text-ink font-bold">{networkSol.pathString}</span>
+                    {networkSubtype === "maximal-flow" ? "Summary: " : "Sequence: "}
+                    <span className="text-ink font-bold">{networkSol.pathString}</span>
                   </p>
+
+                  {/* Maximal Flow Detailed Flow Breakdown & Min-Cut Cut Table */}
+                  {networkSubtype === "maximal-flow" && networkSol.flowBreakdown && networkSol.flowBreakdown.length > 0 && (
+                    <div className="pt-2 border-t border-hairline-soft space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                          Arc Flow & Capacity Utilization:
+                        </span>
+                        {networkSol.minCut && (
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-semibold border border-primary/20">
+                              Min-Cut Capacity: {networkSol.minCut.cutCapacity}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {networkSol.flowBreakdown.map((arc, i) => {
+                          const isBottleneck = arc.flow === arc.capacity && arc.capacity > 0;
+                          const pct = arc.capacity > 0 ? Math.round((arc.flow / arc.capacity) * 100) : 0;
+
+                          return (
+                            <div
+                              key={i}
+                              className={`p-2.5 rounded-xl border text-xs flex flex-col justify-between gap-1.5 transition-colors ${
+                                isBottleneck
+                                  ? "bg-primary/10 border-primary/40 text-primary font-semibold"
+                                  : arc.flow > 0
+                                  ? "bg-canvas border-hairline text-ink"
+                                  : "bg-surface-soft/60 border-hairline-soft text-muted opacity-70"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between font-mono">
+                                <span className="font-bold">{arc.from} → {arc.to}</span>
+                                <span className="text-[10px] font-semibold">{pct}%</span>
+                              </div>
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className="text-muted">Flow:</span>
+                                <span className="font-mono font-bold">{arc.flow} / {arc.capacity}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
