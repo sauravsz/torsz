@@ -388,8 +388,6 @@ function MainWorkspace() {
         onOpenHistory={() => setIsHistoryOpen(true)}
         onExportDatabase={handleExportDatabase}
         isFileImported={isFileImported}
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         loading={loadingSchema}
       />
 
@@ -424,7 +422,6 @@ function MainWorkspace() {
                 setActiveView("or");
                 if (window.innerWidth < 768) setIsSidebarOpen(false);
               }}
-              onToggle={() => setIsSidebarOpen(false)}
             />
           </div>
         )}

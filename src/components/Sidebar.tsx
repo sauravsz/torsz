@@ -9,7 +9,6 @@ import {
   Clock,
   Swords,
   Calculator,
-  PanelLeftClose,
   Sun,
   Moon,
   Laptop,
@@ -44,7 +43,6 @@ interface SidebarProps {
   loadingSchema?: boolean;
   activeOrModule: OrModule;
   onSelectOrModule: (module: OrModule) => void;
-  onToggle?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -55,7 +53,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   loadingSchema = false,
   activeOrModule,
   onSelectOrModule,
-  onToggle,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [themeMode, setThemeMode] = useState<ThemeMode>(getThemePreference);
@@ -171,19 +168,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* 1. TOP: Workspace Views Section */}
       <div className="p-3 border-b border-hairline bg-surface-soft shrink-0 space-y-2">
-        <div className="flex items-center justify-between gap-2 px-1">
+        <div className="px-1">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted truncate">
             Views
           </span>
-          {onToggle && (
-            <button
-              onClick={onToggle}
-              title="Collapse Sidebar (⌘B)"
-              className="p-1 text-muted hover:text-ink rounded hover:bg-surface-cream transition-colors shrink-0"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         <div className={`grid gap-1.5 ${isCompact ? "grid-cols-1" : "grid-cols-2"}`}>

@@ -1,5 +1,5 @@
 import React from "react";
-import { RefreshCw, FileSpreadsheet, History, PanelLeft, PanelLeftClose, Download } from "lucide-react";
+import { RefreshCw, FileSpreadsheet, History, Download } from "lucide-react";
 import { ConnectionConfig } from "../types";
 interface TopNavProps {
   activeConnection: ConnectionConfig | null;
@@ -10,8 +10,6 @@ interface TopNavProps {
   onRefreshSchema: () => void;
   onImportSpreadsheet: (file: File) => void;
   onOpenHistory: () => void;
-  isSidebarOpen?: boolean;
-  onToggleSidebar?: () => void;
   onExportDatabase?: () => void;
   isFileImported?: boolean;
   loading: boolean;
@@ -26,8 +24,6 @@ export const TopNav: React.FC<TopNavProps> = ({
 
   onImportSpreadsheet,
   onOpenHistory,
-  isSidebarOpen = true,
-  onToggleSidebar,
   onExportDatabase,
   isFileImported = false,
   loading,
@@ -49,24 +45,7 @@ export const TopNav: React.FC<TopNavProps> = ({
             torsz
           </span>
         </div>
-
-        {/* Sidebar Collapse Toggle Button */}
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            title={isSidebarOpen ? "Collapse Sidebar (⌘B)" : "Expand Sidebar (⌘B)"}
-            className="p-1.5 text-muted hover:text-ink hover:bg-surface-soft rounded-md border border-hairline transition-colors ml-1"
-          >
-            {isSidebarOpen ? (
-              <PanelLeftClose className="w-4 h-4 text-primary" />
-            ) : (
-              <PanelLeft className="w-4 h-4" />
-            )}
-          </button>
-        )}
       </div>
-
-      {/* Connection & Actions Cluster */}
       <div className="flex items-center gap-2">
         {/* Active Database Badge - Only shown when a user imports a spreadsheet/file */}
         {isFileImported && activeConnection && (
