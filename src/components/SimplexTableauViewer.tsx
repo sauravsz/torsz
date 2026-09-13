@@ -16,8 +16,7 @@ export const SimplexTableauViewer: React.FC<SimplexTableauViewerProps> = ({ tabl
   if (!current) return null;
 
   return (
-    <div className="bg-surface-dark border border-surface-dark-elevated rounded-2xl p-5 shadow-md space-y-4">
-      {/* Iteration Selector Tabs */}
+    <div className="bg-surface-dark border border-surface-dark-elevated rounded-2xl p-5 shadow-md space-y-4 animate-keyframe-fade-up">
       <div className="flex items-center justify-between border-b border-surface-dark-elevated pb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-on-dark uppercase tracking-wider">
@@ -28,7 +27,7 @@ export const SimplexTableauViewer: React.FC<SimplexTableauViewerProps> = ({ tabl
               <button
                 key={idx}
                 onClick={() => setSelectedIter(idx)}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-colors ${
+                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-all duration-200 ease-apple-snappy active:scale-[0.97] ${
                   selectedIter === idx
                     ? "bg-primary text-on-primary shadow-xs"
                     : "text-on-dark-soft hover:text-on-dark hover:bg-surface-dark-elevated"

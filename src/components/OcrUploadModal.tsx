@@ -276,10 +276,9 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
   return (
     <div
       onPaste={handlePaste}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 select-none transition-opacity duration-300 ease-apple-ease"
     >
-      <div className="bg-surface-card border border-hairline w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Modal Header */}
+      <div className="bg-surface-card border border-hairline w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-keyframe-scale">
         <div className="px-6 py-4 border-b border-hairline flex items-center justify-between bg-surface-soft">
           <div className="flex items-center gap-3">
             <div className="flex items-center bg-canvas p-1 rounded-xl border border-hairline">
@@ -609,7 +608,7 @@ export const OcrUploadModal: React.FC<OcrUploadModalProps> = ({
                           handleAnalyzeText(ocrText, pt.key);
                         }
                       }}
-                      className={`p-3 rounded-xl border text-left transition-all ${
+                      className={`p-3 rounded-2xl border text-left transition-all duration-200 ease-apple-snappy active:scale-[0.98] ${
                         isSelected
                           ? "bg-primary/10 border-primary shadow-xs ring-1 ring-primary/40"
                           : "bg-canvas border-hairline hover:bg-surface-cream"

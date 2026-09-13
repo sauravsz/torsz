@@ -75,56 +75,56 @@ export const TopNav: React.FC<TopNavProps> = ({
           <button
             onClick={() => onSelectView("editor")}
             title="Query Editor"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-in-out rounded-sm ${
+            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
               activeView === "editor"
                 ? "bg-surface-card text-ink font-semibold shadow-2xs border border-hairline px-3"
                 : "text-muted hover:text-ink hover:bg-surface-cream px-2"
             }`}
           >
             <Terminal className={`w-3.5 h-3.5 shrink-0 ${activeView === "editor" ? "text-primary" : ""}`} />
-            {activeView === "editor" && <span className="whitespace-nowrap animate-in fade-in duration-150">Query Editor</span>}
+            {activeView === "editor" && <span className="whitespace-nowrap animate-keyframe-scale">Query Editor</span>}
           </button>
 
           {/* Schema Visualizer Tab */}
           <button
             onClick={() => onSelectView("diagram")}
             title="Schema Visualizer"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-in-out rounded-sm ${
+            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
               activeView === "diagram"
                 ? "bg-surface-card text-ink font-semibold shadow-2xs border border-hairline px-3"
                 : "text-muted hover:text-ink hover:bg-surface-cream px-2"
             }`}
           >
             <Network className={`w-3.5 h-3.5 shrink-0 ${activeView === "diagram" ? "text-primary" : ""}`} />
-            {activeView === "diagram" && <span className="whitespace-nowrap animate-in fade-in duration-150">Schema Visualizer</span>}
+            {activeView === "diagram" && <span className="whitespace-nowrap animate-keyframe-scale">Schema Visualizer</span>}
           </button>
 
           {/* AI Assistant Tab */}
           <button
             onClick={() => onSelectView("ai")}
             title="AI Assistant"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-in-out rounded-sm ${
+            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
               activeView === "ai"
                 ? "bg-surface-card text-primary font-semibold shadow-2xs border border-hairline px-3"
                 : "text-muted hover:text-primary hover:bg-surface-cream px-2"
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 shrink-0 text-primary" />
-            {activeView === "ai" && <span className="whitespace-nowrap animate-in fade-in duration-150">AI Assistant</span>}
+            {activeView === "ai" && <span className="whitespace-nowrap animate-keyframe-scale">AI Assistant</span>}
           </button>
 
           {/* TORA Solvers Tab */}
           <button
             onClick={() => onSelectView("or")}
             title="TORA Operations Research Suite"
-            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-in-out rounded-sm ${
+            className={`flex items-center gap-1.5 py-1 text-xs transition-all duration-200 ease-apple-snappy active:scale-[0.97] rounded-sm ${
               activeView === "or"
                 ? "bg-surface-card text-primary font-semibold shadow-2xs border border-hairline px-3"
                 : "text-muted hover:text-primary hover:bg-surface-cream px-2"
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5 shrink-0 text-primary" />
-            {activeView === "or" && <span className="whitespace-nowrap animate-in fade-in duration-150">TORA Solvers</span>}
+            {activeView === "or" && <span className="whitespace-nowrap animate-keyframe-scale">TORA Solvers</span>}
           </button>
         </div>
       </div>

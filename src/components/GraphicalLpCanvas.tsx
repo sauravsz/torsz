@@ -22,8 +22,7 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
     .join(" ");
 
   return (
-    <div className="bg-surface-dark border border-surface-dark-elevated rounded-2xl p-5 shadow-md flex flex-col md:flex-row gap-6 items-center">
-      {/* SVG Canvas */}
+    <div className="bg-surface-dark border border-surface-dark-elevated rounded-2xl p-5 shadow-md flex flex-col md:flex-row gap-6 items-center animate-keyframe-fade-up">
       <div className="relative bg-[#141312] border border-surface-dark-elevated rounded-xl p-2 shadow-inner">
         <svg width={width} height={height} className="overflow-visible">
           {/* Grid lines */}
@@ -89,9 +88,9 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
               fill="rgba(93, 184, 166, 0.25)"
               stroke="#5db8a6"
               strokeWidth="2"
+              className="transition-all duration-500 ease-apple-spring"
             />
           )}
-
           {/* Constraint Lines */}
           {solution.lines.map((line, idx) => {
             const colors = ["#cc785c", "#e8a55a", "#5db872", "#93c5fd", "#d8b4fe"];
@@ -124,7 +123,7 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
                   y2={scaleY(p2[1])}
                   stroke={col}
                   strokeWidth="2"
-                  strokeDasharray={line.operator === "=" ? "none" : "none"}
+                  className="transition-all duration-700 ease-apple-ease"
                 />
               </g>
             );
@@ -144,15 +143,24 @@ export const GraphicalLpCanvas: React.FC<GraphicalLpCanvasProps> = ({ solution }
             </g>
           ))}
 
-          {/* Optimal Target Vertex */}
+          {/* Optimal Target Vertex with Keyframer Pulse Ring */}
           <circle
             cx={scaleX(solution.optimalPoint[0])}
             cy={scaleY(solution.optimalPoint[1])}
-            r="8"
+            r="12"
             fill="none"
             stroke="#cc785c"
-            strokeWidth="2.5"
-            className="animate-ping"
+            strokeWidth="1.5"
+            className="animate-ping opacity-75"
+          />
+          <circle
+            cx={scaleX(solution.optimalPoint[0])}
+            cy={scaleY(solution.optimalPoint[1])}
+            r="6.5"
+            fill="#cc785c"
+            stroke="#faf9f5"
+            strokeWidth="2"
+            className="animate-pulse"
           />
         </svg>
       </div>
