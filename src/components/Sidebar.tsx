@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from "react";
 import {
-  Table,
-  Eye,
-  ChevronRight,
-  ChevronDown,
-  Key,
   Search,
-  Database,
-  Layers,
+  TrendingUp,
+  Truck,
+  Network,
+  Calendar,
+  Package,
+  Clock,
+  Swords,
+  Calculator,
   PanelLeftClose,
   Sun,
   Moon,
   Laptop,
+  Sparkles,
 } from "lucide-react";
-import { DatabaseSchema } from "../types";
+import { OrModule } from "../services/or/types";
 import {
   getThemePreference,
   applyTheme,
@@ -22,20 +24,17 @@ import {
 } from "../services/theme";
 
 interface SidebarProps {
-  schema: DatabaseSchema | null;
-  onSelectTable: (tableName: string) => void;
+  activeOrModule: OrModule;
+  onSelectOrModule: (module: OrModule) => void;
   onToggle?: () => void;
-  loading: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  schema,
-  onSelectTable,
+  activeOrModule,
+  onSelectOrModule,
   onToggle,
-  loading,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({});
   const [themeMode, setThemeMode] = useState<ThemeMode>(getThemePreference);
 
   useEffect(() => {
@@ -50,32 +49,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
     applyTheme(mode);
   };
 
-  const toggleTable = (name: string) => {
-    setExpandedTables((prev) => ({
-      ...prev,
-      [name]: !prev[name],
-    }));
-  };
+  const orModules = [
+    { id: "linear-programming", name: "Linear Programming", icon: TrendingUp, desc: "Simplex & 2D Graphical" },
+    { id: "transportation-assignment", name: "Transportation & Assignment", icon: Truck, desc: "VAM & Hungarian" },
+    { id: "network-models", name: "Network Models", icon: Network, desc: "Dijkstra, MST, Max Flow" },
+    { id: "project-planning", name: "Project Planning (CPM/PERT)", icon: Calendar, desc: "Critical Path & Float" },
+    { id: "inventory-control", name: "Inventory Control (EOQ)", icon: Package, desc: "Order Qty & Cycle Times" },
+    { id: "queuing-models", name: "Queuing Analysis", icon: Clock, desc: "M/M/1 & M/M/c Waiting" },
+    { id: "zero-sum-games", name: "Zero-Sum Games", icon: Swords, desc: "Minimax & Saddle Points" },
+    { id: "linear-equations", name: "Linear Equations", icon: Calculator, desc: "Gauss-Jordan Ax = b" },
+  ];
 
-  const tables = schema?.tables.filter((t) => t.table_type === "table") || [];
-  const views = schema?.tables.filter((t) => t.table_type === "view") || [];
-
-  const filteredTables = tables.filter((t) =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  const filteredViews = views.filter((v) =>
-    v.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredOrModules = orModules.filter(
+    (m) =>
+      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.desc.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <aside className="w-64 bg-surface-card border-r border-hairline flex flex-col h-[calc(100vh-3.5rem)] select-none text-body">
-      {/* Header */}
-      <div className="p-3 border-b border-hairline bg-surface-soft">
+    <aside className="w-64 bg-surface-card border-r border-hairline flex flex-col h-[calc(100vh-3.5rem)] select-none text-body shrink-0">
+      {/* Sidebar Header */}
+      <div className="p-3 border-b border-hairline bg-surface-soft shrink-0">
         <div className="flex items-center justify-between gap-2 mb-2">
           <div className="flex items-center gap-2 truncate">
-            <Database className="w-4 h-4 text-primary shrink-0" />
+            <Sparkles className="w-4 h-4 text-primary shrink-0" />
             <span className="font-editorial-serif text-lg font-medium text-ink truncate">
-              {schema?.database_name || "Database Schema"}
+              TORA Solvers
             </span>
           </div>
           {onToggle && (
@@ -88,12 +87,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
         </div>
-        {/* Search */}
+
+        {/* Search Solvers */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-muted" />
           <input
             type="text"
-            placeholder="Search schema..."
+            placeholder="Search optimization models..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-canvas border border-hairline rounded-md pl-8 pr-3 py-1 text-xs text-ink placeholder:text-muted-soft focus:border-primary outline-none"
@@ -101,105 +101,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Schema Tree */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-4">
-        {loading ? (
-          <div className="p-4 text-center text-xs text-muted">
-            <div className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mb-2" />
-            <p>Introspecting schema...</p>
-          </div>
-        ) : !schema ? (
-          <div className="p-6 text-center text-xs text-muted">
-            <Layers className="w-8 h-8 text-muted-soft mx-auto mb-2 opacity-60" />
-            <p className="font-medium text-ink mb-1">No Active Connection</p>
-            <p className="text-[11px] text-muted-soft">
-              Connect to a database or load the sample SQLite store.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Database Tables Group */}
-            <div>
-              <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                <span>Tables ({filteredTables.length})</span>
-              </div>
-              <div className="space-y-0.5 mt-1">
-                {filteredTables.map((table) => {
-                  return (
-                    <div key={table.name} className="group">
-                      <div
-                        onClick={() => toggleTable(table.name)}
-                        className="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-surface-cream text-xs text-ink cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          {expandedTables[table.name] ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-muted shrink-0" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-muted shrink-0" />
-                          )}
-                          <Table className="w-3.5 h-3.5 shrink-0 text-primary" />
-                          <span className="font-semibold truncate">{table.name}</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectTable(table.name);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 text-[11px] font-semibold text-primary hover:underline px-1 py-0.5"
-                        >
-                          SELECT
-                        </button>
-                      </div>
+      {/* Solvers Vertical Navigation List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted mb-1">
+          Optimization Models ({filteredOrModules.length})
+        </div>
 
-                      {/* Columns Subtree */}
-                      {expandedTables[table.name] && (
-                        <div className="pl-6 pr-2 py-1 space-y-1 border-l-2 border-hairline ml-4 my-1">
-                          {table.columns.map((col) => (
-                            <div
-                              key={col.name}
-                              className="flex items-center justify-between text-xs text-body py-0.5"
-                            >
-                              <div className="flex items-center gap-1.5 truncate">
-                                {col.is_primary_key && (
-                                  <Key className="w-3 h-3 text-accent-amber shrink-0" />
-                                )}
-                                <span className="truncate">{col.name}</span>
-                              </div>
-                              <span className="text-[10px] font-mono text-muted-soft bg-canvas px-1 py-0.2 rounded border border-hairline shrink-0">
-                                {col.data_type}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+        {filteredOrModules.map((m) => {
+          const Icon = m.icon;
+          const isActive = activeOrModule === m.id;
 
-            {/* Views Group if any */}
-            {filteredViews.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
-                  <span>Views ({filteredViews.length})</span>
+          return (
+            <button
+              key={m.id}
+              onClick={() => onSelectOrModule(m.id as OrModule)}
+              className={`w-full flex items-start gap-2.5 px-3 py-2 rounded-xl text-left transition-all duration-150 ${
+                isActive
+                  ? "bg-canvas text-ink border border-hairline shadow-xs font-semibold ring-1 ring-primary/20"
+                  : "text-body hover:text-ink hover:bg-surface-cream/70"
+              }`}
+            >
+              <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isActive ? "text-primary font-bold" : "text-muted"}`} />
+              <div className="flex-1 truncate">
+                <div className={`text-xs truncate ${isActive ? "text-primary font-semibold" : "text-ink font-medium"}`}>
+                  {m.name}
                 </div>
-                <div className="space-y-0.5 mt-1">
-                  {filteredViews.map((view) => (
-                    <div
-                      key={view.name}
-                      onClick={() => onSelectTable(view.name)}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-surface-cream text-xs text-ink cursor-pointer transition-colors"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-accent-teal opacity-80 shrink-0" />
-                      <span className="font-medium truncate">{view.name}</span>
-                    </div>
-                  ))}
+                <div className="text-[10px] text-muted-soft truncate">
+                  {m.desc}
                 </div>
               </div>
-            )}
-          </>
-        )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Theme Mode Switcher Pinned to Sidebar Bottom */}

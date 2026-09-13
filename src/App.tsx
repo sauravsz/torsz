@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { TopNav } from "./components/TopNav";
 import { Sidebar } from "./components/Sidebar";
 import { SqlEditor } from "./components/SqlEditor";
+import { HorizontalTablesBar } from "./components/HorizontalTablesBar";
 import { ResultsTable, PendingCellUpdate } from "./components/ResultsTable";
 import { ErDiagram } from "./components/ErDiagram";
 import { AiAssistant } from "./components/AiAssistant";
@@ -347,18 +348,27 @@ function MainWorkspace() {
         {/* Left Schema Sidebar */}
         {isSidebarOpen && (
           <Sidebar
-            schema={schema}
-            onSelectTable={handleSelectTable}
+            activeOrModule={activeOrModule}
+            onSelectOrModule={(mod) => {
+              setActiveOrModule(mod);
+              setActiveView("or");
+            }}
             onToggle={() => setIsSidebarOpen(false)}
-            loading={loadingSchema}
           />
         )}
 
         {/* Center Canvas Area */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft/40">
-          {activeView === "editor" ? (
-            <div className="flex flex-col h-full overflow-hidden p-3 gap-3">
-              {/* Top Half: Code Editor */}
+        <div className="flex-1 flex flex-col h-full overflow-hidden bg-surface-soft/40">
+          {/* Horizontal Database Tables Bar */}
+          <HorizontalTablesBar
+            schema={schema}
+            onSelectTable={handleSelectTable}
+            loading={loadingSchema}
+          />
+
+          <main className="flex-1 flex flex-col h-full overflow-hidden">
+            {activeView === "editor" ? (
+              <div className="flex flex-col h-full overflow-hidden p-3 gap-3">
               <div className="h-[44%] min-h-[200px] shrink-0">
                 <SqlEditor
                   sql={sql}
@@ -398,7 +408,6 @@ function MainWorkspace() {
           ) : (
             <OrSuiteView
               activeModule={activeOrModule}
-              onSelectModule={setActiveOrModule}
               importedOcrData={importedOcrData}
               onAskAi={(promptText: string) => {
                 setAiInitialPrompt(promptText);
@@ -417,6 +426,7 @@ function MainWorkspace() {
             />
           )}
         </main>
+        </div>
       </div>
       <ConnectionModal
         isOpen={isModalOpen}
