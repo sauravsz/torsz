@@ -58,6 +58,23 @@ describe("TORA Operations Research Multi-Scenario Test Suite", () => {
     expect(sol.status).toBe("optimal");
     expect(sol.objectiveValue).toBeLessThanOrEqual(50);
   });
+  it("solves 9-variable Weighted Moving Average MAD Error Minimization Goal Programming LP", () => {
+    const lp: LpProblem = {
+      objective: "min",
+      objectiveCoefficients: [0, 0, 0, 1, 1, 1, 1, 1, 1],
+      variableNames: ["w1", "w2", "w3", "e4+", "e4-", "e5+", "e5-", "e6+", "e6-"],
+      constraints: [
+        { coefficients: [270, 241, 331, -1, 1, 0, 0, 0, 0], operator: "=", rhs: 299 },
+        { coefficients: [241, 331, 299, 0, 0, -1, 1, 0, 0], operator: "=", rhs: 360 },
+        { coefficients: [331, 299, 360, 0, 0, 0, 0, -1, 1], operator: "=", rhs: 340 },
+        { coefficients: [0, -1, 1, 0, 0, 0, 0, 0, 0], operator: ">=", rhs: 0 },
+        { coefficients: [-1, 1, 0, 0, 0, 0, 0, 0, 0], operator: ">=", rhs: 0 },
+      ],
+    };
+    const sol = solveLinearProgramming(lp);
+    expect(sol.status).toBe("optimal");
+    expect(sol.objectiveValue).toBeCloseTo(62.258, 1);
+  });
   it("detects unbounded feasible region in Simplex method", () => {
     const lp: LpProblem = {
       objective: "max",

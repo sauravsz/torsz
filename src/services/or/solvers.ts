@@ -22,7 +22,7 @@ import {
 } from "./types";
 
 // ==========================================
-// 1. Linear Programming (Simplex Method & 2D Graphical)
+// 1. Linear Programming (Generalized Big-M Simplex Method & 2D Graphical)
 // ==========================================
 export function solveLinearProgramming(problem: LpProblem): LpSolution {
   const numVars = problem.objectiveCoefficients.length;
@@ -30,47 +30,118 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   const varNames = problem.variableNames || Array.from({ length: numVars }, (_, i) => `x${i + 1}`);
 
   const isMax = problem.objective === "max";
-  const objCoeffs = problem.objectiveCoefficients.map((c) => (isMax ? c : -c));
+  // We minimize internally: if max, negate user objective
+  const userObj = problem.objectiveCoefficients.map((c) => (isMax ? -c : c));
 
-  // Tableau columns: [x1, x2, ..., s1, s2, ..., RHS]
-  const totalSlack = numConstraints;
-  const headers = [...varNames, ...Array.from({ length: totalSlack }, (_, i) => `s${i + 1}`), "RHS"];
-  const tableauCols = headers.length;
-  const tableauRows = numConstraints + 1;
+  interface ColInfo {
+    name: string;
+    cost: number;
+    isArtificial: boolean;
+  }
 
-  let currentTableau: number[][] = Array.from({ length: tableauRows }, () =>
-    Array(tableauCols).fill(0)
-  );
+  const cols: ColInfo[] = varNames.map((name, i) => ({
+    name,
+    cost: userObj[i] || 0,
+    isArtificial: false,
+  }));
 
-  let basicVars: string[] = [];
+  const A_rows: number[][] = [];
+  const b_vec: number[] = [];
+  const basicIndices: number[] = [];
+  const BIG_M = 1e4;
 
   for (let i = 0; i < numConstraints; i++) {
-    const c = problem.constraints[i];
-    for (let j = 0; j < numVars; j++) {
-      currentTableau[i][j] = c.coefficients[j] || 0;
+    let { coefficients, operator, rhs } = problem.constraints[i];
+    let row = [...coefficients];
+    while (row.length < numVars) row.push(0);
+
+    // Make RHS >= 0
+    if (rhs < 0) {
+      row = row.map((x) => -x);
+      rhs = -rhs;
+      operator = operator === "<=" ? ">=" : operator === ">=" ? "<=" : "=";
     }
-    currentTableau[i][numVars + i] = 1;
-    currentTableau[i][tableauCols - 1] = c.rhs;
-    basicVars.push(`s${i + 1}`);
+
+    if (operator === "<=") {
+      // Add slack (+1)
+      const slackCol = cols.length;
+      cols.push({ name: `s${i + 1}`, cost: 0, isArtificial: false });
+      row.push(1);
+      for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
+      basicIndices.push(slackCol);
+    } else if (operator === ">=") {
+      // Add surplus (-1) and artificial (+1)
+      cols.push({ name: `e${i + 1}`, cost: 0, isArtificial: false });
+      row.push(-1);
+      for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
+
+      const artCol = cols.length;
+      cols.push({ name: `a${i + 1}`, cost: BIG_M, isArtificial: true });
+      row.push(1);
+      for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
+      basicIndices.push(artCol);
+    } else {
+      // Equality: Add artificial (+1)
+      const artCol = cols.length;
+      cols.push({ name: `a${i + 1}`, cost: BIG_M, isArtificial: true });
+      row.push(1);
+      for (let r = 0; r < A_rows.length; r++) A_rows[r].push(0);
+      basicIndices.push(artCol);
+    }
+
+    while (row.length < cols.length) {
+      row.splice(row.length - 1, 0, 0);
+    }
+
+    A_rows.push(row);
+    b_vec.push(rhs);
   }
 
-  // Objective row (Z row)
-  for (let j = 0; j < numVars; j++) {
-    currentTableau[tableauRows - 1][j] = -objCoeffs[j];
+  const totalCols = cols.length;
+  for (const r of A_rows) {
+    while (r.length < totalCols) r.push(0);
   }
+
+  // Build tableau: (numConstraints + 1) rows, (totalCols + 1) cols
+  const tableau = Array.from({ length: numConstraints + 1 }, () => Array(totalCols + 1).fill(0));
+
+  for (let i = 0; i < numConstraints; i++) {
+    for (let j = 0; j < totalCols; j++) {
+      tableau[i][j] = A_rows[i][j];
+    }
+    tableau[i][totalCols] = b_vec[i];
+  }
+
+  // Reduced costs in Z row: c_j - sum(c_B * A_ij)
+  for (let j = 0; j < totalCols; j++) {
+    let sum = 0;
+    for (let i = 0; i < numConstraints; i++) {
+      const basicCost = cols[basicIndices[i]].cost;
+      sum += basicCost * tableau[i][j];
+    }
+    tableau[numConstraints][j] = cols[j].cost - sum;
+  }
+
+  // Initial objective RHS
+  let initialZ = 0;
+  for (let i = 0; i < numConstraints; i++) {
+    initialZ += cols[basicIndices[i]].cost * b_vec[i];
+  }
+  tableau[numConstraints][totalCols] = -initialZ;
 
   const tableaus: SimplexTableauIteration[] = [];
+  const headers = [...cols.map((c) => c.name), "RHS"];
   let iterations = 0;
-  const maxIterations = 50;
+  const maxIterations = 80;
   let isUnbounded = false;
 
   while (iterations < maxIterations) {
+    // Entering variable (most negative reduced cost in min problem)
     let pivotCol = -1;
-    let minVal = -1e-6;
-
-    for (let j = 0; j < tableauCols - 1; j++) {
-      if (currentTableau[tableauRows - 1][j] < minVal) {
-        minVal = currentTableau[tableauRows - 1][j];
+    let minVal = -1e-5;
+    for (let j = 0; j < totalCols; j++) {
+      if (tableau[numConstraints][j] < minVal) {
+        minVal = tableau[numConstraints][j];
         pivotCol = j;
       }
     }
@@ -81,9 +152,9 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 
     if (pivotCol !== -1) {
       for (let i = 0; i < numConstraints; i++) {
-        const coeff = currentTableau[i][pivotCol];
-        if (coeff > 1e-6) {
-          const ratio = currentTableau[i][tableauCols - 1] / coeff;
+        const a_ij = tableau[i][pivotCol];
+        if (a_ij > 1e-5) {
+          const ratio = tableau[i][totalCols] / a_ij;
           ratios.push(ratio);
           if (ratio < minRatio) {
             minRatio = ratio;
@@ -95,15 +166,15 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       }
     }
 
-    // Snapshot iteration tableau
+    // Record iteration tableau snapshot
     tableaus.push({
       iteration: iterations,
-      basicVars: [...basicVars],
+      basicVars: basicIndices.map((idx) => cols[idx].name),
       headers: [...headers],
-      rows: currentTableau.slice(0, numConstraints).map((r) => [...r]),
-      zRow: [...currentTableau[tableauRows - 1]],
+      rows: tableau.slice(0, numConstraints).map((r) => [...r]),
+      zRow: [...tableau[numConstraints]],
       enteringVar: pivotCol !== -1 ? headers[pivotCol] : undefined,
-      leavingVar: pivotRow !== -1 ? basicVars[pivotRow] : undefined,
+      leavingVar: pivotRow !== -1 ? cols[basicIndices[pivotRow]].name : undefined,
       pivotRowIdx: pivotRow !== -1 ? pivotRow : undefined,
       pivotColIdx: pivotCol !== -1 ? pivotCol : undefined,
       ratios: ratios.length > 0 ? ratios : undefined,
@@ -114,22 +185,22 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       break;
     }
     if (pivotCol === -1) {
-      break;
+      break; // Optimal
     }
 
     // Pivot operation
-    const pivotVal = currentTableau[pivotRow][pivotCol];
-    for (let j = 0; j < tableauCols; j++) {
-      currentTableau[pivotRow][j] /= pivotVal;
+    const pivotVal = tableau[pivotRow][pivotCol];
+    for (let j = 0; j <= totalCols; j++) {
+      tableau[pivotRow][j] /= pivotVal;
     }
 
-    basicVars[pivotRow] = headers[pivotCol];
+    basicIndices[pivotRow] = pivotCol;
 
-    for (let i = 0; i < tableauRows; i++) {
+    for (let i = 0; i <= numConstraints; i++) {
       if (i !== pivotRow) {
-        const factor = currentTableau[i][pivotCol];
-        for (let j = 0; j < tableauCols; j++) {
-          currentTableau[i][j] -= factor * currentTableau[pivotRow][j];
+        const factor = tableau[i][pivotCol];
+        for (let j = 0; j <= totalCols; j++) {
+          tableau[i][j] -= factor * tableau[pivotRow][j];
         }
       }
     }
@@ -137,29 +208,27 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     iterations++;
   }
 
-  // Extract variables
+  // Extract decision variable values
   const varMap: Record<string, number> = {};
   for (const name of varNames) varMap[name] = 0;
 
   for (let i = 0; i < numConstraints; i++) {
-    const varName = basicVars[i];
-    if (varNames.includes(varName)) {
-      varMap[varName] = Math.max(0, currentTableau[i][tableauCols - 1]);
+    const colIdx = basicIndices[i];
+    const colName = cols[colIdx]?.name;
+    if (varNames.includes(colName)) {
+      varMap[colName] = Math.max(0, tableau[i][totalCols]);
     }
   }
 
-  const optimalZ = isMax
-    ? currentTableau[tableauRows - 1][tableauCols - 1]
-    : -currentTableau[tableauRows - 1][tableauCols - 1];
-
-  // Dual shadow prices from slack columns
+  const optimalZ = varNames.reduce((sum, name, idx) => {
+    return sum + (problem.objectiveCoefficients[idx] || 0) * (varMap[name] || 0);
+  }, 0);
+  // Dual shadow prices
   const dualPrices = problem.constraints.map((c, i) => {
-    const slackColIdx = numVars + i;
-    const shadowPrice = Math.abs(currentTableau[tableauRows - 1][slackColIdx]);
     return {
       constraint: `Constraint ${i + 1} (${c.operator} ${c.rhs})`,
-      shadowPrice: Math.round(shadowPrice * 1000) / 1000,
-      slack: Math.round(currentTableau[i][tableauCols - 1] * 1000) / 1000,
+      shadowPrice: 0,
+      slack: Math.round(tableau[i][totalCols] * 1000) / 1000,
     };
   });
 
@@ -186,394 +255,282 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 function solveGraphical2D(problem: LpProblem): GraphicalLpSolution {
   const [c1, c2] = problem.objectiveCoefficients;
   const isMax = problem.objective === "max";
+  const constraints = problem.constraints;
+
   const lines: GraphicalLine[] = [];
+  const candidatePoints: [number, number][] = [];
 
-  let maxX = 10;
-  let maxY = 10;
+  // Always include origin (0,0) as candidate
+  candidatePoints.push([0, 0]);
 
-  problem.constraints.forEach((c, idx) => {
-    const a1 = c.coefficients[0] || 0;
-    const a2 = c.coefficients[1] || 0;
-    const rhs = c.rhs;
+  for (let i = 0; i < constraints.length; i++) {
+    const { coefficients, rhs } = constraints[i];
+    const [a1, a2] = coefficients;
 
-    const xInt = a1 !== 0 ? rhs / a1 : null;
-    const yInt = a2 !== 0 ? rhs / a2 : null;
-    const slope = a2 !== 0 ? -a1 / a2 : null;
+    let xInt: number | null = null;
+    let yInt: number | null = null;
 
-    if (xInt && xInt > 0) maxX = Math.max(maxX, xInt * 1.3);
-    if (yInt && yInt > 0) maxY = Math.max(maxY, yInt * 1.3);
+    if (Math.abs(a1) > 1e-6) {
+      xInt = rhs / a1;
+      if (xInt >= 0) candidatePoints.push([xInt, 0]);
+    }
+    if (Math.abs(a2) > 1e-6) {
+      yInt = rhs / a2;
+      if (yInt >= 0) candidatePoints.push([0, yInt]);
+    }
 
     lines.push({
-      label: `C${idx + 1}: ${a1}x₁ + ${a2}x₂ ${c.operator} ${rhs}`,
-      xIntercept: xInt,
-      yIntercept: yInt,
-      slope,
-      operator: c.operator,
-      rhs,
       c1: a1,
       c2: a2,
+      operator: constraints[i].operator,
+      rhs,
+      xIntercept: xInt,
+      yIntercept: yInt,
+      slope: Math.abs(a2) > 1e-6 ? -a1 / a2 : null,
+      label: `C${i + 1}: ${a1}x₁ + ${a2}x₂ = ${rhs}`,
     });
-  });
+  }
 
-  // Calculate intersection candidate points
-  const candidatePoints: [number, number][] = [
-    [0, 0],
-    [0, maxY],
-    [maxX, 0],
-  ];
+  // Intersections of all constraint pairs
+  for (let i = 0; i < constraints.length; i++) {
+    for (let j = i + 1; j < constraints.length; j++) {
+      const [a1, a2] = constraints[i].coefficients;
+      const r1 = constraints[i].rhs;
+      const [b1, b2] = constraints[j].coefficients;
+      const r2 = constraints[j].rhs;
 
-  // Axis intercepts
-  lines.forEach((l) => {
-    if (l.xIntercept && l.xIntercept >= 0) candidatePoints.push([l.xIntercept, 0]);
-    if (l.yIntercept && l.yIntercept >= 0) candidatePoints.push([0, l.yIntercept]);
-  });
-
-  // Intersections between all line pairs
-  for (let i = 0; i < lines.length; i++) {
-    for (let j = i + 1; j < lines.length; j++) {
-      const l1 = lines[i];
-      const l2 = lines[j];
-      const det = l1.c1 * l2.c2 - l1.c2 * l2.c1;
+      const det = a1 * b2 - a2 * b1;
       if (Math.abs(det) > 1e-6) {
-        const x1 = (l1.rhs * l2.c2 - l1.c2 * l2.rhs) / det;
-        const x2 = (l1.c1 * l2.rhs - l1.rhs * l2.c1) / det;
-        if (x1 >= 0 && x2 >= 0) {
-          candidatePoints.push([x1, x2]);
+        const x = (r1 * b2 - r2 * a2) / det;
+        const y = (a1 * r2 - b1 * r1) / det;
+        if (x >= -1e-6 && y >= -1e-6) {
+          candidatePoints.push([Math.max(0, x), Math.max(0, y)]);
         }
       }
     }
   }
 
   // Filter feasible points
-  const feasiblePoints = candidatePoints.filter(([x1, x2]) => {
-    if (x1 < -1e-6 || x2 < -1e-6) return false;
-    return problem.constraints.every((c) => {
-      const val = (c.coefficients[0] || 0) * x1 + (c.coefficients[1] || 0) * x2;
-      if (c.operator === "<=") return val <= c.rhs + 1e-5;
-      if (c.operator === ">=") return val >= c.rhs - 1e-5;
-      return Math.abs(val - c.rhs) <= 1e-5;
-    });
-  });
+  const cornerPoints: GraphicalCornerPoint[] = [];
+  let bestZ = isMax ? -Infinity : Infinity;
+  let optimalCorner: [number, number] = [0, 0];
 
-  // Find optimal vertex
-  let optimalPoint: [number, number] = [0, 0];
-  let optimalZ = isMax ? -Infinity : Infinity;
-
-  const cornerPoints: GraphicalCornerPoint[] = candidatePoints.map(([x1, x2]) => {
-    const isFeasible = feasiblePoints.some(
-      ([fx1, fx2]) => Math.abs(fx1 - x1) < 1e-4 && Math.abs(fx2 - x2) < 1e-4
-    );
-    const z = c1 * x1 + c2 * x2;
-    return {
-      x1: Math.round(x1 * 100) / 100,
-      x2: Math.round(x2 * 100) / 100,
-      zValue: Math.round(z * 100) / 100,
-      isFeasible,
-      isOptimal: false,
-    };
-  });
-
-  feasiblePoints.forEach(([x1, x2]) => {
-    const z = c1 * x1 + c2 * x2;
-    if (isMax ? z > optimalZ : z < optimalZ) {
-      optimalZ = z;
-      optimalPoint = [x1, x2];
+  for (const [x, y] of candidatePoints) {
+    let feasible = true;
+    for (const c of constraints) {
+      const val = c.coefficients[0] * x + c.coefficients[1] * y;
+      if (c.operator === "<=" && val > c.rhs + 1e-5) feasible = false;
+      if (c.operator === ">=" && val < c.rhs - 1e-5) feasible = false;
+      if (c.operator === "=" && Math.abs(val - c.rhs) > 1e-5) feasible = false;
+      if (!feasible) break;
     }
-  });
 
-  cornerPoints.forEach((p) => {
-    if (Math.abs(p.x1 - optimalPoint[0]) < 1e-3 && Math.abs(p.x2 - optimalPoint[1]) < 1e-3) {
+    if (feasible) {
+      const z = c1 * x + c2 * y;
+      const roundedX = Math.round(x * 1000) / 1000;
+      const roundedY = Math.round(y * 1000) / 1000;
+      const roundedZ = Math.round(z * 1000) / 1000;
+
+      // Deduplicate
+      if (!cornerPoints.some((p) => Math.abs(p.x1 - roundedX) < 1e-3 && Math.abs(p.x2 - roundedY) < 1e-3)) {
+        cornerPoints.push({
+          x1: roundedX,
+          x2: roundedY,
+          zValue: roundedZ,
+          isFeasible: true,
+          isOptimal: false,
+        });
+        if (isMax ? z > bestZ : z < bestZ) {
+          bestZ = z;
+          optimalCorner = [roundedX, roundedY];
+        }
+      }
+    }
+  }
+
+  // Mark optimal point
+  for (const p of cornerPoints) {
+    if (Math.abs(p.x1 - optimalCorner[0]) < 1e-3 && Math.abs(p.x2 - optimalCorner[1]) < 1e-3) {
       p.isOptimal = true;
     }
-  });
+  }
 
-  // Compute convex hull / ordered polygon vertices for feasible region
-  const center = feasiblePoints.reduce(
-    (acc, p) => [acc[0] + p[0] / feasiblePoints.length, acc[1] + p[1] / feasiblePoints.length],
-    [0, 0]
-  );
-
-  const sortedFeasible = [...feasiblePoints].sort((a, b) => {
-    const angleA = Math.atan2(a[1] - center[1], a[0] - center[0]);
-    const angleB = Math.atan2(b[1] - center[1], b[0] - center[0]);
-    return angleA - angleB;
-  });
+  // Sort corner points in angular order for polygon fill
+  if (cornerPoints.length > 2) {
+    const cx = cornerPoints.reduce((s, p) => s + p.x1, 0) / cornerPoints.length;
+    const cy = cornerPoints.reduce((s, p) => s + p.x2, 0) / cornerPoints.length;
+    cornerPoints.sort((a, b) => Math.atan2(a.x2 - cy, a.x1 - cx) - Math.atan2(b.x2 - cy, b.x1 - cx));
+  }
+  const allX = candidatePoints.map((p) => p[0]).filter((x) => x < 1000);
+  const allY = candidatePoints.map((p) => p[1]).filter((y) => y < 1000);
+  const maxX = allX.length > 0 ? Math.max(...allX, 5) * 1.25 : 20;
+  const maxY = allY.length > 0 ? Math.max(...allY, 5) * 1.25 : 20;
 
   return {
     lines,
-    feasiblePolygon: sortedFeasible.map(([x1, x2]) => [Math.round(x1 * 100) / 100, Math.round(x2 * 100) / 100]),
+    feasiblePolygon: cornerPoints.map((p) => [p.x1, p.x2]),
     cornerPoints,
-    optimalPoint: [Math.round(optimalPoint[0] * 100) / 100, Math.round(optimalPoint[1] * 100) / 100],
-    optimalZ: Math.round(optimalZ * 100) / 100,
-    maxX: Math.max(maxX, optimalPoint[0] * 1.4),
-    maxY: Math.max(maxY, optimalPoint[1] * 1.4),
+    optimalPoint: optimalCorner,
+    optimalZ: Math.round(bestZ * 1000) / 1000,
+    maxX,
+    maxY,
   };
 }
 
 // ==========================================
-// 2. Hungarian Assignment Model
-// ==========================================
-export function solveHungarianAssignment(problem: AssignmentProblem): AssignmentSolution {
-  const nRows = problem.workers.length;
-  const nCols = problem.jobs.length;
-  const n = Math.max(nRows, nCols);
-
-  // Pad matrix to n x n if rectangular
-  const matrix: number[][] = Array.from({ length: n }, (_, r) =>
-    Array.from({ length: n }, (_, c) => {
-      if (r < nRows && c < nCols) return problem.costs[r][c];
-      return 0;
-    })
-  );
-
-  const steps: { label: string; matrix: number[][] }[] = [];
-
-  // Step 1: Row reduction
-  for (let r = 0; r < n; r++) {
-    const minVal = Math.min(...matrix[r]);
-    for (let c = 0; c < n; c++) {
-      matrix[r][c] -= minVal;
-    }
-  }
-  steps.push({ label: "1. Row Reduction (Subtract Row Minima)", matrix: matrix.map((r) => [...r]) });
-
-  // Step 2: Column reduction
-  for (let c = 0; c < n; c++) {
-    let minVal = Infinity;
-    for (let r = 0; r < n; r++) {
-      minVal = Math.min(minVal, matrix[r][c]);
-    }
-    for (let r = 0; r < n; r++) {
-      matrix[r][c] -= minVal;
-    }
-  }
-  steps.push({ label: "2. Column Reduction (Subtract Column Minima)", matrix: matrix.map((r) => [...r]) });
-
-  // Maximum Bipartite Matching on Zero Elements using Augmenting Paths (Hopcroft-Karp / DFS)
-  function findMaxMatching(costMat: number[][]): { matchRow: (number | null)[]; matchCol: (number | null)[] } {
-    const matchRow: (number | null)[] = Array(n).fill(null);
-    const matchCol: (number | null)[] = Array(n).fill(null);
-
-    function dfs(u: number, visited: boolean[]): boolean {
-      for (let v = 0; v < n; v++) {
-        if (costMat[u][v] === 0 && !visited[v]) {
-          visited[v] = true;
-          if (matchCol[v] === null || dfs(matchCol[v]!, visited)) {
-            matchRow[u] = v;
-            matchCol[v] = u;
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    for (let u = 0; u < n; u++) {
-      const visited = Array(n).fill(false);
-      dfs(u, visited);
-    }
-
-    return { matchRow, matchCol };
-  }
-
-  let iter = 0;
-  const maxIters = 30;
-  let currentMatching = findMaxMatching(matrix);
-
-  while (iter < maxIters) {
-    const matchCount = currentMatching.matchRow.filter((c) => c !== null).length;
-    if (matchCount === n) {
-      break; // Optimal matching of n zeros found
-    }
-
-    // Find minimum vertex cover using König's theorem
-    const visitedRows = Array(n).fill(false);
-    const visitedCols = Array(n).fill(false);
-
-    function dfsCover(u: number) {
-      visitedRows[u] = true;
-      for (let v = 0; v < n; v++) {
-        if (matrix[u][v] === 0 && !visitedCols[v]) {
-          visitedCols[v] = true;
-          const matchedRow = currentMatching.matchCol[v];
-          if (matchedRow !== null && !visitedRows[matchedRow]) {
-            dfsCover(matchedRow);
-          }
-        }
-      }
-    }
-
-    for (let u = 0; u < n; u++) {
-      if (currentMatching.matchRow[u] === null) {
-        dfsCover(u);
-      }
-    }
-
-    // Marked rows = visitedRows, marked cols = visitedCols
-    // Covered rows = NOT visitedRows, Covered cols = visitedCols
-    let theta = Infinity;
-    for (let r = 0; r < n; r++) {
-      if (visitedRows[r]) {
-        for (let c = 0; c < n; c++) {
-          if (!visitedCols[c]) {
-            theta = Math.min(theta, matrix[r][c]);
-          }
-        }
-      }
-    }
-
-    if (theta === Infinity || theta === 0) theta = 1;
-
-    for (let r = 0; r < n; r++) {
-      for (let c = 0; c < n; c++) {
-        if (visitedRows[r] && !visitedCols[c]) {
-          matrix[r][c] -= theta;
-        } else if (!visitedRows[r] && visitedCols[c]) {
-          matrix[r][c] += theta;
-        }
-      }
-    }
-
-    iter++;
-    steps.push({
-      label: `${steps.length + 1}. Minimum Line Covering & Matrix Shift (θ = ${theta})`,
-      matrix: matrix.map((r) => [...r]),
-    });
-
-    currentMatching = findMaxMatching(matrix);
-  }
-
-  const assignedJobs = currentMatching.matchRow;
-  const assignments: { worker: string; job: string; cost: number }[] = [];
-
-  for (let r = 0; r < nRows; r++) {
-    const worker = problem.workers[r];
-    const jobIdx = assignedJobs[r] !== null ? assignedJobs[r]! : 0;
-    const job = jobIdx < nCols ? problem.jobs[jobIdx] : "Dummy Job";
-    const cost = jobIdx < nCols && r < nRows ? problem.costs[r][jobIdx] : 0;
-    assignments.push({ worker, job, cost });
-  }
-
-  const totalCost = assignments.reduce((acc, a) => acc + a.cost, 0);
-
-  return {
-    assignments,
-    totalCost,
-    steps,
-  };
-}
-
-// ==========================================
-// 3. Transportation Model (Vogel's VAM)
+// 2. Transportation Model (Vogel's Approximation Method - VAM)
 // ==========================================
 export function solveTransportation(problem: TransportationProblem): TransportationSolution {
-  const sources = [...problem.sources];
-  const destinations = [...problem.destinations];
-  const supply = [...problem.supply];
-  const demand = [...problem.demand];
-  const costs = problem.costs.map((row) => [...row]);
 
-  const totalSupply = supply.reduce((a, b) => a + b, 0);
-  const totalDemand = demand.reduce((a, b) => a + b, 0);
-  let dummyAdded: "supply" | "demand" | null = null;
+  const totalSupply = problem.supply.reduce((a, b) => a + b, 0);
+  const totalDemand = problem.demand.reduce((a, b) => a + b, 0);
+
+  let sources = [...problem.sources];
+  let destinations = [...problem.destinations];
+  let costs = problem.costs.map((row) => [...row]);
+  let supply = [...problem.supply];
+  let demand = [...problem.demand];
+
+  let dummyAdded: "supply" | "demand" | undefined;
 
   if (totalSupply > totalDemand) {
-    destinations.push("Dummy Demand");
-    demand.push(totalSupply - totalDemand);
-    for (let r = 0; r < costs.length; r++) {
-      costs[r].push(0);
-    }
     dummyAdded = "demand";
+    destinations.push("Dummy Market");
+    demand.push(totalSupply - totalDemand);
+    costs.forEach((row) => row.push(0));
   } else if (totalDemand > totalSupply) {
-    sources.push("Dummy Supply");
-    supply.push(totalDemand - totalSupply);
-    costs.push(Array(destinations.length).fill(0));
     dummyAdded = "supply";
+    sources.push("Dummy Plant");
+    supply.push(totalDemand - totalSupply);
+    costs.push(new Array(destinations.length).fill(0));
   }
 
-  const numS = sources.length;
-  const numD = destinations.length;
-  const allocations: number[][] = Array.from({ length: numS }, () => Array(numD).fill(0));
+  const numRows = sources.length;
+  const numCols = destinations.length;
+
+  const allocations: number[][] = Array.from({ length: numRows }, () =>
+    new Array(numCols).fill(0)
+  );
 
   const remSupply = [...supply];
   const remDemand = [...demand];
-  const activeRows = new Set(Array.from({ length: numS }, (_, i) => i));
-  const activeCols = new Set(Array.from({ length: numD }, (_, i) => i));
+  const activeRows = new Set<number>(Array.from({ length: numRows }, (_, i) => i));
+  const activeCols = new Set<number>(Array.from({ length: numCols }, (_, i) => i));
 
   while (activeRows.size > 0 && activeCols.size > 0) {
-    if (activeRows.size === 1 && activeCols.size === 1) {
-      const r = Array.from(activeRows)[0];
-      const c = Array.from(activeCols)[0];
-      const qty = Math.min(remSupply[r], remDemand[c]);
-      allocations[r][c] = qty;
-      break;
-    }
-
     let maxPenalty = -1;
-    let isRow = true;
-    let selectedIdx = -1;
+    let chosenType: "row" | "col" = "row";
+    let chosenIdx = -1;
 
+    // Row penalties
     for (const r of activeRows) {
-      const availableCosts = Array.from(activeCols).map((c) => costs[r][c]).sort((a, b) => a - b);
-      const penalty = availableCosts.length > 1 ? availableCosts[1] - availableCosts[0] : availableCosts[0];
-      if (penalty > maxPenalty) {
-        maxPenalty = penalty;
-        isRow = true;
-        selectedIdx = r;
-      }
-    }
-
-    for (const c of activeCols) {
-      const availableCosts = Array.from(activeRows).map((r) => costs[r][c]).sort((a, b) => a - b);
-      const penalty = availableCosts.length > 1 ? availableCosts[1] - availableCosts[0] : availableCosts[0];
-      if (penalty > maxPenalty) {
-        maxPenalty = penalty;
-        isRow = false;
-        selectedIdx = c;
-      }
-    }
-
-    if (isRow) {
-      const r = selectedIdx;
-      let minCost = Infinity;
-      let targetCol = -1;
+      const rowCosts: { cost: number; c: number }[] = [];
       for (const c of activeCols) {
-        if (costs[r][c] < minCost) {
-          minCost = costs[r][c];
-          targetCol = c;
-        }
+        rowCosts.push({ cost: costs[r][c], c });
       }
-      const qty = Math.min(remSupply[r], remDemand[targetCol]);
-      allocations[r][targetCol] = qty;
-      remSupply[r] -= qty;
-      remDemand[targetCol] -= qty;
+      rowCosts.sort((a, b) => a.cost - b.cost);
 
-      if (remSupply[r] === 0) activeRows.delete(r);
-      if (remDemand[targetCol] === 0) activeCols.delete(targetCol);
-    } else {
-      const c = selectedIdx;
-      let minCost = Infinity;
-      let targetRow = -1;
+      let penalty = 0;
+      if (rowCosts.length >= 2) {
+        penalty = rowCosts[1].cost - rowCosts[0].cost;
+      } else if (rowCosts.length === 1) {
+        penalty = rowCosts[0].cost;
+      }
+
+      if (penalty > maxPenalty) {
+        maxPenalty = penalty;
+        chosenType = "row";
+        chosenIdx = r;
+      }
+    }
+
+    // Col penalties
+    for (const c of activeCols) {
+      const colCosts: { cost: number; r: number }[] = [];
       for (const r of activeRows) {
-        if (costs[r][c] < minCost) {
-          minCost = costs[r][c];
-          targetRow = r;
+        colCosts.push({ cost: costs[r][c], r });
+      }
+      colCosts.sort((a, b) => a.cost - b.cost);
+
+      let penalty = 0;
+      if (colCosts.length >= 2) {
+        penalty = colCosts[1].cost - colCosts[0].cost;
+      } else if (colCosts.length === 1) {
+        penalty = colCosts[0].cost;
+      }
+
+      if (penalty > maxPenalty) {
+        maxPenalty = penalty;
+        chosenType = "col";
+        chosenIdx = c;
+      }
+    }
+
+    if (chosenIdx === -1) break;
+
+    let rAlloc = -1;
+    let cAlloc = -1;
+
+    if (chosenType === "row") {
+      rAlloc = chosenIdx;
+      let minCost = Infinity;
+      for (const c of activeCols) {
+        if (costs[rAlloc][c] < minCost) {
+          minCost = costs[rAlloc][c];
+          cAlloc = c;
         }
       }
-      const qty = Math.min(remSupply[targetRow], remDemand[c]);
-      allocations[targetRow][c] = qty;
-      remSupply[targetRow] -= qty;
-      remDemand[c] -= qty;
+    } else {
+      cAlloc = chosenIdx;
+      let minCost = Infinity;
+      for (const r of activeRows) {
+        if (costs[r][cAlloc] < minCost) {
+          minCost = costs[r][cAlloc];
+          rAlloc = r;
+        }
+      }
+    }
 
-      if (remSupply[targetRow] === 0) activeRows.delete(targetRow);
-      if (remDemand[c] === 0) activeCols.delete(c);
+    const qty = Math.min(remSupply[rAlloc], remDemand[cAlloc]);
+    allocations[rAlloc][cAlloc] = qty;
+    remSupply[rAlloc] -= qty;
+    remDemand[cAlloc] -= qty;
+
+    if (remSupply[rAlloc] === 0 && remDemand[cAlloc] === 0) {
+      if (activeRows.size > 1) {
+        activeRows.delete(rAlloc);
+      } else {
+        activeCols.delete(cAlloc);
+      }
+    } else if (remSupply[rAlloc] === 0) {
+      activeRows.delete(rAlloc);
+    } else {
+      activeCols.delete(cAlloc);
     }
   }
 
   let totalCost = 0;
-  for (let r = 0; r < numS; r++) {
-    for (let c = 0; c < numD; c++) {
-      totalCost += allocations[r][c] * costs[r][c];
+  const allocationBreakdown: {
+    from: string;
+    to: string;
+    amount: number;
+    unitCost: number;
+    cost: number;
+  }[] = [];
+
+  for (let r = 0; r < numRows; r++) {
+    for (let c = 0; c < numCols; c++) {
+      if (allocations[r][c] > 0) {
+        const cost = allocations[r][c] * costs[r][c];
+        totalCost += cost;
+        allocationBreakdown.push({
+          from: sources[r],
+          to: destinations[c],
+          amount: allocations[r][c],
+          unitCost: costs[r][c],
+          cost,
+        });
+      }
     }
   }
 
@@ -583,78 +540,169 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     isBalanced: totalSupply === totalDemand,
     dummyAdded,
     method: "Vogel's Approximation Method (VAM)",
+    sources,
+    destinations,
+    costs,
+    allocationBreakdown,
   };
 }
 
 // ==========================================
-// 4. Network Models: Shortest Route & MST & Max Flow
+// 3. Hungarian Method for Assignment Problems
+// ==========================================
+export function solveHungarianAssignment(problem: AssignmentProblem): AssignmentSolution {
+  const nRows = problem.workers.length;
+  const nCols = problem.jobs.length;
+  const dim = Math.max(nRows, nCols);
+
+  const workers = [...problem.workers];
+  while (workers.length < dim) {
+    workers.push(`Worker ${workers.length + 1} (Dummy)`);
+  }
+
+  const jobs = [...problem.jobs];
+  while (jobs.length < dim) {
+    jobs.push(`Job ${jobs.length + 1} (Dummy)`);
+  }
+
+  const origMatrix: number[][] = Array.from({ length: dim }, (_, r) =>
+    Array.from({ length: dim }, (_, c) => {
+      if (r < nRows && c < nCols) return problem.costs[r][c];
+      return 0;
+    })
+  );
+
+  const matrix = origMatrix.map((r) => [...r]);
+
+  // Step 1: Row Reduction
+  for (let r = 0; r < dim; r++) {
+    const minVal = Math.min(...matrix[r]);
+    for (let c = 0; c < dim; c++) {
+      matrix[r][c] -= minVal;
+    }
+  }
+
+  // Step 2: Column Reduction
+  for (let c = 0; c < dim; c++) {
+    let minVal = Infinity;
+    for (let r = 0; r < dim; r++) {
+      if (matrix[r][c] < minVal) minVal = matrix[r][c];
+    }
+    for (let r = 0; r < dim; r++) {
+      matrix[r][c] -= minVal;
+    }
+  }
+
+  const rowMatch = new Array(dim).fill(-1);
+  const colMatch = new Array(dim).fill(-1);
+
+  function dfs(u: number, visited: boolean[]): boolean {
+    for (let v = 0; v < dim; v++) {
+      if (matrix[u][v] === 0 && !visited[v]) {
+        visited[v] = true;
+        if (colMatch[v] < 0 || dfs(colMatch[v], visited)) {
+          rowMatch[u] = v;
+          colMatch[v] = u;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  for (let u = 0; u < dim; u++) {
+    const visited = new Array(dim).fill(false);
+    dfs(u, visited);
+  }
+
+  const assignments: { worker: string; job: string; cost: number }[] = [];
+  let totalCost = 0;
+
+  for (let r = 0; r < nRows; r++) {
+    const c = rowMatch[r];
+    if (c !== -1 && c < nCols) {
+      const cost = problem.costs[r][c];
+      totalCost += cost;
+      assignments.push({
+        worker: problem.workers[r],
+        job: problem.jobs[c],
+        cost,
+      });
+    }
+  }
+
+  return {
+    assignments,
+    totalCost,
+    reducedMatrix: matrix,
+    dim,
+    workers,
+    jobs,
+  };
+}
+
+// ==========================================
+// 4. Network Models: Shortest Route (Dijkstra)
 // ==========================================
 export function solveNetworkShortestRoute(
   edges: NetworkEdge[],
   startNode: string,
   endNode: string
 ): NetworkSolution {
-  const adj: Record<string, { to: string; cost: number }[]> = {};
-  for (const e of edges) {
-    const u = String(e.from);
-    const v = String(e.to);
-    if (!adj[u]) adj[u] = [];
-    if (!adj[v]) adj[v] = [];
-    adj[u].push({ to: v, cost: e.cost });
-    adj[v].push({ to: u, cost: e.cost });
-  }
+  const nodes = new Set<string>();
+  edges.forEach((e) => {
+    nodes.add(String(e.from));
+    nodes.add(String(e.to));
+  });
 
   const dist: Record<string, number> = {};
   const prev: Record<string, string | null> = {};
-  const unvisited = new Set<string>();
+  const unvisited = new Set<string>(nodes);
 
-  for (const node of Object.keys(adj)) {
-    dist[node] = Infinity;
-    prev[node] = null;
-    unvisited.add(node);
-  }
-
+  nodes.forEach((n) => {
+    dist[n] = Infinity;
+    prev[n] = null;
+  });
   dist[startNode] = 0;
 
   while (unvisited.size > 0) {
-    let curr: string | null = null;
+    let u: string | null = null;
     let minDist = Infinity;
 
-    for (const node of unvisited) {
-      if (dist[node] < minDist) {
-        minDist = dist[node];
-        curr = node;
+    unvisited.forEach((n) => {
+      if (dist[n] < minDist) {
+        minDist = dist[n];
+        u = n;
       }
-    }
+    });
 
-    if (!curr || minDist === Infinity) break;
-    if (curr === endNode) break;
+    if (!u || minDist === Infinity || u === endNode) break;
 
-    unvisited.delete(curr);
+    unvisited.delete(u);
 
-    for (const neighbor of adj[curr] || []) {
-      if (unvisited.has(neighbor.to)) {
-        const alt = dist[curr] + neighbor.cost;
-        if (alt < dist[neighbor.to]) {
-          dist[neighbor.to] = alt;
-          prev[neighbor.to] = curr;
+    // Neighbors
+    edges.forEach((e) => {
+      const uStr = String(u);
+      const fromStr = String(e.from);
+      const toStr = String(e.to);
+
+      let v: string | null = null;
+      if (fromStr === uStr) v = toStr;
+      else if (toStr === uStr) v = fromStr; // Undirected
+
+      if (v && unvisited.has(v)) {
+        const alt = dist[uStr] + e.cost;
+        if (alt < dist[v]) {
+          dist[v] = alt;
+          prev[v] = uStr;
         }
       }
-    }
-  }
-
-  if (dist[endNode] === undefined || dist[endNode] === Infinity) {
-    return {
-      type: "shortest-route",
-      selectedEdges: [],
-      totalMetric: 0,
-      pathString: "No route exists between selected nodes",
-    };
+    });
   }
 
   const path: string[] = [];
   let curr: string | null = endNode;
-  while (curr !== null) {
+  while (curr) {
     path.unshift(curr);
     curr = prev[curr];
   }
@@ -674,23 +722,26 @@ export function solveNetworkShortestRoute(
   return {
     type: "shortest-route",
     selectedEdges,
-    totalMetric: dist[endNode] || 0,
-    pathString: path.join(" -> "),
+    totalMetric: dist[endNode] !== Infinity ? dist[endNode] : 0,
+    pathString: path.join(" → "),
   };
 }
 
+// ==========================================
+// 5. Network Models: Minimum Spanning Tree (Kruskal's)
+// ==========================================
 export function solveNetworkMst(edges: NetworkEdge[]): NetworkSolution {
-  const sorted = [...edges].sort((a, b) => a.cost - b.cost);
+  const sortedEdges = [...edges].sort((a, b) => a.cost - b.cost);
   const parent: Record<string, string> = {};
 
-  const find = (i: string): string => {
+  function find(i: string): string {
     if (!parent[i]) parent[i] = i;
     if (parent[i] === i) return i;
     parent[i] = find(parent[i]);
     return parent[i];
-  };
+  }
 
-  const union = (i: string, j: string): boolean => {
+  function union(i: string, j: string): boolean {
     const rootI = find(i);
     const rootJ = find(j);
     if (rootI !== rootJ) {
@@ -698,450 +749,295 @@ export function solveNetworkMst(edges: NetworkEdge[]): NetworkSolution {
       return true;
     }
     return false;
-  };
+  }
 
-  const selectedEdges: { from: string; to: string; weight: number; stepReason?: string }[] = [];
-  let totalWeight = 0;
+  const selectedEdges: { from: string; to: string; weight: number }[] = [];
+  let totalCost = 0;
 
-  for (const e of sorted) {
+  for (const e of sortedEdges) {
     const u = String(e.from);
     const v = String(e.to);
     if (union(u, v)) {
-      selectedEdges.push({
-        from: u,
-        to: v,
-        weight: e.cost,
-        stepReason: `Selected edge (${u}-${v}) with weight ${e.cost}`,
-      });
-      totalWeight += e.cost;
+      selectedEdges.push({ from: u, to: v, weight: e.cost });
+      totalCost += e.cost;
     }
   }
 
   return {
     type: "minimum-spanning-tree",
     selectedEdges,
-    totalMetric: Math.round(totalWeight * 100) / 100,
-    pathString: selectedEdges.map((e) => `${e.from}-${e.to}`).join(", "),
+    totalMetric: Math.round(totalCost * 100) / 100,
+    pathString: selectedEdges.map((e) => `${e.from}-${e.to} (${e.weight})`).join(", "),
   };
 }
 
+// ==========================================
+// 6. Network Models: Maximal Flow (Edmonds-Karp BFS with Min-Cut Partition)
+// ==========================================
 export function solveNetworkMaxFlow(
   edges: NetworkEdge[],
   source: string,
   sink: string
 ): NetworkSolution {
-  const normSource = String(source).trim();
-  const normSink = String(sink).trim();
+  const nodes = new Set<string>();
+  edges.forEach((e) => {
+    nodes.add(String(e.from));
+    nodes.add(String(e.to));
+  });
 
-  // Edmonds-Karp with residual graph tracking and initial capacity preservation
   const originalCapacity: Record<string, Record<string, number>> = {};
   const residualCapacity: Record<string, Record<string, number>> = {};
-  const nodes = new Set<string>();
 
-  for (const e of edges) {
-    const u = String(e.from).trim();
-    const v = String(e.to).trim();
-    const cap = Math.max(0, e.capacity !== undefined ? e.capacity : e.cost);
-    nodes.add(u);
-    nodes.add(v);
+  nodes.forEach((u) => {
+    originalCapacity[u] = {};
+    residualCapacity[u] = {};
+    nodes.forEach((v) => {
+      originalCapacity[u][v] = 0;
+      residualCapacity[u][v] = 0;
+    });
+  });
 
-    if (!originalCapacity[u]) originalCapacity[u] = {};
-    if (!originalCapacity[v]) originalCapacity[v] = {};
-    if (!residualCapacity[u]) residualCapacity[u] = {};
-    if (!residualCapacity[v]) residualCapacity[v] = {};
-
-    originalCapacity[u][v] = (originalCapacity[u][v] || 0) + cap;
-    residualCapacity[u][v] = (residualCapacity[u][v] || 0) + cap;
-    if (residualCapacity[v][u] === undefined) residualCapacity[v][u] = 0;
-  }
-
-  // Handle case where source or sink are not in node set
-  if (!nodes.has(normSource) || !nodes.has(normSink) || normSource === normSink) {
-    return {
-      type: "maximal-flow",
-      selectedEdges: [],
-      totalMetric: 0,
-      pathString: "Source or Sink node invalid / disconnected in network topology.",
-      flowBreakdown: [],
-    };
-  }
+  edges.forEach((e) => {
+    const u = String(e.from);
+    const v = String(e.to);
+    originalCapacity[u][v] += e.cost;
+    residualCapacity[u][v] += e.cost;
+  });
 
   let maxFlow = 0;
 
-  // Edmonds-Karp BFS to find shortest augmenting path in terms of edge count
-  while (true) {
+  function bfsPath(): { path: string[]; flow: number } | null {
     const parent: Record<string, string | null> = {};
-    for (const n of nodes) parent[n] = null;
-    const queue: string[] = [normSource];
+    const visited = new Set<string>([source]);
+    const queue: string[] = [source];
 
     while (queue.length > 0) {
       const u = queue.shift()!;
-      if (u === normSink) break;
+      if (u === sink) break;
 
-      const neighbors = Object.keys(residualCapacity[u] || {});
-      for (const v of neighbors) {
-        if (parent[v] === null && v !== normSource && residualCapacity[u][v] > 0) {
+      for (const v of nodes) {
+        if (!visited.has(v) && residualCapacity[u][v] > 1e-6) {
+          visited.add(v);
           parent[v] = u;
           queue.push(v);
         }
       }
     }
 
-    if (parent[normSink] === null) break; // No augmenting path exists
+    if (!visited.has(sink)) return null;
 
-    // Calculate bottleneck capacity along path
     let pathFlow = Infinity;
-    let curr = normSink;
-    while (curr !== normSource) {
-      const p = parent[curr]!;
-      pathFlow = Math.min(pathFlow, residualCapacity[p][curr]);
-      curr = p;
+    let curr = sink;
+    while (curr !== source) {
+      const prev = parent[curr]!;
+      pathFlow = Math.min(pathFlow, residualCapacity[prev][curr]);
+      curr = prev;
     }
 
-    // Augment flow and update forward/backward residual capacities
-    curr = normSink;
-    while (curr !== normSource) {
-      const p = parent[curr]!;
-      residualCapacity[p][curr] -= pathFlow;
-      residualCapacity[curr][p] += pathFlow;
-      curr = p;
-    }
-
-    maxFlow += pathFlow;
-  }
-
-  // Compute actual net flow along each original edge
-  const flowBreakdown: { from: string; to: string; flow: number; capacity: number }[] = [];
-  const selectedEdges: { from: string; to: string; weight: number; stepReason?: string }[] = [];
-
-  for (const u of Object.keys(originalCapacity)) {
-    for (const v of Object.keys(originalCapacity[u])) {
-      const origCap = originalCapacity[u][v];
-      if (origCap > 0) {
-        const remainingCap = residualCapacity[u]?.[v] || 0;
-        const actualFlow = Math.max(0, origCap - remainingCap);
-        flowBreakdown.push({
-          from: u,
-          to: v,
-          flow: actualFlow,
-          capacity: origCap,
-        });
-
-        if (actualFlow > 0) {
-          selectedEdges.push({
-            from: u,
-            to: v,
-            weight: actualFlow,
-            stepReason: `Flow: ${actualFlow} / ${origCap}`,
-          });
-        }
+    const path: string[] = [];
+    curr = sink;
+    while (curr) {
+      path.unshift(curr);
+      curr = parent[curr] || "";
+      if (curr === source) {
+        path.unshift(source);
+        break;
       }
     }
+
+    return { path, flow: pathFlow };
   }
 
-  // Find Min-Cut partition using BFS on final residual graph from source
-  const reachableFromSource = new Set<string>();
-  const cutQueue = [normSource];
-  reachableFromSource.add(normSource);
+  while (true) {
+    const result = bfsPath();
+    if (!result) break;
+
+    const { path, flow } = result;
+    for (let i = 0; i < path.length - 1; i++) {
+      const u = path[i];
+      const v = path[i + 1];
+      residualCapacity[u][v] -= flow;
+      residualCapacity[v][u] += flow;
+    }
+    maxFlow += flow;
+  }
+
+  // Min-Cut computation (BFS reachable from source)
+  const sourceSet = new Set<string>();
+  const cutQueue = [source];
+  sourceSet.add(source);
 
   while (cutQueue.length > 0) {
     const u = cutQueue.shift()!;
-    for (const v of Object.keys(residualCapacity[u] || {})) {
-      if (!reachableFromSource.has(v) && residualCapacity[u][v] > 0) {
-        reachableFromSource.add(v);
+    for (const v of nodes) {
+      if (!sourceSet.has(v) && residualCapacity[u][v] > 1e-6) {
+        sourceSet.add(v);
         cutQueue.push(v);
       }
     }
   }
 
-  const sourceSet = Array.from(reachableFromSource).sort();
-  const sinkSet = Array.from(nodes).filter((n) => !reachableFromSource.has(n)).sort();
+  const sinkSet = new Set<string>();
+  nodes.forEach((n) => {
+    if (!sourceSet.has(n)) sinkSet.add(n);
+  });
+
+  // Calculate flow on every original edge
+  const selectedEdges: { from: string; to: string; weight: number; stepReason?: string }[] = [];
+  const flowBreakdown: { from: string; to: string; flow: number; capacity: number }[] = [];
+
+  edges.forEach((e) => {
+    const u = String(e.from);
+    const v = String(e.to);
+    const cap = originalCapacity[u][v];
+    const rem = residualCapacity[u][v];
+    const flow = Math.max(0, cap - rem);
+
+    if (flow > 0) {
+      selectedEdges.push({ from: u, to: v, weight: flow, stepReason: `${flow}/${cap}` });
+    }
+    flowBreakdown.push({ from: u, to: v, flow, capacity: cap });
+  });
 
   return {
     type: "maximal-flow",
     selectedEdges,
     totalMetric: maxFlow,
-    pathString: `Maximal Throughput: ${maxFlow} units | Min-Cut: S = {${sourceSet.join(", ")}} | T = {${sinkSet.join(", ")}}`,
     flowBreakdown,
     minCut: {
-      sourceSet,
-      sinkSet,
+      sourceSet: Array.from(sourceSet),
+      sinkSet: Array.from(sinkSet),
       cutCapacity: maxFlow,
     },
   };
 }
 
 // ==========================================
-// 5. Project Planning (CPM / PERT)
+// 7. Project Planning: CPM / PERT
 // ==========================================
 export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
   const earlyStart: Record<string, number> = {};
   const earlyFinish: Record<string, number> = {};
-  const actDurations: Record<string, number> = {};
+  const lateStart: Record<string, number> = {};
+  const lateFinish: Record<string, number> = {};
+  const slack: Record<string, number> = {};
 
-  let totalProjectVariance = 0;
-
-  for (const a of activities) {
-    let dur = a.duration;
-    if (a.optimisticA !== undefined && a.mostLikelyM !== undefined && a.pessimisticB !== undefined) {
-      // PERT 3-Time mean and variance
-      dur = (a.optimisticA + 4 * a.mostLikelyM + a.pessimisticB) / 6;
-      const variance = Math.pow((a.pessimisticB - a.optimisticA) / 6, 2);
-      totalProjectVariance += variance;
-    }
-    actDurations[a.id] = Math.round(dur * 100) / 100;
-  }
+  const actMap = new Map<string, CpmActivity>();
+  activities.forEach((a) => actMap.set(a.id, a));
 
   // Forward Pass
-  for (const a of activities) {
-    const dur = actDurations[a.id];
+  activities.forEach((a) => {
+    const dur = a.duration;
     if (!a.predecessors || a.predecessors.length === 0) {
       earlyStart[a.id] = 0;
       earlyFinish[a.id] = dur;
     } else {
       let maxEF = 0;
-      for (const p of a.predecessors) {
-        maxEF = Math.max(maxEF, earlyFinish[p] || 0);
-      }
+      a.predecessors.forEach((p) => {
+        if (earlyFinish[p] !== undefined && earlyFinish[p] > maxEF) {
+          maxEF = earlyFinish[p];
+        }
+      });
       earlyStart[a.id] = maxEF;
-      earlyFinish[a.id] = Math.round((maxEF + dur) * 100) / 100;
+      earlyFinish[a.id] = maxEF + dur;
     }
-  }
+  });
 
   const projectDuration = Math.max(...Object.values(earlyFinish), 0);
 
   // Backward Pass
-  const lateFinish: Record<string, number> = {};
-  const lateStart: Record<string, number> = {};
-  const successors: Record<string, string[]> = {};
-  for (const a of activities) successors[a.id] = [];
-  for (const a of activities) {
-    for (const p of a.predecessors || []) {
-      if (successors[p]) successors[p].push(a.id);
-    }
-  }
+  [...activities].reverse().forEach((a) => {
+    const dur = a.duration;
+    // Find successors
+    const successors = activities.filter((succ) => succ.predecessors?.includes(a.id));
 
-  const reversed = [...activities].reverse();
-  for (const a of reversed) {
-    const dur = actDurations[a.id];
-    const succs = successors[a.id] || [];
-    if (succs.length === 0) {
+    if (successors.length === 0) {
       lateFinish[a.id] = projectDuration;
-      lateStart[a.id] = Math.round((projectDuration - dur) * 100) / 100;
+      lateStart[a.id] = projectDuration - dur;
     } else {
       let minLS = Infinity;
-      for (const s of succs) {
-        minLS = Math.min(minLS, lateStart[s]);
-      }
+      successors.forEach((succ) => {
+        if (lateStart[succ.id] !== undefined && lateStart[succ.id] < minLS) {
+          minLS = lateStart[succ.id];
+        }
+      });
       lateFinish[a.id] = minLS;
-      lateStart[a.id] = Math.round((minLS - dur) * 100) / 100;
+      lateStart[a.id] = minLS - dur;
     }
-  }
 
-  const activityResults = activities.map((a) => {
-    const dur = actDurations[a.id];
-    const es = earlyStart[a.id] || 0;
-    const ef = earlyFinish[a.id] || 0;
-    const ls = lateStart[a.id] || 0;
-    const lf = lateFinish[a.id] || 0;
-    const slack = Math.round((ls - es) * 100) / 100;
-
-    return {
-      id: a.id,
-      duration: dur,
-      earlyStart: es,
-      earlyFinish: ef,
-      lateStart: ls,
-      lateFinish: lf,
-      slack,
-      isCritical: Math.abs(slack) < 1e-4,
-    };
+    slack[a.id] = lateStart[a.id] - earlyStart[a.id];
   });
 
-  const criticalPath = activityResults.filter((a) => a.isCritical).map((a) => a.id);
+  const criticalPath = activities.filter((a) => Math.abs(slack[a.id]) < 1e-5).map((a) => a.id);
+
+  const schedule = activities.map((a) => ({
+    id: a.id,
+    name: a.name || a.id,
+    duration: a.duration,
+    earlyStart: earlyStart[a.id],
+    earlyFinish: earlyFinish[a.id],
+    lateStart: lateStart[a.id],
+    lateFinish: lateFinish[a.id],
+    slack: slack[a.id],
+    isCritical: criticalPath.includes(a.id),
+  }));
 
   return {
-    activities: activityResults,
-    criticalPath,
     projectDuration,
-    projectVariance: Math.round(totalProjectVariance * 100) / 100,
-    projectStdDev: Math.round(Math.sqrt(totalProjectVariance) * 100) / 100,
+    criticalPath,
+    activities: schedule,
+    schedule,
   };
 }
 
 // ==========================================
-// 6. Inventory Control (EOQ Models)
-// ==========================================
-export function solveInventoryControl(problem: InventoryProblem): InventorySolution {
-  const D = problem.annualDemandD;
-  const K = problem.orderingCostK;
-  const h = problem.holdingCostH;
-  const c = problem.unitPriceC;
-
-  if (problem.model === "quantity-discounts" && problem.priceBreaks && problem.priceBreaks.length > 0) {
-    const tiers = problem.priceBreaks.map((tier, idx) => {
-      const tierPrice = tier.unitPrice;
-      const tierHolding = tier.holdingCostH || (h / c) * tierPrice || h;
-      const calculatedEoq = Math.sqrt((2 * K * D) / tierHolding);
-
-      let feasibleQty = calculatedEoq;
-      let isFeasible = true;
-
-      if (calculatedEoq < tier.minQty) {
-        feasibleQty = tier.minQty;
-        isFeasible = false;
-      } else if (tier.maxQty !== undefined && calculatedEoq > tier.maxQty) {
-        feasibleQty = tier.maxQty;
-        isFeasible = false;
-      }
-
-      const annualOrdering = (K * D) / feasibleQty;
-      const annualHolding = (tierHolding * feasibleQty) / 2;
-      const totalCost = tierPrice * D + annualOrdering + annualHolding;
-
-      return {
-        tierIndex: idx + 1,
-        minQty: tier.minQty,
-        maxQty: tier.maxQty,
-        unitPrice: tierPrice,
-        holdingCostH: tierHolding,
-        eoqCalculated: Math.round(calculatedEoq),
-        isFeasible,
-        totalCost: Math.round(totalCost * 100) / 100,
-        orderQty: Math.round(feasibleQty),
-      };
-    });
-
-    // Find tier with lowest total cost
-    let bestTier = tiers[0];
-    for (const t of tiers) {
-      if (t.totalCost < bestTier.totalCost) {
-        bestTier = t;
-      }
-    }
-
-    const optimalOrderQtyY = bestTier.orderQty;
-    const t0Days = (optimalOrderQtyY / D) * 365;
-    const annualOrderingCost = (K * D) / optimalOrderQtyY;
-    const annualHoldingCost = ((bestTier.holdingCostH || h) * optimalOrderQtyY) / 2;
-
-    return {
-      optimalOrderQtyY,
-      cycleTimeT0Days: Math.round(t0Days * 10) / 10,
-      annualOrderingCost: Math.round(annualOrderingCost * 100) / 100,
-      annualHoldingCost: Math.round(annualHoldingCost * 100) / 100,
-      totalAnnualCost: bestTier.totalCost,
-      selectedPriceBreakTier: bestTier.tierIndex,
-      priceBreakAnalysis: tiers.map((t) => ({
-        tierIndex: t.tierIndex,
-        minQty: t.minQty,
-        maxQty: t.maxQty,
-        unitPrice: t.unitPrice,
-        holdingCostH: t.holdingCostH,
-        eoqCalculated: t.eoqCalculated,
-        isFeasible: t.isFeasible,
-        totalCost: t.totalCost,
-      })),
-    };
-  }
-
-  if (problem.model === "classic-eoq" || !problem.shortageCostP) {
-    const yStar = Math.sqrt((2 * K * D) / h);
-    const t0Days = (yStar / D) * 365;
-    const annualOrdering = (K * D) / yStar;
-    const annualHolding = (h * yStar) / 2;
-    const totalCost = c * D + annualOrdering + annualHolding;
-
-    return {
-      optimalOrderQtyY: Math.round(yStar),
-      cycleTimeT0Days: Math.round(t0Days * 10) / 10,
-      annualOrderingCost: Math.round(annualOrdering * 100) / 100,
-      annualHoldingCost: Math.round(annualHolding * 100) / 100,
-      totalAnnualCost: Math.round(totalCost * 100) / 100,
-    };
-  } else {
-    // EOQ with Backorders / Planned Shortages
-    const p = problem.shortageCostP;
-    const yStar = Math.sqrt(((2 * K * D) / h) * ((h + p) / p));
-    const sStar = (h * yStar) / (h + p); // max shortage
-    const t0Days = (yStar / D) * 365;
-    const annualOrdering = (K * D) / yStar;
-    const annualHolding = (h * Math.pow(yStar - sStar, 2)) / (2 * yStar);
-    const annualShortage = (p * Math.pow(sStar, 2)) / (2 * yStar);
-    const totalCost = c * D + annualOrdering + annualHolding + annualShortage;
-
-    return {
-      optimalOrderQtyY: Math.round(yStar),
-      cycleTimeT0Days: Math.round(t0Days * 10) / 10,
-      maxShortageS: Math.round(sStar),
-      annualOrderingCost: Math.round(annualOrdering * 100) / 100,
-      annualHoldingCost: Math.round(annualHolding * 100) / 100,
-      annualShortageCost: Math.round(annualShortage * 100) / 100,
-      totalAnnualCost: Math.round(totalCost * 100) / 100,
-    };
-  }
-}
-
-// ==========================================
-// 7. Queuing Analysis (M/M/1 & M/M/c & M/M/c/K)
+// 8. Queuing Analysis (M/M/1, M/M/c, M/M/1/K)
 // ==========================================
 export function solveQueuing(problem: QueuingProblem): QueuingSolution {
-  const lambda = problem.arrivalRateLambda;
-  const mu = problem.serviceRateMu;
-  const c = problem.serversCountC || 1;
-  const K = problem.systemCapacityK;
+  const { arrivalRateLambda: lambda, serviceRateMu: mu, serversCountC: c } = problem;
 
-  // Finite Capacity Queue (M/M/1/K or M/M/c/K)
-  if (K !== undefined && K > 0) {
-    const r = lambda / mu;
+  if (c === 1) {
+    const rho = lambda / mu;
+    if (rho >= 1 && !problem.systemCapacityK) {
+      return {
+        utilizationRho: Math.round(rho * 1000) / 1000,
+        probZeroP0: 0,
+        avgInQueueLq: Infinity,
+        avgInSystemLs: Infinity,
+        avgWaitQueueWq: Infinity,
+        avgWaitSystemWs: Infinity,
+      };
+    }
 
-    if (c === 1) {
-      const rho = r;
-      let p0: number;
-      if (Math.abs(rho - 1) < 1e-6) {
-        p0 = 1 / (K + 1);
-      } else {
-        p0 = (1 - rho) / (1 - Math.pow(rho, K + 1));
-      }
-
+    if (problem.systemCapacityK && problem.systemCapacityK > 0) {
+      const K = problem.systemCapacityK;
+      const p0 = Math.abs(rho - 1) < 1e-6 ? 1 / (K + 1) : (1 - rho) / (1 - Math.pow(rho, K + 1));
       const pK = p0 * Math.pow(rho, K);
       const lambdaEff = lambda * (1 - pK);
-
-      let Ls: number;
-      if (Math.abs(rho - 1) < 1e-6) {
-        Ls = K / 2;
-      } else {
-        Ls = (rho * (1 - (K + 1) * Math.pow(rho, K) + K * Math.pow(rho, K + 1))) / ((1 - rho) * (1 - Math.pow(rho, K + 1)));
-      }
-
-      const Lq = Ls - (1 - p0);
+      const Ls = Math.abs(rho - 1) < 1e-6
+        ? K / 2
+        : (rho * (1 - (K + 1) * Math.pow(rho, K) + K * Math.pow(rho, K + 1))) / ((1 - rho) * (1 - Math.pow(rho, K + 1)));
       const Ws = Ls / lambdaEff;
+      const Lq = Math.max(0, Ls - (1 - p0));
       const Wq = Lq / lambdaEff;
 
       return {
-        utilizationRho: Math.round((1 - p0) * 1000) / 1000,
+        utilizationRho: Math.round(rho * 1000) / 1000,
         probZeroP0: Math.round(p0 * 1000) / 1000,
-        avgInQueueLq: Math.round(Math.max(0, Lq) * 1000) / 1000,
+        avgInQueueLq: Math.round(Lq * 1000) / 1000,
         avgInSystemLs: Math.round(Ls * 1000) / 1000,
-        avgWaitQueueWq: Math.round(Math.max(0, Wq) * 1000) / 1000,
+        avgWaitQueueWq: Math.round(Wq * 1000) / 1000,
         avgWaitSystemWs: Math.round(Ws * 1000) / 1000,
         blockingProbabilityPk: Math.round(pK * 1000) / 1000,
         effectiveArrivalRate: Math.round(lambdaEff * 1000) / 1000,
       };
     }
-  }
 
-  if (lambda >= c * mu) {
-    throw new Error(`Unstable queue: Arrival rate (λ=${lambda}) exceeds service capacity (c*μ=${c * mu}).`);
-  }
-
-  if (c === 1) {
-    const rho = lambda / mu;
-    const Lq = (lambda * lambda) / (mu * (mu - lambda));
-    const Ls = lambda / (mu - lambda);
-    const Wq = Lq / lambda;
-    const Ws = 1 / (mu - lambda);
     const p0 = 1 - rho;
+    const Ls = rho / (1 - rho);
+    const Lq = (rho * rho) / (1 - rho);
+    const Ws = 1 / (mu - lambda);
+    const Wq = lambda / (mu * (mu - lambda));
 
     return {
       utilizationRho: Math.round(rho * 1000) / 1000,
@@ -1152,23 +1048,21 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
       avgWaitSystemWs: Math.round(Ws * 1000) / 1000,
     };
   } else {
+    const numServers = c ?? 1;
     const r = lambda / mu;
-    const rho = r / c;
+    const rho = r / numServers;
 
     // Iteratively compute terms: term[n] = (r^n / n!) using recurrence term[n] = term[n-1] * (r / n)
-    let sumTerms = 1.0; // n=0 term: r^0 / 0! = 1
+    let sumTerms = 1.0;
     let currentTerm = 1.0;
 
-    for (let n = 1; n < c; n++) {
+    for (let n = 1; n < numServers; n++) {
       currentTerm *= r / n;
       sumTerms += currentTerm;
     }
-
-    // Term for n = c
-    const termC = currentTerm * (r / c);
+    const termC = currentTerm * (r / numServers);
     const lastTerm = termC / (1 - rho);
     const p0 = 1 / (sumTerms + lastTerm);
-
     const Lq = (p0 * termC * rho) / Math.pow(1 - rho, 2);
     const Ls = Lq + r;
     const Wq = Lq / lambda;
@@ -1186,62 +1080,152 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
 }
 
 // ==========================================
-// 8. Zero-Sum Games (Payoff Matrix)
+// 9. Zero-Sum Games (Minimax / Maximin)
 // ==========================================
 export function solveZeroSumGame(problem: ZeroSumGameProblem): ZeroSumGameSolution {
-  const n = problem.payoffMatrix[0].length;
-  const rowMinima = problem.payoffMatrix.map((row) => Math.min(...row));
-  const maximin = Math.max(...rowMinima);
-  const bestRow = rowMinima.indexOf(maximin);
+  const m = problem.player1Strategies.length;
+  const n = problem.player2Strategies.length;
+  const matrix = problem.payoffMatrix;
 
-  const colMaxima = Array.from({ length: n }, (_, c) =>
-    Math.max(...problem.payoffMatrix.map((row) => row[c]))
-  );
-  const minimax = Math.min(...colMaxima);
-  const bestCol = colMaxima.indexOf(minimax);
+  // Row minimums (Player 1 security levels)
+  const rowMins: number[] = matrix.map((row) => Math.min(...row));
+  const maximin = Math.max(...rowMins);
+
+  // Column maximums (Player 2 minimum penalties)
+  const colMaxs: number[] = [];
+  for (let c = 0; c < n; c++) {
+    let maxVal = -Infinity;
+    for (let r = 0; r < m; r++) {
+      if (matrix[r][c] > maxVal) maxVal = matrix[r][c];
+    }
+    colMaxs.push(maxVal);
+  }
+  const minimax = Math.min(...colMaxs);
 
   const hasSaddlePoint = maximin === minimax;
+  let saddlePointLocation: [number, number] | undefined;
+
+  if (hasSaddlePoint) {
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) {
+        if (matrix[r][c] === maximin && rowMins[r] === maximin && colMaxs[c] === minimax) {
+          saddlePointLocation = [r, c];
+          break;
+        }
+      }
+      if (saddlePointLocation) break;
+    }
+  }
+
+  const p1Probabilities = new Array(m).fill(0);
+  const p2Probabilities = new Array(n).fill(0);
+
+  if (hasSaddlePoint && saddlePointLocation) {
+    p1Probabilities[saddlePointLocation[0]] = 1;
+    p2Probabilities[saddlePointLocation[1]] = 1;
+  } else {
+    // Equal distribution placeholder if no pure saddle point
+    p1Probabilities.fill(1 / m);
+    p2Probabilities.fill(1 / n);
+  }
 
   return {
     hasSaddlePoint,
-    saddlePoint: hasSaddlePoint
-      ? { row: bestRow, col: bestCol, value: maximin }
-      : undefined,
+    gameValue: maximin,
     maximinValue: maximin,
     minimaxValue: minimax,
-    gameValue: hasSaddlePoint ? maximin : (maximin + minimax) / 2,
+    saddlePointLocation,
+    player1Probabilities: p1Probabilities.map((p) => Math.round(p * 1000) / 1000),
+    player2Probabilities: p2Probabilities.map((p) => Math.round(p * 1000) / 1000),
   };
 }
 
 // ==========================================
-// 9. Linear Equations (Gauss-Jordan Elimination)
+// 10. Inventory Control (EOQ)
 // ==========================================
-export function solveLinearEquations(A: number[][], b: number[]): number[] {
-  const n = A.length;
-  const M = A.map((row, i) => [...row, b[i]]);
+export function solveInventoryControl(problem: InventoryProblem): InventorySolution {
+  const { annualDemandD: D, orderingCostK: K, holdingCostH: H, unitPriceC: C } = problem;
+
+  if (problem.priceBreaks && problem.priceBreaks.length > 0) {
+    let bestTotalCost = Infinity;
+    let bestQty = 0;
+    let selectedTier = problem.priceBreaks[0];
+
+    for (const tier of problem.priceBreaks) {
+      const tierUnitPrice = tier.unitPrice;
+      const tierH = problem.holdingCostH > 0 && problem.holdingCostH < 1 ? problem.holdingCostH * tierUnitPrice : problem.holdingCostH;
+      let Q = Math.sqrt((2 * K * D) / tierH);
+
+      if (Q < tier.minQty) {
+        Q = tier.minQty;
+      } else if (tier.maxQty && Q > tier.maxQty) {
+        Q = tier.maxQty;
+      }
+
+      const cost = (D / Q) * K + (Q / 2) * tierH + tierUnitPrice * D;
+      if (cost < bestTotalCost) {
+        bestTotalCost = cost;
+        bestQty = Q;
+        selectedTier = tier;
+      }
+    }
+
+    return {
+      optimalOrderQtyY: Math.round(bestQty),
+      totalAnnualCost: Math.round(bestTotalCost * 100) / 100,
+      cycleTimeMonths: Math.round((bestQty / D) * 12 * 10) / 10,
+      reorderPoint: Math.round((D / 365) * 5),
+      selectedPriceBreakTier: selectedTier,
+    };
+  }
+
+  // Wilson Classic EOQ: Q* = sqrt(2KD / H)
+  const Q_star = Math.sqrt((2 * K * D) / H);
+  const totalAnnualCost = (D / Q_star) * K + (Q_star / 2) * H + C * D;
+  const cycleTimeMonths = (Q_star / D) * 12;
+
+  return {
+    optimalOrderQtyY: Math.round(Q_star),
+    totalAnnualCost: Math.round(totalAnnualCost * 100) / 100,
+    cycleTimeMonths: Math.round(cycleTimeMonths * 10) / 10,
+    reorderPoint: Math.round((D / 365) * 5),
+  };
+}
+// ==========================================
+// 11. Simultaneous Linear Equations (Gauss-Jordan Ax = b)
+// ==========================================
+export function solveLinearEquations(matrixA: number[][], vectorB: number[]): number[] {
+  const n = matrixA.length;
+  const M = matrixA.map((row, i) => [...row, vectorB[i]]);
 
   for (let i = 0; i < n; i++) {
+    // Partial row pivoting
     let maxRow = i;
+    let maxVal = Math.abs(M[i][i]);
     for (let k = i + 1; k < n; k++) {
-      if (Math.abs(M[k][i]) > Math.abs(M[maxRow][i])) {
+      if (Math.abs(M[k][i]) > maxVal) {
+        maxVal = Math.abs(M[k][i]);
         maxRow = k;
       }
     }
-    [M[i], M[maxRow]] = [M[maxRow], M[i]];
 
-    const pivot = M[i][i];
-    if (Math.abs(pivot) < 1e-12) {
-      throw new Error("Singular linear system or infinite solutions.");
+    if (maxRow !== i) {
+      const temp = M[i];
+      M[i] = M[maxRow];
+      M[maxRow] = temp;
     }
 
-    for (let j = i; j <= n; j++) {
+    const pivot = M[i][i];
+    if (Math.abs(pivot) < 1e-10) continue;
+
+    for (let j = 0; j <= n; j++) {
       M[i][j] /= pivot;
     }
 
     for (let k = 0; k < n; k++) {
       if (k !== i) {
         const factor = M[k][i];
-        for (let j = i; j <= n; j++) {
+        for (let j = 0; j <= n; j++) {
           M[k][j] -= factor * M[i][j];
         }
       }

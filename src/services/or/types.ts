@@ -92,6 +92,16 @@ export interface TransportationSolution {
   isBalanced: boolean;
   dummyAdded?: "supply" | "demand" | null;
   method: string;
+  sources?: string[];
+  destinations?: string[];
+  costs?: number[][];
+  allocationBreakdown?: {
+    from: string;
+    to: string;
+    amount: number;
+    unitCost: number;
+    cost: number;
+  }[];
 }
 
 export interface AssignmentProblem {
@@ -104,6 +114,10 @@ export interface AssignmentSolution {
   assignments: { worker: string; job: string; cost: number }[];
   totalCost: number;
   steps?: { label: string; matrix: number[][] }[];
+  reducedMatrix?: number[][];
+  dim?: number;
+  workers?: string[];
+  jobs?: string[];
 }
 
 export interface NetworkEdge {
@@ -150,8 +164,18 @@ export interface CpmSolution {
   projectDuration: number;
   projectVariance?: number;
   projectStdDev?: number;
+  schedule?: {
+    id: string;
+    name: string;
+    duration: number;
+    earlyStart: number;
+    earlyFinish: number;
+    lateStart: number;
+    lateFinish: number;
+    slack: number;
+    isCritical: boolean;
+  }[];
 }
-
 export interface QueuingProblem {
   model: "M/M/1" | "M/M/c";
   arrivalRateLambda: number;
@@ -180,6 +204,7 @@ export interface ZeroSumGameProblem {
 export interface ZeroSumGameSolution {
   hasSaddlePoint: boolean;
   saddlePoint?: { row: number; col: number; value: number };
+  saddlePointLocation?: [number, number];
   maximinValue: number;
   minimaxValue: number;
   gameValue: number;
@@ -210,13 +235,15 @@ export interface InventoryProblem {
 
 export interface InventorySolution {
   optimalOrderQtyY: number;
-  cycleTimeT0Days: number;
+  cycleTimeT0Days?: number;
+  cycleTimeMonths?: number;
   maxShortageS?: number;
-  annualOrderingCost: number;
-  annualHoldingCost: number;
+  annualOrderingCost?: number;
+  annualHoldingCost?: number;
   annualShortageCost?: number;
   totalAnnualCost: number;
+  reorderPoint?: number;
   reorderPointR?: number;
-  selectedPriceBreakTier?: number;
+  selectedPriceBreakTier?: PriceBreakTier | number;
   priceBreakAnalysis?: PriceBreakTier[];
 }

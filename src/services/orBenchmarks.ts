@@ -141,6 +141,24 @@ export const BENCHMARKS = {
         variableNames: ["Food 1 (x1)", "Food 2 (x2)"],
       },
     },
+    {
+      id: "moving-avg-mad",
+      title: "Weighted Moving Average MAD Error Minimization",
+      description: "Goal Programming LP minimizing sum of absolute forecast error deviations subject to ordered weights w3 >= w2 >= w1 >= 0",
+      source: "Operations Research Forecasting Model",
+      data: {
+        objective: "min",
+        objectiveCoefficients: [0, 0, 0, 1, 1, 1, 1, 1, 1],
+        variableNames: ["w1", "w2", "w3", "e4+", "e4-", "e5+", "e5-", "e6+", "e6-"],
+        constraints: [
+          { coefficients: [270, 241, 331, -1, 1, 0, 0, 0, 0], operator: "=", rhs: 299 },
+          { coefficients: [241, 331, 299, 0, 0, -1, 1, 0, 0], operator: "=", rhs: 360 },
+          { coefficients: [331, 299, 360, 0, 0, 0, 0, -1, 1], operator: "=", rhs: 340 },
+          { coefficients: [0, -1, 1, 0, 0, 0, 0, 0, 0], operator: ">=", rhs: 0 },
+          { coefficients: [-1, 1, 0, 0, 0, 0, 0, 0, 0], operator: ">=", rhs: 0 },
+        ],
+      },
+    },
   ] as BenchmarkProblem<LpProblem>[],
 
   network: [

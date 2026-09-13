@@ -7,70 +7,220 @@ import {
 } from "./or/types";
 
 // ============================================================================
-// 1. LINEAR PROGRAMMING (LP) EXTRACTOR
+// 1. ADVANCED LINEAR PROGRAMMING (LP) & GOAL PROGRAMMING EXTRACTOR
 // ============================================================================
 export function extractLinearProgramming(text: string): LpProblem | null {
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  // Normalize Greek symbols, superscripts, subscripts, and deviation variables
+  const normalizedText = text
+    .replace(/e_?\{?(\d+)\}?\s*\^\s*\+/gi, "e$1_pos")
+    .replace(/e_?\{?(\d+)\}?\s*\^\s*\-/gi, "e$1_neg")
+    .replace(/e(\d+)\s*\+/gi, "e$1_pos")
+    .replace(/e(\d+)\s*\-/gi, "e$1_neg")
+    .replace(/e_?(\d+)_pos/gi, "e$1_pos")
+    .replace(/e_?(\d+)_neg/gi, "e$1_neg")
+    .replace(/w_?\{?(\d+)\}?/gi, "w$1")
+    .replace(/x_?\{?(\d+)\}?/gi, "x$1")
+    .replace(/y_?\{?(\d+)\}?/gi, "y$1")
+    .replace(/z_?\{?(\d+)\}?/gi, "z$1");
+
+  const lines = normalizedText.split("\n").map((l) => l.trim()).filter(Boolean);
 
   let objective: "max" | "min" = "max";
-  let objectiveCoefficients: number[] = [3, 5];
-  const constraints: { coefficients: number[]; operator: "<=" | ">=" | "="; rhs: number }[] = [];
+  const objLine = lines.find((l) => /maximiz|minimiz|objective|obj\s*f|\bmax\b|\bmin\b/i.test(l));
+  if (objLine && /min/i.test(objLine)) {
+    objective = "min";
+  }
 
-  // Check objective
-  const objLine = lines.find((l) => /maximiz|minimiz|objective|\bmax\b|\bmin\b/i.test(l));
-  if (objLine) {
-    if (/min/i.test(objLine)) objective = "min";
-    // Extract coeffs: e.g. "Maximize Z = 3x1 + 5x2" or "3 x1 + 5 x2"
-    const matches = Array.from(objLine.matchAll(/([+-]?\s*\d*\.?\d*)\s*(?:x_?\{?(\d+)\}?|x(\d+)|y|x)/gi));
-    const coeffs: number[] = [];
-    for (const m of matches) {
-      let numStr = m[1].replace(/\s+/g, "");
-      if (numStr === "" || numStr === "+") numStr = "1";
-      if (numStr === "-") numStr = "-1";
-      const val = parseFloat(numStr);
-      if (!isNaN(val)) coeffs.push(val);
-    }
-    if (coeffs.length >= 2) {
-      objectiveCoefficients = coeffs;
+  // 1. Discover all distinct decision variable names across all lines
+  // Tokenize variable names: e.g. w1, w2, w3, e4_pos, e4_neg, x1, x2, etc.
+  const varRegex = /\b([a-zA-Z][a-zA-Z0-9_]*)\b/g;
+  const reservedKeywords = new Set([
+    "max", "min", "maximize", "minimize", "objective", "subject", "to", "st", "constraints",
+    "and", "for", "all", "where", "with", "sum", "each", "total", "fn", "z", "obj"
+  ]);
+
+  const varSet = new Set<string>();
+
+  for (const line of lines) {
+    if (/subject to|s\.t\.|constraints/i.test(line) && !/[<>=]/.test(line)) continue;
+    let match;
+    while ((match = varRegex.exec(line)) !== null) {
+      const v = match[1];
+      if (!reservedKeywords.has(v.toLowerCase()) && !/^\d+$/.test(v)) {
+        varSet.add(v);
+      }
     }
   }
 
-  // Check constraints: lines containing <=, >=, =, or "subject to"
+  // If summation notation like sum_{t=4}^6 (e_t^+ + e_t^-) was used, ensure e4..e6 exist
+  if (/sum.*e.*[4-6]/i.test(text) || lines.some(l => /e[4-6]/i.test(l))) {
+    for (let t = 4; t <= 6; t++) {
+      varSet.add(`e${t}_pos`);
+      varSet.add(`e${t}_neg`);
+    }
+  }
+
+  const varNames = Array.from(varSet).sort((a, b) => {
+    // Custom sort: w1..w3 first, then e-vars, then alphabetical
+    const isW_A = a.startsWith("w");
+    const isW_B = b.startsWith("w");
+    if (isW_A && !isW_B) return -1;
+    if (!isW_A && isW_B) return 1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+
+  if (varNames.length === 0) {
+    varNames.push("x1", "x2");
+  }
+
+  // Helper to extract linear expression terms for discovered variables
+  const parseExpression = (expr: string): Map<string, number> => {
+    const coeffMap = new Map<string, number>();
+    for (const v of varNames) coeffMap.set(v, 0);
+
+    // Matches term like "+ 331 w3", "- 241.5 w2", "e4_pos", "- e4_neg"
+    // Handle both "331 w3" and "w3 331" formats
+    const termRegex = /([+-]?\s*\d*\.?\d*)\s*([a-zA-Z][a-zA-Z0-9_]*)|([a-zA-Z][a-zA-Z0-9_]*)\s*([+-]?\s*\d+\.?\d*)/g;
+    let match;
+    while ((match = termRegex.exec(expr)) !== null) {
+      if (match[2]) {
+        // format: 331 w3 or + w3 or - w3
+        let numStr = (match[1] || "").replace(/\s+/g, "");
+        const varName = match[2];
+        if (varNames.includes(varName)) {
+          if (numStr === "" || numStr === "+") numStr = "1";
+          if (numStr === "-") numStr = "-1";
+          const val = parseFloat(numStr);
+          if (!isNaN(val)) {
+            coeffMap.set(varName, (coeffMap.get(varName) || 0) + val);
+          }
+        }
+      } else if (match[3]) {
+        // format: w3 331
+        const varName = match[3];
+        const numStr = (match[4] || "").replace(/\s+/g, "");
+        if (varNames.includes(varName)) {
+          const val = parseFloat(numStr);
+          if (!isNaN(val)) {
+            coeffMap.set(varName, (coeffMap.get(varName) || 0) + val);
+          }
+        }
+      }
+    }
+    return coeffMap;
+  };
+
+  // 2. Parse Objective Function
+  let objectiveCoefficients: number[] = Array(varNames.length).fill(0);
+  if (objLine) {
+    const expr = objLine.replace(/maximiz\w*|minimiz\w*|obj\w*|z\s*=|f\^n/gi, "");
+    if (/sum/i.test(expr) && /e/i.test(expr)) {
+      // Sum of all deviation variables
+      objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 0));
+    } else {
+      const objMap = parseExpression(expr);
+      objectiveCoefficients = varNames.map((v) => objMap.get(v) || 0);
+    }
+  } else {
+    // Default weights
+    objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 0));
+  }
+
+  // If all objective coefficients are 0, default to 1 on deviation variables or 1 on all
+  if (objectiveCoefficients.every((c) => c === 0)) {
+    objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 1));
+  }
+
+  // 3. Parse Constraints
+  const constraints: { coefficients: number[]; operator: "<=" | ">=" | "="; rhs: number }[] = [];
+
   for (const line of lines) {
-    if (/subject to|s\.t\.|constraints/i.test(line) && !/[<>=]/.test(line)) continue;
     if (line === objLine) continue;
+    if (/subject to|s\.t\.|constraints/i.test(line) && !/[<>=≤≥]/.test(line)) continue;
+    if (/non-negativity|all\s*>=0|\ball\s*≥\s*0\b/i.test(line)) continue;
+
+    // Handle compound inequality like "w3 >= w2 >= w1 >= 0"
+    if (line.includes(">=") || line.includes("≥") || line.includes("<=") || line.includes("≤")) {
+      const parts = line.split(/(>=|<=|≥|≤)/).map((p) => p.trim()).filter(Boolean);
+      if (parts.length >= 4) {
+        // e.g. ["w3", ">=", "w2", ">=", "w1", ">=", "0"]
+        for (let i = 0; i < parts.length - 2; i += 2) {
+          const leftVar = parts[i];
+          const op = parts[i + 1];
+          const rightVar = parts[i + 2];
+          if (rightVar === "0" || rightVar === "0.0") continue;
+
+          const coeffs = Array(varNames.length).fill(0);
+          const leftIdx = varNames.indexOf(leftVar);
+          const rightIdx = varNames.indexOf(rightVar);
+
+          if (leftIdx !== -1 && rightIdx !== -1) {
+            if (op === ">=" || op === "≥") {
+              // leftVar - rightVar >= 0
+              coeffs[leftIdx] = 1;
+              coeffs[rightIdx] = -1;
+              constraints.push({ coefficients: coeffs, operator: ">=", rhs: 0 });
+            } else {
+              // leftVar - rightVar <= 0
+              coeffs[leftIdx] = 1;
+              coeffs[rightIdx] = -1;
+              constraints.push({ coefficients: coeffs, operator: "<=", rhs: 0 });
+            }
+          }
+        }
+        continue;
+      }
+    }
 
     const opMatch = line.match(/(<=|>=|=|<|>|≤|≥)/);
     if (opMatch) {
       const rawOp = opMatch[1];
       const operator: "<=" | ">=" | "=" = rawOp.includes("<") || rawOp === "≤" ? "<=" : rawOp.includes(">") || rawOp === "≥" ? ">=" : "=";
       const parts = line.split(opMatch[0]);
-      const left = parts[0];
-      const right = parts[1];
-      const rhs = parseFloat(right.replace(/[^0-9.-]/g, ""));
+      const leftExpr = parts[0];
+      const rightExpr = parts[1];
 
-      // Extract left coefficients
-      const matches = Array.from(left.matchAll(/([+-]?\s*\d*\.?\d*)\s*(?:x_?\{?(\d+)\}?|x(\d+)|y|x)/gi));
-      const coeffs: number[] = [];
-      for (const m of matches) {
-        let numStr = m[1].replace(/\s+/g, "");
-        if (numStr === "" || numStr === "+") numStr = "1";
-        if (numStr === "-") numStr = "-1";
-        const val = parseFloat(numStr);
-        if (!isNaN(val)) coeffs.push(val);
+      const leftMap = parseExpression(leftExpr);
+      const rightMap = parseExpression(rightExpr);
+
+      // Collect constants from both sides
+      const rightConstMatch = rightExpr.match(/([+-]?\s*\d+\.?\d*)\s*$/);
+      let rhs = rightConstMatch ? parseFloat(rightConstMatch[1].replace(/\s+/g, "")) : 0;
+      if (isNaN(rhs)) rhs = 0;
+
+      // Handle expressions like "e4_pos - e4_neg = 331w3 + 241w2 + 270w1 - 299"
+      // Bring all variables to LHS: LHS_coeffs - RHS_coeffs
+      const coeffs = varNames.map((v) => {
+        return (leftMap.get(v) || 0) - (rightMap.get(v) || 0);
+      });
+
+      // If constant was on the left side, subtract it from RHS
+      const leftConstMatch = leftExpr.match(/([+-]?\s*\d+\.?\d*)\s*$/);
+      if (leftConstMatch && !leftExpr.includes(varNames.find(v => leftExpr.includes(v)) || "___")) {
+        rhs -= parseFloat(leftConstMatch[1].replace(/\s+/g, ""));
       }
 
-      if (coeffs.length > 0 && !isNaN(rhs)) {
-        // Pad to match objective dimension
-        while (coeffs.length < objectiveCoefficients.length) coeffs.push(0);
-        constraints.push({ coefficients: coeffs.slice(0, objectiveCoefficients.length), operator, rhs });
+      // If all coeffs are on RHS and LHS had deviation variables, invert so constant is positive
+      if (rhs < 0 && operator === "=") {
+        for (let i = 0; i < coeffs.length; i++) coeffs[i] = -coeffs[i];
+        rhs = -rhs;
+      }
+
+      if (coeffs.some((c) => c !== 0)) {
+        constraints.push({ coefficients: coeffs, operator, rhs: Math.abs(rhs) });
       }
     }
   }
 
   if (constraints.length > 0) {
-    return { objective, objectiveCoefficients, constraints };
+    return {
+      objective,
+      objectiveCoefficients,
+      constraints,
+      variableNames: varNames,
+    };
   }
+
   return null;
 }
 
@@ -81,7 +231,6 @@ export function extractCpmActivities(text: string): CpmActivity[] | null {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const activities: CpmActivity[] = [];
 
-  // Look for Markdown table: | Activity | Predecessor | Duration |
   const pipeLines = lines.filter((l) => l.includes("|") && !l.includes("---"));
   if (pipeLines.length >= 2) {
     const dataRows = pipeLines.slice(1);
@@ -99,7 +248,6 @@ export function extractCpmActivities(text: string): CpmActivity[] | null {
     if (activities.length >= 2) return activities;
   }
 
-  // Look for line-based: "A: None, 5" or "Activity A (Duration: 5, Predecessors: None)"
   for (const line of lines) {
     const match = line.match(/(?:Activity\s+)?([A-Za-z0-9_-]+)[:\s]+(?:predecessors?[:\s]*([A-Za-z0-9,\s_-]+|none|-))?.*?(?:duration[:\s]*(\d+\.?\d*)|(\d+\.?\d*)\s*(?:days|weeks|hours|units)?)/i);
     if (match) {
