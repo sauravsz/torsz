@@ -11,12 +11,18 @@ export default {
         "2xs": ["11px", "15px"],
         "xs": ["13px", "18px"],
         "sm": ["15px", "22px"],
-        "base": ["17px", "26px"],
-        "lg": ["19px", "28px"],
-        "xl": ["21px", "30px"],
-        "2xl": ["26px", "34px"],
-        "3xl": ["32px", "38px"],
-        "4xl": ["38px", "44px"],
+        "base": ["16px", "24px"],
+        "lg": ["18px", "26px"],
+        "xl": ["20px", "28px"],
+        "2xl": ["24px", "30px"],
+        "3xl": ["36px", "40px"],
+        "4xl": ["48px", "52px"],
+        "5xl": ["60px", "64px"],
+      },
+      letterSpacing: {
+        "tight-hero": "-1.5px",
+        "tight-section": "-1.2px",
+        "tight-sub": "-0.9px",
       },
       colors: {
         primary: {
@@ -36,6 +42,7 @@ export default {
         hairline: {
           DEFAULT: "var(--color-hairline)",
           soft: "var(--color-hairline-soft)",
+          interactive: "var(--color-hairline-interactive)",
         },
         canvas: "var(--color-canvas)",
         surface: {
@@ -47,7 +54,7 @@ export default {
           "dark-soft": "var(--color-surface-dark-soft)",
         },
         on: {
-          primary: "#ffffff",
+          primary: "var(--color-on-primary)",
           dark: "#faf9f5",
           "dark-soft": "#a09d96",
         },
@@ -61,18 +68,23 @@ export default {
       },
       fontFamily: {
         serif: ["Copernicus", "Tiempos Headline", "Cormorant Garamond", "EB Garamond", "Georgia", "serif"],
-        sans: ["StyreneB", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "sans-serif"],
+        sans: ["Camera Plain Variable", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
         mono: ["JetBrains Mono", "Menlo", "Monaco", "Courier New", "monospace"],
       },
       borderRadius: {
         xs: "4px",
         sm: "6px",
-        md: "10px",
-        lg: "14px",
-        xl: "18px",
-        "2xl": "22px",
-        "3xl": "28px",
+        md: "8px",
+        lg: "12px",
+        xl: "16px",
+        "2xl": "20px",
+        "3xl": "24px",
         pill: "9999px",
+      },
+      boxShadow: {
+        "lovable-btn": "rgba(255,255,255,0.2) 0px 0.5px 0px 0px inset, rgba(0,0,0,0.2) 0px 0px 0px 0.5px inset, rgba(0,0,0,0.05) 0px 1px 2px 0px",
+        "lovable-focus": "rgba(0,0,0,0.1) 0px 4px 12px",
+        "2xs": "0 1px 2px 0 rgba(0, 0, 0, 0.04)",
       },
       transitionTimingFunction: {
         "swiftui-bouncy": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",

@@ -4,23 +4,30 @@
 
 @layer base {
   :root {
-    --color-primary: #cc785c;
-    --color-primary-active: #a9583e;
-    --color-primary-disabled: #e6dfd8;
-    --color-ink: #141413;
-    --color-body: #3d3d3a;
-    --color-body-strong: #252523;
-    --color-muted: #6c6a64;
-    --color-muted-soft: #8e8b82;
-    --color-hairline: #dfd4c4;
-    --color-hairline-soft: #e8ded0;
-    --color-canvas: #faf8f5;
-    --color-surface-soft: #f2ece2;
-    --color-surface-card: #eadecc;
-    --color-surface-cream-strong: #e0d2bd;
-    --color-surface-dark: #181715;
-    --color-surface-dark-elevated: #252320;
-    --color-surface-dark-soft: #1f1e1b;
+    /* Lovable Design System Color Tokens */
+    --color-canvas: #f7f4ed; /* Warm parchment cream */
+    --color-surface-card: #f7f4ed; /* Card background matching seamless parchment */
+    --color-surface-soft: #eceae4; /* Subtle divider surface */
+    --color-surface-cream-strong: #e6e3da; /* Deep cream accent */
+    
+    --color-ink: #1c1c1c; /* Charcoal 100% */
+    --color-body: rgba(28, 28, 28, 0.82); /* Charcoal 82% */
+    --color-body-strong: rgba(28, 28, 28, 0.83); /* Charcoal 83% */
+    --color-muted: #5f5f5d; /* Muted gray */
+    --color-muted-soft: rgba(28, 28, 28, 0.40); /* Charcoal 40% */
+    
+    --color-hairline: #eceae4; /* Light cream border */
+    --color-hairline-soft: rgba(28, 28, 28, 0.08); /* 8% opacity divider */
+    --color-hairline-interactive: rgba(28, 28, 28, 0.40); /* 40% interactive border */
+    
+    --color-primary: #1c1c1c; /* Charcoal CTA */
+    --color-primary-active: #2e2e2e;
+    --color-primary-disabled: rgba(28, 28, 28, 0.20);
+    --color-on-primary: #fcfbf8; /* Off-white button text on dark */
+
+    --color-surface-dark: #141413;
+    --color-surface-dark-elevated: #1f1e1b;
+    --color-surface-dark-soft: #181715;
 
     /* SwiftUI Spring & Easing Physics Curves */
     --ease-swiftui-bouncy: cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -31,32 +38,40 @@
   }
 
   .dark {
-    --color-primary: #cc785c;
-    --color-primary-active: #e28e73;
-    --color-primary-disabled: #3d3a36;
-    --color-ink: #faf9f5;
-    --color-body: #d5d3cc;
-    --color-body-strong: #faf9f5;
-    --color-muted: #a09d96;
-    --color-muted-soft: #6c6a64;
-    --color-hairline: #2e2c28;
-    --color-hairline-soft: #252320;
-    --color-canvas: #141312;
-    --color-surface-soft: #181715;
-    --color-surface-card: #1f1e1b;
-    --color-surface-cream-strong: #2a2825;
-    --color-surface-dark: #121110;
-    --color-surface-dark-elevated: #252320;
-    --color-surface-dark-soft: #1c1b18;
+    --color-canvas: #121212;
+    --color-surface-card: #181818;
+    --color-surface-soft: #222222;
+    --color-surface-cream-strong: #2c2c2c;
+    
+    --color-ink: #fcfbf8;
+    --color-body: rgba(252, 251, 248, 0.85);
+    --color-body-strong: #ffffff;
+    --color-muted: #9e9e9e;
+    --color-muted-soft: rgba(252, 251, 248, 0.40);
+    
+    --color-hairline: #262626;
+    --color-hairline-soft: #1e1e1e;
+    --color-hairline-interactive: rgba(252, 251, 248, 0.40);
+    
+    --color-primary: #fcfbf8;
+    --color-primary-active: #e5e4e0;
+    --color-primary-disabled: rgba(252, 251, 248, 0.25);
+    --color-on-primary: #1c1c1c;
+
+    --color-surface-dark: #0e0e0e;
+    --color-surface-dark-elevated: #1a1a1a;
+    --color-surface-dark-soft: #161616;
   }
 
   html {
-    font-size: 16.5px;
+    font-size: 16px;
+    background-color: var(--color-canvas);
   }
 
   body {
     background-color: var(--color-canvas);
     color: var(--color-ink);
+    font-family: "Camera Plain Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-variant-numeric: tabular-nums lining-nums;
   }
 
@@ -65,157 +80,74 @@
   }
 }
 
+/* Lovable Signature Primary Dark Button Inset Shadow */
+.btn-lovable-primary {
+  background-color: #1c1c1c;
+  color: #fcfbf8;
+  border-radius: 6px;
+  box-shadow: rgba(255, 255, 255, 0.2) 0px 0.5px 0px 0px inset, rgba(0, 0, 0, 0.2) 0px 0px 0px 0.5px inset, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.btn-lovable-primary:active {
+  opacity: 0.8;
+  transform: scale(0.98);
+}
+
+.dark .btn-lovable-primary {
+  background-color: #fcfbf8;
+  color: #1c1c1c;
+}
+
+/* Lovable Focus Shadow */
+.focus-lovable:focus {
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 12px;
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 1px;
+}
+
 /* ========================================================== */
-/* SwiftUI & Open-SwiftUI Animation & Motion Physics System   */
+/* Animations & Motion Physics System                         */
 /* ========================================================== */
 
 @keyframes swiftui-spring-pop {
-  0% {
-    opacity: 0;
-    transform: scale(0.92) translateY(6px);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(1.03) translateY(-1px);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+  0% { transform: scale(0.88); opacity: 0; }
+  70% { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes swiftui-fade-slide-up {
-  0% {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { transform: translateY(10px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes swiftui-stagger-in {
-  0% {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  0% { transform: translateY(6px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
-@keyframes swiftui-pulse-ring {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.4);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(0.95);
-    opacity: 0;
-  }
+@keyframes keyframe-fade-in-up {
+  0% { transform: translateY(8px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
 }
 
-@keyframes swiftui-glow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(204, 120, 92, 0);
-  }
-  50% {
-    box-shadow: 0 0 16px 3px rgba(204, 120, 92, 0.35);
-  }
+@keyframes keyframe-scale-in {
+  0% { transform: scale(0.95); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
-@keyframes swiftui-glow-teal {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(93, 184, 166, 0);
-  }
-  50% {
-    box-shadow: 0 0 14px 2px rgba(93, 184, 166, 0.4);
-  }
+.animate-keyframe-fade-up {
+  animation: keyframe-fade-in-up 240ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
-@keyframes swiftui-rotate-spring {
-  0% {
-    transform: rotate(0deg);
-  }
-  70% {
-    transform: rotate(190deg);
-  }
-  100% {
-    transform: rotate(180deg);
-  }
-}
-
-@keyframes swiftui-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-/* SwiftUI Utility Classes */
-.animate-swiftui-pop {
-  animation: swiftui-spring-pop 320ms var(--ease-swiftui-bouncy) forwards;
-}
-
-.animate-swiftui-slide-up {
-  animation: swiftui-fade-slide-up 280ms var(--ease-swiftui-spring) forwards;
-}
-
-.animate-swiftui-stagger {
-  animation: swiftui-stagger-in 220ms var(--ease-swiftui-smooth) forwards;
-}
-
-.animate-swiftui-ring {
-  animation: swiftui-pulse-ring 2s infinite cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.animate-swiftui-glow {
-  animation: swiftui-glow-pulse 2.4s infinite ease-in-out;
-}
-
-.animate-swiftui-glow-teal {
-  animation: swiftui-glow-teal 2.4s infinite ease-in-out;
-}
-
-/* SwiftUI Interactive Button Micro-Physics */
-.swiftui-btn {
-  transition: transform 140ms var(--ease-swiftui-bouncy), background-color 140ms ease, box-shadow 140ms ease;
-}
-
-.swiftui-btn:hover {
-  transform: translateY(-1px);
-}
-
-.swiftui-btn:active {
-  transform: scale(0.95);
-}
-
-/* SwiftUI Card Lift Physics */
-.swiftui-card {
-  transition: transform 220ms var(--ease-swiftui-spring), box-shadow 220ms var(--ease-swiftui-spring), border-color 220ms ease;
-}
-
-.swiftui-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.08);
-}
-
-.dark .swiftui-card:hover {
-  box-shadow: 0 10px 24px -4px rgba(0, 0, 0, 0.4);
+.animate-keyframe-scale {
+  animation: keyframe-scale-in 200ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
 /* Custom Editorial Scrollbars */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -223,23 +155,24 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #e6dfd8;
+  background: #eceae4;
   border-radius: 9999px;
-  transition: background 150ms ease;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #2e2c28;
+  background: #2a2a2a;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #8e8b82;
+  background: #dcd8d0;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #6c6a64;
+  background: #3a3a3a;
 }
 
 .font-editorial-serif {
-  font-family: 'Cormorant Garamond', 'Copernicus', 'Tiempos Headline', 'Georgia', serif;
+  font-family: "Camera Plain Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.9px;
+  font-weight: 600;
 }
