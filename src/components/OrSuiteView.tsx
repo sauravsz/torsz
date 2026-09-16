@@ -1637,14 +1637,16 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                           type="text"
                           value={netStartNode}
                           onChange={(e) => setNetStartNode(e.target.value)}
-                          className="w-12 px-2 py-0.5 bg-canvas border border-hairline rounded text-center font-bold text-ink"
+                          className="w-16 sm:w-20 px-2.5 py-1 bg-canvas border border-hairline rounded-lg text-center font-bold text-ink focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs font-mono"
+                          title="Source / Start Node"
                         />
                         <span className="text-muted">End:</span>
                         <input
                           type="text"
                           value={netEndNode}
                           onChange={(e) => setNetEndNode(e.target.value)}
-                          className="w-12 px-2 py-0.5 bg-canvas border border-hairline rounded text-center font-bold text-ink"
+                          className="w-16 sm:w-20 px-2.5 py-1 bg-canvas border border-hairline rounded-lg text-center font-bold text-ink focus:outline-none focus:ring-1 focus:ring-primary shadow-2xs font-mono"
+                          title="Sink / Destination Node"
                         />
                       </div>
                     )}
@@ -1655,7 +1657,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                       onClick={() =>
                         setNetworkEdges([
                           ...networkEdges,
-                          { from: networkEdges.length + 1, to: networkEdges.length + 2, cost: 500 },
+                          { from: String(networkEdges.length + 1), to: String(networkEdges.length + 2), cost: 500 },
                         ])
                       }
                       className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
@@ -1673,13 +1675,13 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   </div>
                 </div>
 
-                <div className="overflow-x-auto max-h-60 bg-canvas rounded-xl border border-hairline p-1">
+                <div className="overflow-x-auto max-h-72 bg-canvas rounded-xl border border-hairline p-1">
                   <table className="w-full text-left font-sans text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-hairline bg-surface-soft/60 text-muted">
                         <th className="p-2 w-12 text-center">#</th>
-                        <th className="p-2">From Node</th>
-                        <th className="p-2">To Node</th>
+                        <th className="p-2 w-1/3">From Node</th>
+                        <th className="p-2 w-1/3">To Node</th>
                         <th className="p-2 text-right">Cost / Weight</th>
                         <th className="w-10"></th>
                       </tr>
@@ -1697,7 +1699,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                                 next[idx] = { ...next[idx], from: ev.target.value };
                                 setNetworkEdges(next);
                               }}
-                              className="w-20 px-2 py-0.5 bg-surface-card border border-hairline rounded font-bold text-ink"
+                              className="w-full px-2.5 py-1 bg-surface-card border border-hairline rounded-lg font-mono font-medium text-ink focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                             />
                           </td>
                           <td className="p-2">
@@ -1709,25 +1711,26 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                                  next[idx] = { ...next[idx], to: ev.target.value };
                                  setNetworkEdges(next);
                                }}
-                              className="w-20 px-2 py-0.5 bg-surface-card border border-hairline rounded font-bold text-ink"
+                              className="w-full px-2.5 py-1 bg-surface-card border border-hairline rounded-lg font-mono font-medium text-ink focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                             />
                           </td>
                           <td className="p-2 text-right">
                             <input
                               type="number"
+                              step="any"
                               value={e.cost}
                               onChange={(ev) => {
                                 const next = [...networkEdges];
                                 next[idx] = { ...next[idx], cost: parseFloat(ev.target.value) || 0 };
                                 setNetworkEdges(next);
                               }}
-                              className="w-24 px-2 py-0.5 bg-surface-card border border-hairline rounded text-right font-mono font-bold text-primary"
+                              className="w-28 sm:w-32 px-2.5 py-1 bg-surface-card border border-hairline rounded-lg text-right font-mono font-bold text-primary focus:outline-none focus:ring-1 focus:ring-primary text-xs"
                             />
                           </td>
                           <td className="p-2 text-center">
                             <button
                               onClick={() => setNetworkEdges(networkEdges.filter((_, i) => i !== idx))}
-                              className="text-muted hover:text-error p-1 rounded"
+                              className="text-muted hover:text-error p-1 rounded transition-colors"
                               title="Delete route"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
