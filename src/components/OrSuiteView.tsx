@@ -256,6 +256,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const [copiedLatex, setCopiedLatex] = useState(false);
 
   const [showBenchmarks, setShowBenchmarks] = useState(false);
+  const [showExports, setShowExports] = useState(false);
 
   const loadBenchmark = (b: any) => {
     setShowBenchmarks(false);
@@ -844,23 +845,151 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Main Module Solver Content */}
-      <main className="flex-1 overflow-y-auto p-3 sm:p-6 max-w-5xl mx-auto w-full space-y-4 sm:space-y-6 pb-28">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 pb-1 border-b border-hairline-soft">
+      <main className="flex-1 overflow-y-auto p-3 sm:p-6 max-w-7xl mx-auto w-full space-y-4 sm:space-y-6 pb-28">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-hairline/60">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="font-editorial-serif text-2xl font-medium text-ink tracking-tight">
+              {activeModule === "transportation-assignment"
+                ? "Transportation & Assignment"
+                : activeModule === "linear-programming"
+                ? "Linear Programming"
+                : activeModule === "network-models"
+                ? "Network Models"
+                : activeModule === "project-planning"
+                ? "Project Planning (CPM/PERT)"
+                : activeModule === "inventory-control"
+                ? "Inventory Control (EOQ)"
+                : activeModule === "queuing-models"
+                ? "Queuing Analysis"
+                : activeModule === "zero-sum-games"
+                ? "Zero-Sum Game Theory"
+                : "Simultaneous Linear Equations"}
+            </h3>
+
+            {/* Subtype Segmented Pill Switcher */}
+            {activeModule === "transportation-assignment" && (
+              <div className="flex items-center bg-surface-soft p-0.5 rounded-xl border border-hairline/60 shadow-2xs">
+                <button
+                  onClick={() => setTransSubtype("transportation")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    transSubtype === "transportation"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Transportation (VAM)
+                </button>
+                <button
+                  onClick={() => setTransSubtype("hungarian-assignment")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    transSubtype === "hungarian-assignment"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Hungarian Assignment
+                </button>
+              </div>
+            )}
+
+            {activeModule === "linear-programming" && (
+              <div className="flex items-center bg-surface-soft p-0.5 rounded-xl border border-hairline/60 shadow-2xs">
+                <button
+                  onClick={() => setLpMode("graphical-2d")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    lpMode === "graphical-2d"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  2D Graphical
+                </button>
+                <button
+                  onClick={() => setLpMode("simplex-tableau")}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    lpMode === "simplex-tableau"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Simplex Tableaus
+                </button>
+              </div>
+            )}
+
+            {activeModule === "network-models" && (
+              <div className="flex items-center bg-surface-soft p-0.5 rounded-xl border border-hairline/60 shadow-2xs">
+                <button
+                  onClick={() => {
+                    setNetworkSubtype("shortest-route");
+                    if (networkEdges.length > 0) {
+                      const sol = solveNetworkShortestRoute(networkEdges, netStartNode, netEndNode);
+                      setNetworkSol(sol);
+                    }
+                  }}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    networkSubtype === "shortest-route"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Shortest Route
+                </button>
+                <button
+                  onClick={() => {
+                    setNetworkSubtype("minimum-spanning-tree");
+                    if (networkEdges.length > 0) {
+                      const sol = solveNetworkMst(networkEdges);
+                      setNetworkSol(sol);
+                    }
+                  }}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    networkSubtype === "minimum-spanning-tree"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Minimum Spanning Tree
+                </button>
+                <button
+                  onClick={() => {
+                    setNetworkSubtype("maximal-flow");
+                    if (networkEdges.length > 0) {
+                      const sol = solveNetworkMaxFlow(networkEdges, netStartNode, netEndNode);
+                      setNetworkSol(sol);
+                    }
+                  }}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    networkSubtype === "maximal-flow"
+                      ? "bg-surface-card text-ink shadow-2xs font-bold"
+                      : "text-muted hover:text-ink"
+                  }`}
+                >
+                  Maximal Flow
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Right Action Bar */}
           <div className="flex items-center gap-2">
-            {/* Benchmark Problems Dropdown */}
+            {/* Textbook Benchmark Presets Dropdown */}
             <div className="relative">
               <button
-                onClick={() => setShowBenchmarks(!showBenchmarks)}
-                className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 hover:bg-primary/20 px-2.5 py-1 rounded-lg border border-primary/30 transition-colors shadow-2xs"
-                title="Load classic textbook benchmark problems"
+                onClick={() => {
+                  setShowBenchmarks(!showBenchmarks);
+                  setShowExports(false);
+                }}
+                className="flex items-center gap-1.5 text-xs text-primary font-semibold bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-xl border border-primary/20 transition-all shadow-2xs"
+                title="Load textbook benchmark problems"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Benchmark Examples</span>
-                <ChevronDown className="w-3 h-3" />
+                <span>Presets</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
               </button>
 
               {showBenchmarks && (
-                <div className="absolute left-0 top-8 w-72 bg-surface-card border border-hairline rounded-2xl shadow-2xl p-2 z-50 animate-keyframe-fade-up space-y-1">
+                <div className="absolute right-0 top-10 w-72 bg-surface-card border border-hairline/80 rounded-2xl shadow-xl p-2 z-50 animate-keyframe-fade-up space-y-1">
                   <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
                     Textbook Benchmark Problems
                   </div>
@@ -882,7 +1011,10 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   ).map((b: any) => (
                     <button
                       key={b.id}
-                      onClick={() => loadBenchmark(b)}
+                      onClick={() => {
+                        loadBenchmark(b);
+                        setShowBenchmarks(false);
+                      }}
                       className="w-full text-left p-2 rounded-xl hover:bg-surface-cream transition-colors group"
                     >
                       <div className="text-xs font-semibold text-ink group-hover:text-primary">
@@ -899,72 +1031,75 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 
             <button
               onClick={handleOpenDbImport}
-              className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-card px-2.5 py-1 rounded-lg border border-hairline transition-colors"
+              className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-card px-3 py-1.5 rounded-xl border border-hairline/60 transition-all shadow-2xs"
               title="Import active SQLite database table into this solver"
             >
               <Database className="w-3.5 h-3.5 text-primary" />
-              <span>Import Table</span>
-            </button>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleExportLatex}
-              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-2 py-1 rounded-md border border-hairline transition-colors"
-              title="Copy LaTeX Mathematical Model"
-            >
-              <FileCode className="w-3 h-3 text-accent-teal" />
-              <span>{copiedLatex ? "Copied!" : "LaTeX"}</span>
+              <span className="hidden sm:inline">Import Table</span>
             </button>
 
-            <button
-              onClick={handleExportExcel}
-              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-2 py-1 rounded-md border border-hairline transition-colors"
-              title="Export Formatted Excel Spreadsheet (.xlsx)"
-            >
-              <Download className="w-3 h-3 text-success" />
-              <span>Excel</span>
-            </button>
+            {/* Consolidated Export Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setShowExports(!showExports);
+                  setShowBenchmarks(false);
+                }}
+                className="flex items-center gap-1.5 text-xs text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-3 py-1.5 rounded-xl border border-hairline/60 transition-all shadow-2xs"
+                title="Export options"
+              >
+                <Download className="w-3.5 h-3.5 text-ink" />
+                <span>Export</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
 
-            <button
-              onClick={handlePrintBriefing}
-              className="flex items-center gap-1 text-[11px] text-muted hover:text-ink bg-surface-card hover:bg-surface-cream px-2 py-1 rounded-md border border-hairline transition-colors"
-              title="Print / PDF Executive Briefing Report"
-            >
-              <Printer className="w-3 h-3 text-accent-amber" />
-              <span>Print</span>
-            </button>
+              {showExports && (
+                <div className="absolute right-0 top-10 w-44 bg-surface-card border border-hairline/80 rounded-2xl shadow-xl p-1.5 z-50 animate-keyframe-fade-up space-y-1">
+                  <button
+                    onClick={() => {
+                      handleExportLatex();
+                      setShowExports(false);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 text-xs text-ink hover:bg-surface-cream rounded-xl transition-colors text-left"
+                  >
+                    <FileCode className="w-3.5 h-3.5 text-accent-teal" />
+                    <span>{copiedLatex ? "Copied!" : "Copy LaTeX"}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportExcel();
+                      setShowExports(false);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 text-xs text-ink hover:bg-surface-cream rounded-xl transition-colors text-left"
+                  >
+                    <Download className="w-3.5 h-3.5 text-success" />
+                    <span>Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handlePrintBriefing();
+                      setShowExports(false);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 text-xs text-ink hover:bg-surface-cream rounded-xl transition-colors text-left"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-accent-amber" />
+                    <span>Print Report</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-          {/* 1. TRANSPORTATION & ASSIGNMENT             */}
+
+        {/* 1. TRANSPORTATION & ASSIGNMENT             */}
           {/* ========================================== */}
           {activeModule === "transportation-assignment" && (
             <div className="space-y-6 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
-                  Transportation & Assignment Models
-                </h3>
-                <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
-                  <button
-                    onClick={() => setTransSubtype("transportation")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      transSubtype === "transportation" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    Transportation (VAM)
-                  </button>
-                  <button
-                    onClick={() => setTransSubtype("hungarian-assignment")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      transSubtype === "hungarian-assignment" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    Hungarian Assignment
-                  </button>
-                </div>
-              </div>
+              
 
               {transSubtype === "transportation" ? (
-                <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  <div className="lg:col-span-6 bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
                       Shipping Cost Matrix
@@ -1116,9 +1251,11 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     </table>
                   </div>
 
+                  </div>
+
                   {/* Solution Output */}
                   {transSol && (
-                    <div className="bg-surface-card text-ink p-5 rounded-2xl border border-hairline space-y-3 animate-keyframe-fade-up shadow-sm">
+                    <div className="lg:col-span-6 bg-surface-card text-ink p-5 rounded-2xl border border-hairline/70 space-y-3 animate-keyframe-fade-up shadow-2xs">
                       <div className="flex items-center justify-between border-b border-hairline pb-2">
                         <span className="font-semibold text-base">Optimal Distribution Plan</span>
                         <span className="text-lg font-mono font-bold text-primary">
@@ -1173,7 +1310,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  <div className="lg:col-span-6 bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
                       Assignment Cost Matrix
@@ -1251,14 +1389,18 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     </table>
                   </div>
 
+                  </div>
+
                   {/* Hungarian Reduction & Solution Matrix Viewer */}
                   {assignSol && (
-                    <HungarianMatrixViewer
-                      workers={assignProblem.workers}
-                      jobs={assignProblem.jobs}
-                      costs={assignProblem.costs}
-                      solution={assignSol}
-                    />
+                    <div className="lg:col-span-6">
+                      <HungarianMatrixViewer
+                        workers={assignProblem.workers}
+                        jobs={assignProblem.jobs}
+                        costs={assignProblem.costs}
+                        solution={assignSol}
+                      />
+                    </div>
                   )}
                 </div>
               )}
@@ -1269,31 +1411,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           {/* 2. LINEAR PROGRAMMING                     */}
           {/* ========================================== */}
           {activeModule === "linear-programming" && (
-            <div className="space-y-6 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
-                  Linear Programming
-                </h3>
-                <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
-                  <button
-                    onClick={() => setLpMode("graphical-2d")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      lpMode === "graphical-2d" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    2D Graphical
-                  </button>
-                  <button
-                    onClick={() => setLpMode("simplex-tableau")}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      lpMode === "simplex-tableau" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    Simplex Tableaus
-                  </button>
-                </div>
-              </div>
-              <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-150">
+              <div className="lg:col-span-5 bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
                     Model Formulation ({lpProblem.objectiveCoefficients.length} Variables, {lpProblem.constraints.length} Constraints)
@@ -1459,6 +1578,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 </div>
               </div>
 
+              <div className="lg:col-span-7 space-y-4">
               {/* Graphical or Simplex Tableau Solution */}
               {lpSol && (
                 <div className="space-y-4">
@@ -1577,64 +1697,16 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   )}
                 </div>
               )}
+              </div>
             </div>
           )}
           {/* ========================================== */}
           {/* 3. NETWORK MODELS                         */}
           {/* ========================================== */}
           {activeModule === "network-models" && (
-            <div className="space-y-6 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <h3 className="font-editorial-serif text-2xl font-medium text-ink">
-                  Network Models
-                </h3>
-                <div className="flex items-center bg-surface-soft p-0.5 rounded-lg border border-hairline">
-                  <button
-                    onClick={() => {
-                      setNetworkSubtype("shortest-route");
-                      if (networkEdges.length > 0) {
-                        const sol = solveNetworkShortestRoute(networkEdges, netStartNode, netEndNode);
-                        setNetworkSol(sol);
-                      }
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      networkSubtype === "shortest-route" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    Shortest Route
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNetworkSubtype("minimum-spanning-tree");
-                      if (networkEdges.length > 0) {
-                        const sol = solveNetworkMst(networkEdges);
-                        setNetworkSol(sol);
-                      }
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      networkSubtype === "minimum-spanning-tree" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    Minimum Spanning Tree
-                  </button>
-                  <button
-                    onClick={() => {
-                      setNetworkSubtype("maximal-flow");
-                      if (networkEdges.length > 0) {
-                        const sol = solveNetworkMaxFlow(networkEdges, netStartNode, netEndNode);
-                        setNetworkSol(sol);
-                      }
-                    }}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
-                      networkSubtype === "maximal-flow" ? "bg-canvas text-ink shadow-2xs font-bold" : "text-muted hover:text-ink"
-                    }`}
-                  >
-                    Maximal Flow
-                  </button>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-in fade-in duration-150">
               {/* Network Edges Input Card (Editable) */}
-              <div className="bg-surface-card border border-hairline rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="lg:col-span-5 bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
@@ -1752,6 +1824,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   </table>
                 </div>
               </div>
+              <div className="lg:col-span-7 space-y-4">
               {/* Interactive Visual Network Topology Graph */}
               <NetworkGraphCanvas
                 edges={networkEdges}
@@ -1834,6 +1907,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   )}
                 </div>
               )}
+              </div>
             </div>
           )}
 
