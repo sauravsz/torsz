@@ -17,18 +17,25 @@ export const HungarianMatrixViewer: React.FC<HungarianMatrixViewerProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
 
-  // Compute row reductions and column reductions
-  const rowMins = costs.map((row) => Math.min(...row));
-  const rowReduced = costs.map((row, r) => row.map((val) => val - rowMins[r]));
+  const dispWorkers = solution.workers || workers;
+  const dispJobs = solution.jobs || jobs;
+  const dim = Math.max(dispWorkers.length, dispJobs.length);
 
-  const colMins = jobs.map((_, c) => Math.min(...rowReduced.map((row) => row[c])));
+  const matrixToUse = Array.from({ length: dim }, (_, r) =>
+    Array.from({ length: dim }, (_, c) => costs[r]?.[c] ?? 0)
+  );
+
+  const rowMins = matrixToUse.map((row) => Math.min(...row));
+  const rowReduced = matrixToUse.map((row, r) => row.map((val) => val - rowMins[r]));
+
+  const colMins = Array.from({ length: dim }, (_, c) => Math.min(...rowReduced.map((row) => row[c])));
   const colReduced = rowReduced.map((row) => row.map((val, c) => val - colMins[c]));
 
   const steps = [
     {
       title: "Step 1: Original Cost Matrix",
       desc: "Initial worker-to-job assignment cost coefficients.",
-      matrix: costs,
+      matrix: matrixToUse,
       highlights: [],
     },
     {
@@ -45,8 +52,8 @@ export const HungarianMatrixViewer: React.FC<HungarianMatrixViewerProps> = ({
     },
     {
       title: "Step 4: Optimal One-to-One Zero Matchings",
-      desc: "Optimal assignment allocation derived from zero-cost reduced cells.",
-      matrix: colReduced,
+      desc: "Optimal assignment allocation derived from zero-cost reduced cells (Jonker-Volgenant matching).",
+      matrix: solution.reducedMatrix || colReduced,
       isFinal: true,
     },
   ];
@@ -112,7 +119,7 @@ export const HungarianMatrixViewer: React.FC<HungarianMatrixViewerProps> = ({
           <thead>
             <tr className="border-b border-hairline bg-surface-soft text-muted">
               <th className="p-2.5 border-r border-hairline text-ink font-bold">Worker \ Job</th>
-              {jobs.map((j) => (
+              {dispJobs.map((j) => (
                 <th key={j} className="p-2.5 border-r border-hairline text-center text-ink font-semibold">
                   {j}
                 </th>
@@ -120,10 +127,10 @@ export const HungarianMatrixViewer: React.FC<HungarianMatrixViewerProps> = ({
             </tr>
           </thead>
           <tbody>
-            {workers.map((w, r) => (
-              <tr key={w} className="border-b border-hairline-soft">
-                <td className="p-2.5 font-bold border-r border-hairline text-ink">{w}</td>
-                {jobs.map((j, c) => {
+            {dispWorkers.map((w, r) => (
+              <tr key={r} className="border-b border-hairline-soft">
+                <td className="p-2.5 font-semibold text-ink border-r border-hairline">{w}</td>
+                {dispJobs.map((j, c) => {
                   const val = step.matrix[r]?.[c] ?? 0;
                   const isAssigned =
                     step.isFinal &&

@@ -1125,31 +1125,41 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                           Total Minimum Cost: ${transSol.totalCost.toLocaleString()}
                         </span>
                       </div>
+                      {transSol.dummyAdded && (
+                        <div className="text-xs px-3 py-1.5 bg-primary/5 text-primary border border-primary/20 rounded-lg">
+                          Note: Unbalanced problem — automatically balanced with a{" "}
+                          <span className="font-bold">
+                            {transSol.dummyAdded === "demand" ? "Dummy Market (Destination)" : "Dummy Plant (Source)"}
+                          </span>{" "}
+                          at $0 shipping cost.
+                        </div>
+                      )}
 
                       <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-1">
                         <table className="w-full text-left font-mono text-xs">
                           <thead>
                             <tr className="text-muted border-b border-hairline bg-surface-soft">
                               <th className="p-2">From Source \ To Dest</th>
-                              {transProblem.destinations.map((d, c) => (
-                                <th key={c} className="p-2">{d}</th>
+                              {(transSol.destinations || transProblem.destinations).map((d, c) => (
+                                <th key={c} className="p-2 text-ink">{d}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
-                            {transProblem.sources.map((s, r) => (
+                            {(transSol.sources || transProblem.sources).map((s, r) => (
                               <tr key={r} className="border-b border-hairline-soft">
                                 <td className="p-2 font-semibold text-ink">{s}</td>
-                                {transProblem.destinations.map((_, c) => {
+                                {(transSol.destinations || transProblem.destinations).map((_, c) => {
                                   const alloc = transSol.allocations[r]?.[c] || 0;
+                                  const unitCost = transSol.costs?.[r]?.[c] ?? transProblem.costs[r]?.[c] ?? 0;
                                   return (
                                     <td key={c} className="p-2">
                                       {alloc > 0 ? (
-                                        <span className="bg-primary/10 text-primary font-bold px-2 py-0.5 rounded border border-primary/20">
-                                          {alloc} units (${transProblem.costs[r][c] * alloc})
+                                        <span className="bg-primary/10 text-primary font-bold px-2 py-0.5 rounded border border-primary/20 inline-block">
+                                          {alloc} units <span className="text-[10px] opacity-75">(@ ${unitCost} = ${alloc * unitCost})</span>
                                         </span>
                                       ) : (
-                                        <span className="text-muted-soft">-</span>
+                                        <span className="text-muted-soft text-center block">-</span>
                                       )}
                                     </td>
                                   );
