@@ -67,7 +67,7 @@ import {
   extractZeroSumGame,
   extractLinearEquations,
 } from "../services/orTextParsers";
-import { loadSavedSolverState, saveSolverState } from "../services/orStateManager";
+import { loadSavedSolverState, saveSolverState, sanitizeNetworkEdges } from "../services/orStateManager";
 import { BENCHMARKS } from "../services/orBenchmarks";
 import {
   detectImportableTables,
@@ -261,6 +261,30 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   useEffect(() => { saveSolverState("lp", lpProblem); }, [lpProblem]);
   useEffect(() => { saveSolverState("edges", networkEdges); }, [networkEdges]);
   useEffect(() => { saveSolverState("cpm", cpmActivities); }, [cpmActivities]);
+  // Auto-clean corrupted network edges from localStorage
+  useEffect(() => {
+    const clean = sanitizeNetworkEdges(networkEdges);
+    if (clean.length < networkEdges.length) {
+      const fallbackArcs = [
+        { from: 1, to: 2, cost: 4000 },
+        { from: 1, to: 3, cost: 5400 },
+        { from: 1, to: 4, cost: 9800 },
+        { from: 2, to: 3, cost: 4300 },
+        { from: 2, to: 4, cost: 6200 },
+        { from: 2, to: 5, cost: 8700 },
+        { from: 3, to: 4, cost: 4800 },
+        { from: 3, to: 5, cost: 7100 },
+        { from: 4, to: 5, cost: 4900 },
+      ];
+      const valid = clean.length > 0 ? clean : fallbackArcs;
+      setNetworkEdges(valid);
+      saveSolverState("edges", valid);
+      try {
+        const sol = solveNetworkShortestRoute(valid, netStartNode || "1", netEndNode || "5");
+        setNetworkSol(sol);
+      } catch {}
+    }
+  }, []);
   useEffect(() => { saveSolverState("queuing", queuingProblem); }, [queuingProblem]);
   useEffect(() => { saveSolverState("game", gameProblem); }, [gameProblem]);
   useEffect(() => { saveSolverState("inventory", inventoryProblem); }, [inventoryProblem]);
@@ -1761,6 +1785,35 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
 
                   <div className="flex items-center gap-2">
                     <button
+                      type="button"
+                      onClick={() => {
+                        const fallbackArcs = [
+                          { from: 1, to: 2, cost: 4000 },
+                          { from: 1, to: 3, cost: 5400 },
+                          { from: 1, to: 4, cost: 9800 },
+                          { from: 2, to: 3, cost: 4300 },
+                          { from: 2, to: 4, cost: 6200 },
+                          { from: 2, to: 5, cost: 8700 },
+                          { from: 3, to: 4, cost: 4800 },
+                          { from: 3, to: 5, cost: 7100 },
+                          { from: 4, to: 5, cost: 4900 },
+                        ];
+                        setNetworkEdges(fallbackArcs);
+                        setNetStartNode("1");
+                        setNetEndNode("5");
+                        saveSolverState("edges", fallbackArcs);
+                        try {
+                          const sol = solveNetworkShortestRoute(fallbackArcs, "1", "5");
+                          setNetworkSol(sol);
+                        } catch {}
+                      }}
+                      className="text-xs text-muted hover:text-ink px-2 py-1 rounded-lg border border-hairline/60 hover:bg-surface-cream transition-colors"
+                      title="Reset Arcs to default benchmark"
+                    >
+                      Reset
+                    </button>
+
+                    <button
                       onClick={() =>
                         setNetworkEdges([
                           ...networkEdges,
@@ -1772,6 +1825,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                       <Plus className="w-3.5 h-3.5 text-primary" />
                       <span>Add Arc</span>
                     </button>
+
                     <button
                       onClick={handleSolveNetwork}
                       className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-2xs"

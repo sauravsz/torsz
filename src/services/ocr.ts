@@ -22,6 +22,8 @@ import {
   extractZeroSumGame,
   extractLinearEquations,
 } from "./orTextParsers";
+import { sanitizeNetworkEdges } from "./orStateManager";
+
 export interface OcrProblemClassification {
   detectedModule: OrModule;
   confidence: number;
@@ -917,10 +919,10 @@ export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; start
     startNode = String(edges[0].from);
     endNode = String(edges[edges.length - 1].to);
   }
-
-  if (edges.length > 0) {
+  const cleanEdges = sanitizeNetworkEdges(edges);
+  if (cleanEdges.length > 0) {
     return {
-      edges,
+      edges: cleanEdges,
       startNode,
       endNode,
     };
