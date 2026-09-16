@@ -280,6 +280,22 @@ Smart drives daily to work. Having just completed a course in network analysis, 
       expect(sol.pathString).toBe("1 → 3 → 5 → 7");
       expect(sol.totalMetric).toBeCloseTo(1.17662, 4);
     });
+    it("extracts and solves Three-Jug / Juggling Jugs puzzle as shortest route model (Taha)", () => {
+      const text = `
+        Three-Jug Puzzle (Juggling Jugs Problem):
+        An 8-gallon jug is filled with fluid. Given two empty 5- and 3-gallon jugs, divide the 8 gallons
+        of fluid into two equal parts using only the three jugs. What is the smallest number of transfers
+        (decantations) needed to achieve this result?
+      `;
+      const { edges, startNode, endNode } = extractNetworkEdges(text);
+      expect(edges.length).toBeGreaterThan(20);
+      expect(startNode).toBe("(8,0,0)");
+      expect(endNode).toBe("(4,4,0)");
+
+      const sol = solveNetworkShortestRoute(edges, startNode, endNode);
+      expect(sol.totalMetric).toBe(7);
+      expect(sol.pathString).toBe("(8,0,0) → (3,5,0) → (3,2,3) → (6,2,0) → (6,0,2) → (1,5,2) → (1,4,3) → (4,4,0)");
+    });
 
     it("extracts network edges from tuple list and arrow statements", () => {
       const text = `

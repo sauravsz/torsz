@@ -527,6 +527,10 @@ export function classifyOrProblemFromText(
     lower.includes("replacement policy") ||
     lower.includes("rent car") ||
     lower.includes("car replacement") ||
+    lower.includes("jug") ||
+    lower.includes("jugs") ||
+    lower.includes("decanting") ||
+    lower.includes("decantations") ||
     (lower.includes("acquired") && lower.includes("service"))
   ) {
     const { edges, startNode, endNode } = extractNetworkEdges(text);
@@ -534,7 +538,7 @@ export function classifyOrProblemFromText(
       detectedModule: "network-models",
       networkSubtype: "shortest-route",
       confidence: 0.95,
-      reason: "Detected shortest route / Dijkstra replacement policy problem.",
+      reason: "Detected shortest route / Dijkstra replacement policy or jug puzzle problem.",
       transcription: text,
       parsedData: { edges, startNode, endNode },
     };
@@ -728,6 +732,69 @@ export function classifyOrProblemFromText(
 export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; startNode: string; endNode: string } {
   const lower = text.toLowerCase();
   const edges: NetworkEdge[] = [];
+
+  // Check for Juggling Jugs / Three-Jug puzzle (Hamdy A. Taha Ex 6.3-3)
+  if (
+    lower.includes("jug") ||
+    lower.includes("jugs") ||
+    lower.includes("decanting") ||
+    lower.includes("decantation") ||
+    lower.includes("three-jug")
+  ) {
+    let caps = [8, 5, 3];
+    let start = [8, 0, 0];
+    let goal = [4, 4, 0];
+
+    const nums = Array.from(text.matchAll(/(\d+)\s*(?:-|–|\s)?(?:gallon|liter|litre|qt|quarts?|gal)?\s*jugs?/gi)).map((m) => parseInt(m[1], 10));
+    if (nums.length >= 3) {
+      caps = [nums[0], nums[1], nums[2]];
+      start = [caps[0], 0, 0];
+      const half = caps[0] / 2;
+      goal = [half, half, 0];
+    }
+
+    const startKey = `(${start.join(",")})`;
+    const goalKey = `(${goal.join(",")})`;
+    const queue: number[][] = [start];
+    const visited = new Set<string>([startKey]);
+    const jugEdges: NetworkEdge[] = [];
+    const n = caps.length;
+
+    while (queue.length > 0) {
+      const state = queue.shift()!;
+      const stateKey = `(${state.join(",")})`;
+      if (stateKey === goalKey) continue;
+
+      for (let i = 0; i < n; i++) {
+        if (state[i] === 0) continue;
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          if (state[j] === caps[j]) continue;
+
+          const pour = Math.min(state[i], caps[j] - state[j]);
+          const nextState = [...state];
+          nextState[i] -= pour;
+          nextState[j] += pour;
+          const nextKey = `(${nextState.join(",")})`;
+
+          if (!jugEdges.some((e) => e.from === stateKey && e.to === nextKey)) {
+            jugEdges.push({ from: stateKey, to: nextKey, cost: 1 });
+          }
+
+          if (!visited.has(nextKey)) {
+            visited.add(nextKey);
+            queue.push(nextState);
+          }
+        }
+      }
+    }
+
+    return {
+      edges: jugEdges,
+      startNode: startKey,
+      endNode: goalKey,
+    };
+  }
 
   // Check for Rent Car / Equipment Replacement pattern
   if (
