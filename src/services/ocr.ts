@@ -798,30 +798,6 @@ export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; start
     };
   }
 
-  // Check for Rent Car / Equipment Replacement pattern
-  if (
-    lower.includes("rent car") ||
-    lower.includes("replacement policy") ||
-    (lower.includes("acquired") && lower.includes("service")) ||
-    (text.includes("4,000") && text.includes("5,400")) ||
-    (text.includes("4000") && text.includes("5400"))
-  ) {
-    return {
-      edges: [
-        { from: 1, to: 2, cost: 4000 },
-        { from: 1, to: 3, cost: 5400 },
-        { from: 1, to: 4, cost: 9800 },
-        { from: 2, to: 3, cost: 4300 },
-        { from: 2, to: 4, cost: 6200 },
-        { from: 2, to: 5, cost: 8700 },
-        { from: 3, to: 4, cost: 4800 },
-        { from: 3, to: 5, cost: 7100 },
-        { from: 4, to: 5, cost: 4900 },
-      ],
-      startNode: "1",
-      endNode: "5",
-    };
-  }
   // 1. Check for Pipe Format Tables (Edge List Table OR Adjacency Matrix)
   const pipeLines = text.split("\n").map((l) => l.trim()).filter((l) => l.includes("|") && !l.includes("---"));
   if (pipeLines.length >= 2) {

@@ -1186,25 +1186,6 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        {onAskAi && (
-                          <button
-                            onClick={() =>
-                              onAskAi(
-                                `Analyze this Transportation Shipping Matrix: 3 Plants with supply [${transProblem.supply.join(
-                                  ", "
-                                )}] and 4 Markets with demand [${transProblem.demand.join(
-                                  ", "
-                                )}]. Total optimal shipping cost is $${
-                                  transSol?.totalCost || 455
-                                }. How can we reduce bottleneck lane costs or improve throughput?`
-                              )
-                            }
-                            className="flex items-center gap-1 bg-surface-card hover:bg-surface-cream text-primary text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Ask AI Advisor</span>
-                          </button>
-                        )}
 
                         <button
                           onClick={addTransSource}
