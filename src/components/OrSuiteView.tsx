@@ -117,21 +117,69 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const fileUploadRef = useRef<HTMLInputElement | null>(null);
 
   const problemSuggestions = [
-    "Maximize Z = 3x1 + 5x2 subject to x1 <= 4, 2x2 <= 12, 3x1 + 2x2 <= 18 (Simplex LP)",
-    "Meridian Manufacturing 4-plant to 5-warehouse transportation cost minimization (VAM)",
-    "Shortest route from node 1 to node 7 in Smart Commute road network (Dijkstra)",
-    "Three-Jug puzzle: 8-gallon jug full, 5- and 3-gallon empty, divide into (4,4,0)",
-    "Single-server queuing system with arrival rate 10/hr and service rate 15/hr (M/M/1)",
-    "Economic Order Quantity (EOQ) with annual demand 12000, order cost $50, holding cost $3",
-    "General Foundry project critical path schedule for activities A through H (CPM/PERT)",
-    "Two-person zero-sum 3x4 payoff matrix game theory with saddle point detection",
+    {
+      title: "Wyndor Glass Mix",
+      query: "Maximize Z = 3x1 + 5x2 subject to x1 <= 4, 2x2 <= 12, 3x1 + 2x2 <= 18",
+      module: "Simplex LP",
+    },
+    {
+      title: "Meridian Shipping",
+      query: "Meridian Manufacturing 4-plant to 5-warehouse transportation cost minimization",
+      module: "VAM",
+    },
+    {
+      title: "Smart Commute",
+      query: "Shortest route from node 1 to node 7 in Smart Commute road network",
+      module: "Dijkstra",
+    },
+    {
+      title: "Three-Jug Puzzle",
+      query: "Three-Jug puzzle: 8-gallon jug full, 5- and 3-gallon empty, divide into (4,4,0)",
+      module: "State Space",
+    },
+    {
+      title: "Bank Drive-In Teller",
+      query: "Single-server queuing system with arrival rate 10/hr and service rate 15/hr (M/M/1)",
+      module: "M/M/1",
+    },
+    {
+      title: "Western Electric EOQ",
+      query: "Economic Order Quantity (EOQ) with annual demand 12000, order cost $50, holding cost $3",
+      module: "EOQ",
+    },
+    {
+      title: "General Foundry CPM",
+      query: "General Foundry project critical path schedule for activities A through H",
+      module: "CPM/PERT",
+    },
+    {
+      title: "Zero-Sum Game Matrix",
+      query: "Two-person zero-sum 3x4 payoff matrix game theory with saddle point detection",
+      module: "Game Theory",
+    },
   ];
 
   const sqlSuggestions = [
-    "Find top 5 customers with highest total spending in orders table",
-    "Calculate average monthly revenue grouped by product category",
-    "List active products that have inventory below reorder point",
-    "Show customer retention rate and purchase frequency over time",
+    {
+      title: "Top Customers Spending",
+      query: "Find top 5 customers with highest total spending in orders table",
+      module: "Aggregation",
+    },
+    {
+      title: "Monthly Category Revenue",
+      query: "Calculate average monthly revenue grouped by product category",
+      module: "Group By",
+    },
+    {
+      title: "Low Inventory Stock Alert",
+      query: "List active products that have inventory below reorder point",
+      module: "Filtering",
+    },
+    {
+      title: "Customer Retention Analysis",
+      query: "Show customer retention rate and purchase frequency over time",
+      module: "Analytics",
+    },
   ];
 
   const handleDockSubmit = (e?: React.FormEvent) => {
@@ -2571,17 +2619,27 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                 </button>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {(assistantMode === "sql" ? sqlSuggestions : problemSuggestions).map((s, idx) => (
+                {(assistantMode === "sql" ? sqlSuggestions : problemSuggestions).map((item, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => {
-                      setQuickQuestionText(s);
+                      setQuickQuestionText(item.query);
                       setShowSuggestions(false);
                     }}
-                    className="text-left p-2 rounded-xl text-xs text-ink hover:bg-surface-cream hover:text-primary transition-colors line-clamp-1 border border-hairline/40 bg-canvas"
+                    className="w-full text-left p-2.5 rounded-xl border border-hairline/60 bg-canvas hover:bg-surface-cream hover:border-primary/40 transition-all flex items-center justify-between gap-2 group shadow-2xs overflow-hidden"
                   >
-                    ✦ {s}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-ink group-hover:text-primary truncate">
+                        ✦ {item.title}
+                      </div>
+                      <div className="text-[11px] text-muted truncate">
+                        {item.query}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-mono font-medium text-muted bg-surface-soft px-1.5 py-0.5 rounded-md shrink-0 border border-hairline/40">
+                      {item.module}
+                    </span>
                   </button>
                 ))}
               </div>
