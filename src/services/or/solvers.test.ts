@@ -247,6 +247,40 @@ describe("TORA Operations Research Multi-Scenario & Textbook Benchmark Suite", (
       expect(sol.minCut?.cutCapacity).toBe(45);
     });
 
+    it("extracts network edges from edge-list table and solves Smart commute most reliable route (Taha)", () => {
+      const text = `
+Since torsz's OCR/classifier expects a solvable model, here's the question reframed for its **Shortest Route (Dijkstra)** solver — the "most reliable route" trick is converting each probability to a distance via −log₁₀(p), so minimizing total distance = maximizing the product of probabilities.
+
+**Problem statement**
+Smart drives daily to work. Having just completed a course in network analysis, Smart is able to determine the shortest route to work. Unfortunately, the selected route is heavily patrolled by police, and w/ all the fines paid for speeding, the shortest route may not be the best choice. Smart has thus decided to choose a route that maximises the probability of not being stopped by police.
+
+**Network — Source: Node 1, Sink: Node 7**
+
+| From | To | Probability | Distance (−log₁₀ p) |
+|---|---|---|---|
+| 1 | 2 | 0.2 | 0.69897 |
+| 1 | 3 | 0.9 | 0.04576 |
+| 2 | 3 | 0.6 | 0.2185 |
+| 2 | 4 | 0.8 | 0.09691 |
+| 3 | 4 | 0.1 | 1 |
+| 3 | 5 | 0.3 | 0.5288 |
+| 4 | 5 | 0.4 | 0.39794 |
+| 4 | 6 | 0.35 | 0.45593 |
+| 5 | 7 | 0.25 | 0.60206 |
+| 6 | 7 | 0.5 | 0.30103 |
+
+**Objective:** minimize total distance from Node 1 to Node 7 — this identifies the route with the highest overall probability of not being stopped by police.
+      `;
+      const { edges, startNode, endNode } = extractNetworkEdges(text);
+      expect(edges.length).toBe(10);
+      expect(startNode).toBe("1");
+      expect(endNode).toBe("7");
+
+      const sol = solveNetworkShortestRoute(edges, startNode, endNode);
+      expect(sol.pathString).toBe("1 → 3 → 5 → 7");
+      expect(sol.totalMetric).toBeCloseTo(1.17662, 4);
+    });
+
     it("extracts network edges from tuple list and arrow statements", () => {
       const text = `
         Network flow problem:

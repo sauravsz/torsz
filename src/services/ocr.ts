@@ -753,51 +753,72 @@ export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; start
       endNode: "5",
     };
   }
-
-  // 1. Check for Distance Table / Matrix in Pipe Format
+  // 1. Check for Pipe Format Tables (Edge List Table OR Adjacency Matrix)
   const pipeLines = text.split("\n").map((l) => l.trim()).filter((l) => l.includes("|") && !l.includes("---"));
-  if (pipeLines.length >= 3) {
+  if (pipeLines.length >= 2) {
     const header = pipeLines[0].split("|").map((c) => c.trim()).filter(Boolean);
-    const nodeCols = header.slice(1);
-    for (let r = 1; r < pipeLines.length; r++) {
-      const cols = pipeLines[r].split("|").map((c) => c.trim()).filter(Boolean);
-      if (cols.length >= header.length) {
-        const fromNode = cols[0];
-        for (let c = 0; c < nodeCols.length; c++) {
-          const toNode = nodeCols[c];
-          const valStr = cols[c + 1];
-          if (fromNode !== toNode && valStr !== "-" && valStr !== "0" && valStr !== "inf" && valStr !== "M") {
-            const costVal = parseFloat(valStr.replace(/[^0-9.]/g, ""));
-            if (!isNaN(costVal) && costVal > 0) {
-              edges.push({ from: fromNode, to: toNode, cost: costVal });
+    const headerLower = header.map((h) => h.toLowerCase());
+
+    const fromIdx = headerLower.findIndex((h) => /\b(from|source|start|origin|u|node\s*1)\b/i.test(h));
+    const toIdx = headerLower.findIndex((h) => /\b(to|target|destination|sink|end|v|node\s*2)\b/i.test(h));
+
+    if (fromIdx !== -1 && toIdx !== -1) {
+      // It is an Edge List Table!
+      let costIdx = headerLower.findIndex((h) => /\b(distance|cost|weight|length|log|−log|-log|capacity|metric|value|time)\b/i.test(h));
+      if (costIdx === -1 || costIdx === fromIdx || costIdx === toIdx) {
+        costIdx = header.length - 1;
+      }
+
+      for (let r = 1; r < pipeLines.length; r++) {
+        const cols = pipeLines[r].split("|").map((c) => c.trim()).filter(Boolean);
+        if (cols.length > Math.max(fromIdx, toIdx, costIdx)) {
+          const from = cols[fromIdx];
+          const to = cols[toIdx];
+          const costVal = parseFloat(cols[costIdx].replace(/[^0-9.-]/g, ""));
+          if (from && to && from !== to && !isNaN(costVal)) {
+            edges.push({ from, to, cost: costVal });
+          }
+        }
+      }
+    } else {
+      // Adjacency matrix table
+      const nodeCols = header.slice(1);
+      for (let r = 1; r < pipeLines.length; r++) {
+        const cols = pipeLines[r].split("|").map((c) => c.trim()).filter(Boolean);
+        if (cols.length >= header.length) {
+          const fromNode = cols[0];
+          for (let c = 0; c < nodeCols.length; c++) {
+            const toNode = nodeCols[c];
+            const valStr = cols[c + 1];
+            if (fromNode !== toNode && valStr !== "-" && valStr !== "0" && valStr !== "inf" && valStr !== "M") {
+              const costVal = parseFloat(valStr.replace(/[^0-9.-]/g, ""));
+              if (!isNaN(costVal) && costVal > 0) {
+                edges.push({ from: fromNode, to: toNode, cost: costVal });
+              }
             }
           }
         }
       }
     }
-    if (edges.length >= 2) {
-      return {
-        edges,
-        startNode: String(edges[0].from),
-        endNode: String(edges[edges.length - 1].to),
-      };
-    }
   }
 
   // 2. Check for parenthesized arcs: (1, 2, 4000) or (A, B, 10) or (1, 2): 4000
-  const tupleRegex = /\(\s*([A-Za-z0-9]+)\s*,\s*([A-Za-z0-9]+)(?:\s*,\s*([0-9.,]+))?\s*\)(?:\s*[:=]\s*([0-9.,]+))?/g;
-  let tMatch;
-  while ((tMatch = tupleRegex.exec(text)) !== null) {
-    const from = tMatch[1];
-    const to = tMatch[2];
-    const costStr = tMatch[3] || tMatch[4];
-    if (costStr && from !== to) {
-      const cost = parseFloat(costStr.replace(/,/g, ""));
-      if (!isNaN(cost)) {
-        edges.push({ from, to, cost });
+  if (edges.length === 0) {
+    const tupleRegex = /\(\s*([A-Za-z0-9]+)\s*,\s*([A-Za-z0-9]+)(?:\s*,\s*([0-9.,]+))?\s*\)(?:\s*[:=]\s*([0-9.,]+))?/g;
+    let tMatch;
+    while ((tMatch = tupleRegex.exec(text)) !== null) {
+      const from = tMatch[1];
+      const to = tMatch[2];
+      const costStr = tMatch[3] || tMatch[4];
+      if (costStr && from !== to) {
+        const cost = parseFloat(costStr.replace(/,/g, ""));
+        if (!isNaN(cost)) {
+          edges.push({ from, to, cost });
+        }
       }
     }
   }
+
   // 3. Arrow / Colon regex: 1 -> 2: 4000 or Node 1 to Node 2 = 50
   if (edges.length === 0) {
     const edgeRegex = /(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?:->|–|—|-|to)\s*(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|capacity)\s*([0-9,.]+)/gi;
@@ -811,20 +832,30 @@ export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; start
       }
     }
   }
+
+  // Extract Start & End Nodes with strict non-keyword filtering
   let startNode = "1";
   let endNode = "5";
 
-  // Check for explicit start / end nodes in text e.g. "from node 1 to node 6"
-  const startMatch = text.match(/(?:from\s+(?:node\s+|station\s+|source\s+)?([A-Za-z0-9]+))/i);
-  const endMatch = text.match(/(?:to\s+(?:node\s+|station\s+|sink\s+)?([A-Za-z0-9]+))/i);
-  if (startMatch) startNode = startMatch[1];
-  if (endMatch) endNode = endMatch[1];
+  const sourceSinkMatch = text.match(/(?:source|start|origin)\s*(?:node|station)?[:\s]+(?:node\s+|station\s+)?([A-Za-z0-9_-]+)[^.\n]*?(?:sink|end|destination)\s*(?:node|station)?[:\s]+(?:node\s+|station\s+)?([A-Za-z0-9_-]+)/i) ||
+    text.match(/(?:minimize|find|shortest\s+route|distance|path)[^.\n]*?from\s+(?:node\s+|station\s+)?([A-Za-z0-9_-]+)\s+to\s+(?:node\s+|station\s+)?([A-Za-z0-9_-]+)/i) ||
+    text.match(/from\s+(?:node\s+|station\s+)?([0-9]+|[A-Za-z])\s+to\s+(?:node\s+|station\s+)?([0-9]+|[A-Za-z])/i);
+
+  if (sourceSinkMatch) {
+    const s = sourceSinkMatch[1].trim();
+    const e = sourceSinkMatch[2].trim();
+    if (!/^(node|station|the|a|an|from|to)$/i.test(s)) startNode = s;
+    if (!/^(node|station|the|a|an|from|to)$/i.test(e)) endNode = e;
+  } else if (edges.length > 0) {
+    startNode = String(edges[0].from);
+    endNode = String(edges[edges.length - 1].to);
+  }
 
   if (edges.length > 0) {
     return {
       edges,
-      startNode: startMatch ? startNode : String(edges[0].from),
-      endNode: endMatch ? endNode : String(edges[edges.length - 1].to),
+      startNode,
+      endNode,
     };
   }
 

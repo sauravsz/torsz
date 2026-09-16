@@ -896,48 +896,56 @@ export function solveNetworkShortestRoute(
     nodes.add(String(e.to));
   });
 
-  const dist: Record<string, number> = {};
-  const prev: Record<string, string | null> = {};
-  const unvisited = new Set<string>(nodes);
+  function runDijkstra(directed: boolean) {
+    const d: Record<string, number> = {};
+    const p: Record<string, string | null> = {};
+    const unvis = new Set<string>(nodes);
 
-  nodes.forEach((n) => {
-    dist[n] = Infinity;
-    prev[n] = null;
-  });
-  dist[startNode] = 0;
-
-  while (unvisited.size > 0) {
-    let u: string | null = null;
-    let minDist = Infinity;
-
-    unvisited.forEach((n) => {
-      if (dist[n] < minDist) {
-        minDist = dist[n];
-        u = n;
-      }
+    nodes.forEach((n) => {
+      d[n] = Infinity;
+      p[n] = null;
     });
+    d[startNode] = 0;
 
-    if (!u || minDist === Infinity || u === endNode) break;
+    while (unvis.size > 0) {
+      let u: string | null = null;
+      let minDist = Infinity;
 
-    unvisited.delete(u);
-
-    edges.forEach((e) => {
-      const uStr = String(u);
-      const fromStr = String(e.from);
-      const toStr = String(e.to);
-
-      let v: string | null = null;
-      if (fromStr === uStr) v = toStr;
-      else if (toStr === uStr) v = fromStr; // Undirected
-
-      if (v && unvisited.has(v)) {
-        const alt = dist[uStr] + e.cost;
-        if (alt < dist[v]) {
-          dist[v] = alt;
-          prev[v] = uStr;
+      unvis.forEach((n) => {
+        if (d[n] < minDist) {
+          minDist = d[n];
+          u = n;
         }
-      }
-    });
+      });
+
+      if (!u || minDist === Infinity || u === endNode) break;
+
+      unvis.delete(u);
+
+      edges.forEach((e) => {
+        const uStr = String(u);
+        const fromStr = String(e.from);
+        const toStr = String(e.to);
+
+        let v: string | null = null;
+        if (fromStr === uStr) v = toStr;
+        else if (!directed && toStr === uStr) v = fromStr;
+
+        if (v && unvis.has(v)) {
+          const alt = d[uStr] + e.cost;
+          if (alt < d[v]) {
+            d[v] = alt;
+            p[v] = uStr;
+          }
+        }
+      });
+    }
+    return { dist: d, prev: p };
+  }
+
+  let { dist, prev } = runDijkstra(true);
+  if (dist[endNode] === Infinity) {
+    ({ dist, prev } = runDijkstra(false));
   }
 
   const path: string[] = [];
@@ -946,7 +954,6 @@ export function solveNetworkShortestRoute(
     path.unshift(curr);
     curr = prev[curr];
   }
-
   const selectedEdges: { from: string; to: string; weight: number }[] = [];
   for (let i = 0; i < path.length - 1; i++) {
     const u = path[i];
