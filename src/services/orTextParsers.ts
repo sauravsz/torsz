@@ -7,17 +7,200 @@ import {
 } from "./or/types";
 
 // ============================================================================
-// 1. ADVANCED LINEAR PROGRAMMING (LP) & GOAL PROGRAMMING EXTRACTOR
+// 1. ADVANCED UNIVERSAL LINEAR PROGRAMMING (LP) & GOAL PROGRAMMING EXTRACTOR
 // ============================================================================
 export function extractLinearProgramming(text: string): LpProblem | null {
-  // Normalize Greek symbols, superscripts, subscripts, and deviation variables
+  if (!text || text.trim().length === 0) return null;
+
+  // --------------------------------------------------------------------------
+  // Tier 1: Check for Tabular LP (e.g. Markdown resource-product matrices)
+  // --------------------------------------------------------------------------
+  const tabularLp = extractTabularLp(text);
+  if (tabularLp) return tabularLp;
+
+  // --------------------------------------------------------------------------
+  // Tier 2: Check for Narrative NLP Word Problems (e.g. Flair Furniture, Reddy Mikks, Wyndor Glass)
+  // --------------------------------------------------------------------------
+  const narrativeLp = extractNarrativeLp(text);
+  if (narrativeLp) return narrativeLp;
+
+  // --------------------------------------------------------------------------
+  // Tier 3: Standard Algebraic & Mathematical LP Parser
+  // --------------------------------------------------------------------------
+  return extractAlgebraicLp(text);
+}
+
+function extractTabularLp(text: string): LpProblem | null {
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.includes("|") && !l.includes("---"));
+  if (lines.length < 3) return null;
+
+  const header = lines[0].split("|").map((c) => c.trim()).filter(Boolean);
+  if (header.length < 3) return null;
+
+  const lastHeader = header[header.length - 1].toLowerCase();
+  const isLastColCapacity = /capacity|availab|limit|max|rhs|hours|units|budget/i.test(lastHeader);
+  if (!isLastColCapacity) return null;
+
+  const productNames = header.slice(1, header.length - 1);
+  if (productNames.length < 1) return null;
+
+  let objective: "max" | "min" = "max";
+  let objectiveCoefficients: number[] = Array(productNames.length).fill(0);
+  let foundObj = false;
+
+  const constraints: { coefficients: number[]; operator: "<=" | ">=" | "="; rhs: number }[] = [];
+
+  for (let r = 1; r < lines.length; r++) {
+    const rawTokens = lines[r].split("|").map((c) => c.trim());
+    // remove leading and trailing empty entries from table borders
+    if (rawTokens[0] === "") rawTokens.shift();
+    if (rawTokens[rawTokens.length - 1] === "") rawTokens.pop();
+
+    if (rawTokens.length < productNames.length + 1) continue;
+
+    const rowName = rawTokens[0].toLowerCase();
+    const isProfitOrCostRow = /profit|contribution|revenue|price|selling|cost|margin/i.test(rowName);
+
+    if (isProfitOrCostRow) {
+      if (/cost|min/i.test(rowName)) objective = "min";
+      for (let p = 0; p < productNames.length; p++) {
+        const val = parseFloat((rawTokens[p + 1] || "").replace(/[^0-9.-]/g, ""));
+        if (!isNaN(val)) objectiveCoefficients[p] = val;
+      }
+      foundObj = true;
+    } else {
+      const coeffs: number[] = [];
+      for (let p = 0; p < productNames.length; p++) {
+        const val = parseFloat((rawTokens[p + 1] || "").replace(/[^0-9.-]/g, ""));
+        coeffs.push(isNaN(val) ? 0 : val);
+      }
+      const rhsVal = parseFloat((rawTokens[rawTokens.length - 1] || "").replace(/[^0-9.-]/g, ""));
+      if (!isNaN(rhsVal) && coeffs.some((c) => c !== 0)) {
+        let op: "<=" | ">=" | "=" = "<=";
+        if (/min|at least|greater/i.test(rowName)) op = ">=";
+        else if (/equal|exact/i.test(rowName)) op = "=";
+        constraints.push({ coefficients: coeffs, operator: op, rhs: rhsVal });
+      }
+    }
+  }
+
+  if (constraints.length > 0) {
+    if (!foundObj || objectiveCoefficients.every((c) => c === 0)) {
+      objectiveCoefficients = Array(productNames.length).fill(1);
+    }
+    return {
+      objective,
+      objectiveCoefficients,
+      constraints,
+      variableNames: productNames,
+    };
+  }
+
+  return null;
+}
+
+function extractNarrativeLp(text: string): LpProblem | null {
+  const lower = text.toLowerCase();
+
+  // 1. Identify Products / Decision Variables
+  let productNames: string[] = [];
+  const prodMatch = text.match(/(?:products?|items?|goods?|types?|models?|makes?|produces?|manufactures?)\s*(?:such as|including|namely|:)?\s*([A-Za-z0-9\s,_-]+?)(?:\.|\n|;|which|each)/i);
+  if (prodMatch && prodMatch[1]) {
+    const listStr = prodMatch[1].replace(/^(?:two|three|four|2|3|4)\s*/i, "");
+    productNames = listStr.split(/,|and|\/|&/).map((s) => s.trim()).filter((s) => s.length > 1 && !/^(the|a|an|two|three)$/i.test(s));
+  }
+  if (productNames.length < 2) {
+    if (lower.includes("table") && lower.includes("chair")) productNames = ["Tables", "Chairs"];
+    else if (lower.includes("door") && lower.includes("window")) productNames = ["Doors", "Windows"];
+    else if (lower.includes("exterior") && lower.includes("interior")) productNames = ["Exterior Paint", "Interior Paint"];
+    else if (lower.includes("product 1") && lower.includes("product 2")) productNames = ["Product 1", "Product 2"];
+    else if (lower.includes("product a") && lower.includes("product b")) productNames = ["Product A", "Product B"];
+  }
+
+  const numVars = productNames.length;
+  if (numVars < 2) return null;
+
+  // 2. Identify Profit / Cost for each product
+  let objective: "max" | "min" = /minimiz|minimize|min\b|cost/i.test(text) ? "min" : "max";
+  const objCoeffs: number[] = Array(numVars).fill(0);
+
+  for (let i = 0; i < numVars; i++) {
+    const pSing = productNames[i].replace(/s$/i, "");
+    const m1 = text.match(new RegExp(`(?:profit|cost|revenue|price|earns?|sells?)[^.\\n]*?${pSing}[^.\\n]*?\\$\\s*([0-9.]+)`, "i"));
+    const m2 = text.match(new RegExp(`\\$\\s*([0-9.]+)[^.\\n]*?(?:per|for|each)?\\s*${pSing}`, "i"));
+    const m3 = text.match(new RegExp(`${pSing}[^.\\n]*?\\$\\s*([0-9.]+)`, "i"));
+    const val = parseFloat(m1?.[1] || m2?.[1] || m3?.[1] || "0");
+    if (!isNaN(val) && val > 0) objCoeffs[i] = val;
+  }
+
+  // 3. Identify Resources & Capacities
+  const resourceNames: string[] = [];
+  const resMatches = text.matchAll(/(?:hours?|hrs?|units?|lbs?|kg|tons?)\s+of\s+([A-Za-z0-9_-]+)|([A-Za-z0-9_-]+)\s+(?:hours?|hrs?|units?|lbs?|capacity|available)/gi);
+  for (const rm of resMatches) {
+    const r = (rm[1] || rm[2]).toLowerCase();
+    if (!["the", "and", "total", "a", "an", "is", "each", "per", "available", "capacity", "hours", "units"].includes(r)) {
+      if (!resourceNames.includes(r)) resourceNames.push(r);
+    }
+  }
+
+  const resCaps: Record<string, number> = {};
+  const clauses = text.split(/[.;\n]+|, and\s+|, but\s+|, while\s+/).map((s) => s.trim()).filter(Boolean);
+  for (const c of clauses) {
+    for (const r of resourceNames) {
+      if (c.toLowerCase().includes(r)) {
+        const capMatch = c.match(/(?:available|capacity|limit|maximum|total)[^0-9]*([0-9.,]+)/i) ||
+          c.match(/([0-9.,]+)\s*(?:hours?|hrs?|units?|lbs?|kg|tons?)\s*(?:available|capacity|limit|at most|maximum)/i);
+        if (capMatch) {
+          const cap = parseFloat(capMatch[1].replace(/,/g, ""));
+          if (!isNaN(cap) && cap > 0) resCaps[r] = cap;
+        }
+      }
+    }
+  }
+
+  const constraints: { coefficients: number[]; operator: "<=" | ">=" | "="; rhs: number }[] = [];
+  for (const [res, cap] of Object.entries(resCaps)) {
+    const coeffs = Array(numVars).fill(0);
+    for (let i = 0; i < numVars; i++) {
+      const pSing = productNames[i].replace(/s$/i, "");
+      const cm1 = text.match(new RegExp(`${pSing}[^.\\n,;]*?([0-9.]+)\\s*(?:hours?|hrs?|units?|lbs?|kg|tons?)?\\s*(?:of\\s+)?${res}`, "i"));
+      const cm2 = text.match(new RegExp(`([0-9.]+)\\s*(?:hours?|hrs?|units?|lbs?|kg|tons?)?\\s*(?:of\\s+)?${res}[^.\\n,;]*?${pSing}`, "i"));
+      const val = parseFloat(cm1?.[1] || cm2?.[1] || "0");
+      if (!isNaN(val)) coeffs[i] = val;
+    }
+    if (coeffs.some((c) => c > 0)) {
+      constraints.push({ coefficients: coeffs, operator: "<=", rhs: cap });
+    }
+  }
+
+  if (constraints.length > 0) {
+    return {
+      objective,
+      objectiveCoefficients: objCoeffs.every((c) => c === 0) ? Array(numVars).fill(1) : objCoeffs,
+      constraints,
+      variableNames: productNames,
+    };
+  }
+
+  return null;
+}
+
+function extractAlgebraicLp(text: string): LpProblem | null {
   const normalizedText = text
+    .replace(/\s*(?:subject to|s\.t\.|constraints:?)\s*/gi, "\n")
+    .replace(/\s+and\s+(?=[a-z0-9_+-]+.*?[<>=])/gi, "\n")
+    .replace(/\\le|\\leq/gi, "<=")
+    .replace(/\\ge|\\geq/gi, ">=")
+    .replace(/≤/g, "<=")
+    .replace(/≥/g, ">=")
     .replace(/e_?\{?(\d+)\}?\s*\^\s*\+/gi, "e$1_pos")
     .replace(/e_?\{?(\d+)\}?\s*\^\s*\-/gi, "e$1_neg")
+    .replace(/d_?\{?(\d+)\}?\s*\^\s*\+/gi, "e$1_pos")
+    .replace(/d_?\{?(\d+)\}?\s*\^\s*\-/gi, "e$1_neg")
     .replace(/e(\d+)\s*\+/gi, "e$1_pos")
     .replace(/e(\d+)\s*\-/gi, "e$1_neg")
-    .replace(/e_?(\d+)_pos/gi, "e$1_pos")
-    .replace(/e_?(\d+)_neg/gi, "e$1_neg")
+    .replace(/d(\d+)\s*\+/gi, "e$1_pos")
+    .replace(/d(\d+)\s*\-/gi, "e$1_neg")
     .replace(/w_?\{?(\d+)\}?/gi, "w$1")
     .replace(/x_?\{?(\d+)\}?/gi, "x$1")
     .replace(/y_?\{?(\d+)\}?/gi, "y$1")
@@ -31,12 +214,10 @@ export function extractLinearProgramming(text: string): LpProblem | null {
     objective = "min";
   }
 
-  // 1. Discover all distinct decision variable names across all lines
-  // Tokenize variable names: e.g. w1, w2, w3, e4_pos, e4_neg, x1, x2, etc.
   const varRegex = /\b([a-zA-Z][a-zA-Z0-9_]*)\b/g;
   const reservedKeywords = new Set([
     "max", "min", "maximize", "minimize", "objective", "subject", "to", "st", "constraints",
-    "and", "for", "all", "where", "with", "sum", "each", "total", "fn", "z", "obj"
+    "and", "for", "all", "where", "with", "sum", "each", "total", "fn", "z", "obj", "let"
   ]);
 
   const varSet = new Set<string>();
@@ -52,8 +233,7 @@ export function extractLinearProgramming(text: string): LpProblem | null {
     }
   }
 
-  // If summation notation like sum_{t=4}^6 (e_t^+ + e_t^-) was used, ensure e4..e6 exist
-  if (/sum.*e.*[4-6]/i.test(text) || lines.some(l => /e[4-6]/i.test(l))) {
+  if (/sum.*e.*[4-6]/i.test(text) || lines.some((l) => /e[4-6]/i.test(l))) {
     for (let t = 4; t <= 6; t++) {
       varSet.add(`e${t}_pos`);
       varSet.add(`e${t}_neg`);
@@ -61,7 +241,6 @@ export function extractLinearProgramming(text: string): LpProblem | null {
   }
 
   const varNames = Array.from(varSet).sort((a, b) => {
-    // Custom sort: w1..w3 first, then e-vars, then alphabetical
     const isW_A = a.startsWith("w");
     const isW_B = b.startsWith("w");
     if (isW_A && !isW_B) return -1;
@@ -73,18 +252,14 @@ export function extractLinearProgramming(text: string): LpProblem | null {
     varNames.push("x1", "x2");
   }
 
-  // Helper to extract linear expression terms for discovered variables
   const parseExpression = (expr: string): Map<string, number> => {
     const coeffMap = new Map<string, number>();
     for (const v of varNames) coeffMap.set(v, 0);
 
-    // Matches term like "+ 331 w3", "- 241.5 w2", "e4_pos", "- e4_neg"
-    // Handle both "331 w3" and "w3 331" formats
     const termRegex = /([+-]?\s*\d*\.?\d*)\s*([a-zA-Z][a-zA-Z0-9_]*)|([a-zA-Z][a-zA-Z0-9_]*)\s*([+-]?\s*\d+\.?\d*)/g;
     let match;
     while ((match = termRegex.exec(expr)) !== null) {
       if (match[2]) {
-        // format: 331 w3 or + w3 or - w3
         let numStr = (match[1] || "").replace(/\s+/g, "");
         const varName = match[2];
         if (varNames.includes(varName)) {
@@ -96,7 +271,6 @@ export function extractLinearProgramming(text: string): LpProblem | null {
           }
         }
       } else if (match[3]) {
-        // format: w3 331
         const varName = match[3];
         const numStr = (match[4] || "").replace(/\s+/g, "");
         if (varNames.includes(varName)) {
@@ -110,39 +284,34 @@ export function extractLinearProgramming(text: string): LpProblem | null {
     return coeffMap;
   };
 
-  // 2. Parse Objective Function
   let objectiveCoefficients: number[] = Array(varNames.length).fill(0);
   if (objLine) {
     const expr = objLine.replace(/maximiz\w*|minimiz\w*|obj\w*|z\s*=|f\^n/gi, "");
     if (/sum/i.test(expr) && /e/i.test(expr)) {
-      // Sum of all deviation variables
       objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 0));
     } else {
       const objMap = parseExpression(expr);
       objectiveCoefficients = varNames.map((v) => objMap.get(v) || 0);
     }
   } else {
-    // Default weights
-    objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 0));
+    objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 1));
   }
 
-  // If all objective coefficients are 0, default to 1 on deviation variables or 1 on all
   if (objectiveCoefficients.every((c) => c === 0)) {
     objectiveCoefficients = varNames.map((v) => (v.startsWith("e") ? 1 : 1));
   }
 
-  // 3. Parse Constraints
   const constraints: { coefficients: number[]; operator: "<=" | ">=" | "="; rhs: number }[] = [];
 
   for (const line of lines) {
     if (line === objLine) continue;
-    if (/subject to|s\.t\.|constraints/i.test(line) && !/[<>=≤≥]/.test(line)) continue;
+    if (/subject to|s\.t\.|constraints/i.test(line) && !/[<>=]/.test(line)) continue;
     if (/non-negativity|all\s*>=0|\ball\s*≥\s*0\b/i.test(line)) continue;
-    if (line.includes(",") && (line.includes(">= 0") || line.includes("≥ 0") || line.includes(">=0") || line.includes("≥0"))) continue;
-    if (line.includes(">=") || line.includes("≥") || line.includes("<=") || line.includes("≤")) {
-      const parts = line.split(/(>=|<=|≥|≤)/).map((p) => p.trim()).filter(Boolean);
+    if (line.includes(",") && (line.includes(">= 0") || line.includes(">=0"))) continue;
+
+    if (line.includes(">=") || line.includes("<=")) {
+      const parts = line.split(/(>=|<=)/).map((p) => p.trim()).filter(Boolean);
       if (parts.length >= 4) {
-        // e.g. ["w3", ">=", "w2", ">=", "w1", ">=", "0"]
         for (let i = 0; i < parts.length - 2; i += 2) {
           const leftVar = parts[i];
           const op = parts[i + 1];
@@ -154,13 +323,11 @@ export function extractLinearProgramming(text: string): LpProblem | null {
           const rightIdx = varNames.indexOf(rightVar);
 
           if (leftIdx !== -1 && rightIdx !== -1) {
-            if (op === ">=" || op === "≥") {
-              // leftVar - rightVar >= 0
+            if (op === ">=") {
               coeffs[leftIdx] = 1;
               coeffs[rightIdx] = -1;
               constraints.push({ coefficients: coeffs, operator: ">=", rhs: 0 });
             } else {
-              // leftVar - rightVar <= 0
               coeffs[leftIdx] = 1;
               coeffs[rightIdx] = -1;
               constraints.push({ coefficients: coeffs, operator: "<=", rhs: 0 });
@@ -171,10 +338,10 @@ export function extractLinearProgramming(text: string): LpProblem | null {
       }
     }
 
-    const opMatch = line.match(/(<=|>=|=|<|>|≤|≥)/);
+    const opMatch = line.match(/(<=|>=|=|<|>)/);
     if (opMatch) {
       const rawOp = opMatch[1];
-      const operator: "<=" | ">=" | "=" = rawOp.includes("<") || rawOp === "≤" ? "<=" : rawOp.includes(">") || rawOp === "≥" ? ">=" : "=";
+      const operator: "<=" | ">=" | "=" = rawOp.includes("<") ? "<=" : rawOp.includes(">") ? ">=" : "=";
       const parts = line.split(opMatch[0]);
       const leftExpr = parts[0];
       const rightExpr = parts[1];
@@ -182,24 +349,19 @@ export function extractLinearProgramming(text: string): LpProblem | null {
       const leftMap = parseExpression(leftExpr);
       const rightMap = parseExpression(rightExpr);
 
-      // Collect constants from both sides
       const rightConstMatch = rightExpr.match(/([+-]?\s*\d+\.?\d*)\s*$/);
       let rhs = rightConstMatch ? parseFloat(rightConstMatch[1].replace(/\s+/g, "")) : 0;
       if (isNaN(rhs)) rhs = 0;
 
-      // Handle expressions like "e4_pos - e4_neg = 331w3 + 241w2 + 270w1 - 299"
-      // Bring all variables to LHS: LHS_coeffs - RHS_coeffs
       const coeffs = varNames.map((v) => {
         return (leftMap.get(v) || 0) - (rightMap.get(v) || 0);
       });
 
-      // If constant was on the left side, subtract it from RHS
       const leftConstMatch = leftExpr.match(/([+-]?\s*\d+\.?\d*)\s*$/);
-      if (leftConstMatch && !leftExpr.includes(varNames.find(v => leftExpr.includes(v)) || "___")) {
+      if (leftConstMatch && !leftExpr.includes(varNames.find((v) => leftExpr.includes(v)) || "___")) {
         rhs -= parseFloat(leftConstMatch[1].replace(/\s+/g, ""));
       }
 
-      // If all coeffs are on RHS and LHS had deviation variables, invert so constant is positive
       if (rhs < 0 && operator === "=") {
         for (let i = 0; i < coeffs.length; i++) coeffs[i] = -coeffs[i];
         rhs = -rhs;
@@ -224,7 +386,7 @@ export function extractLinearProgramming(text: string): LpProblem | null {
 }
 
 // ============================================================================
-// 2. PROJECT PLANNING (CPM / PERT) EXTRACTOR
+// 2. PROJECT PLANNING (CPM / PERT / CRASHING) EXTRACTOR
 // ============================================================================
 export function extractCpmActivities(text: string): CpmActivity[] | null {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
@@ -232,15 +394,59 @@ export function extractCpmActivities(text: string): CpmActivity[] | null {
 
   const pipeLines = lines.filter((l) => l.includes("|") && !l.includes("---"));
   if (pipeLines.length >= 2) {
+    const header = pipeLines[0].split("|").map((c) => c.trim().toLowerCase()).filter(Boolean);
+    const hasPert3Time = header.some((h) => h.includes("optimistic") || h === "a") &&
+      header.some((h) => h.includes("pessimistic") || h === "b");
+    const hasCrashing = header.some((h) => h.includes("crash"));
+
     const dataRows = pipeLines.slice(1);
     for (const row of dataRows) {
       const cols = row.split("|").map((c) => c.trim()).filter(Boolean);
       if (cols.length >= 2) {
         const id = cols[0];
-        const preds = cols.length >= 3 && cols[1] !== "-" && cols[1] !== "None" && cols[1] !== "" ? cols[1].split(/[,;\s]+/).filter(Boolean) : [];
-        const dur = parseFloat(cols[cols.length - 1].replace(/[^0-9.]/g, ""));
-        if (id && !isNaN(dur)) {
-          activities.push({ id, name: id, predecessors: preds, duration: dur });
+        const rawPreds = cols[1];
+        const preds = rawPreds && !/none|-|\bnull\b/i.test(rawPreds)
+          ? rawPreds.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)
+          : [];
+
+        if (hasPert3Time && cols.length >= 5) {
+          const a = parseFloat(cols[2].replace(/[^0-9.]/g, ""));
+          const m = parseFloat(cols[3].replace(/[^0-9.]/g, ""));
+          const b = parseFloat(cols[4].replace(/[^0-9.]/g, ""));
+          const te = (a + 4 * m + b) / 6;
+          if (id && !isNaN(te)) {
+            activities.push({
+              id,
+              name: id,
+              predecessors: preds,
+              duration: Math.round(te * 100) / 100,
+              optimisticA: a,
+              mostLikelyM: m,
+              pessimisticB: b,
+            });
+          }
+        } else if (hasCrashing && cols.length >= 5) {
+          const normalT = parseFloat(cols[2].replace(/[^0-9.]/g, ""));
+          const crashT = parseFloat(cols[3].replace(/[^0-9.]/g, ""));
+          const normalC = parseFloat(cols[4].replace(/[^0-9.]/g, ""));
+          const crashC = cols.length >= 6 ? parseFloat(cols[5].replace(/[^0-9.]/g, "")) : undefined;
+          if (id && !isNaN(normalT)) {
+            activities.push({
+              id,
+              name: id,
+              predecessors: preds,
+              duration: normalT,
+              normalTime: normalT,
+              crashTime: crashT,
+              normalCost: normalC,
+              crashCost: crashC,
+            });
+          }
+        } else {
+          const dur = parseFloat(cols[cols.length - 1].replace(/[^0-9.]/g, ""));
+          if (id && !isNaN(dur)) {
+            activities.push({ id, name: id, predecessors: preds, duration: dur });
+          }
         }
       }
     }
@@ -248,11 +454,11 @@ export function extractCpmActivities(text: string): CpmActivity[] | null {
   }
 
   for (const line of lines) {
-    const match = line.match(/(?:Activity\s+)?([A-Za-z0-9_-]+)[:\s]+(?:predecessors?[:\s]*([A-Za-z0-9,\s_-]+|none|-))?.*?(?:duration[:\s]*(\d+\.?\d*)|(\d+\.?\d*)\s*(?:days|weeks|hours|units)?)/i);
+    const match = line.match(/(?:Activity\s+|Task\s+)?([A-Za-z0-9_-]+)[:\s]+(?:predecessors?[:\s]*([A-Za-z0-9,\s_-]+|none|-))?.*?(?:duration[:\s]*(\d+\.?\d*)|(\d+\.?\d*)\s*(?:days|weeks|months|hours|units)?)/i);
     if (match) {
       const id = match[1].trim();
       const rawPreds = match[2] ? match[2].trim() : "";
-      const preds = rawPreds && !/none|-/i.test(rawPreds) ? rawPreds.split(/[,;\s]+/).filter(Boolean) : [];
+      const preds = rawPreds && !/none|-/i.test(rawPreds) ? rawPreds.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean) : [];
       const dur = parseFloat(match[3] || match[4] || "0");
       if (id && !isNaN(dur) && dur > 0) {
         activities.push({ id, name: id, predecessors: preds, duration: dur });
@@ -264,31 +470,69 @@ export function extractCpmActivities(text: string): CpmActivity[] | null {
 }
 
 // ============================================================================
-// 3. INVENTORY CONTROL (EOQ) EXTRACTOR
+// 3. INVENTORY CONTROL EXTRACTOR
 // ============================================================================
 export function extractInventoryProblem(text: string): InventoryProblem | null {
-  const demandMatch = text.match(/(?:annual\s+demand|demand\s*\(D\)|D\s*=)[:\s]*([0-9.,]+)/i);
-  const orderCostMatch = text.match(/(?:ordering\s+cost|order\s+cost|setup\s+cost|cost\s+per\s+order|K\s*=)[:\s]*([0-9.,]+)/i);
-  const holdCostMatch = text.match(/(?:holding\s+cost|carrying\s+cost|cost\s+per\s+unit\s+per\s+year|H\s*=)[:\s]*([0-9.,]+)/i);
-  const unitPriceMatch = text.match(/(?:unit\s+price|purchase\s+price|cost\s+per\s+unit|C\s*=)[:\s]*([0-9.,]+)/i);
-  const shortageCostMatch = text.match(/(?:shortage\s+cost|backorder\s+cost|penalty\s+cost|P\s*=)[:\s]*([0-9.,]+)/i);
+  const demandMatch = text.match(/(?:annual\s+demand|demand\s*\(D\)|D\s*=|\bdemand\b)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.,]+)/i);
+  const orderCostMatch = text.match(/(?:ordering\s+cost|order\s+cost|setup\s+cost|cost\s+per\s+order|S\s*=|K\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.,]+)/i);
+  const holdCostMatch = text.match(/(?:holding\s+cost|carrying\s+cost|cost\s+per\s+unit\s+per\s+year|H\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.,]+)/i);
+  const unitPriceMatch = text.match(/(?:unit\s+price|purchase\s+price|cost\s+per\s+unit|item\s+cost|unit\s+cost|C\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.,]+)/i);
+  const shortageCostMatch = text.match(/(?:shortage\s+cost|backorder\s+cost|penalty\s+cost|P\s*=|p\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.,]+)/i);
+  const prodRateMatch = text.match(/(?:production\s+rate|daily\s+production|rate\s+of\s+production|P\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*([0-9.,]+)/i);
 
   const annualDemandD = demandMatch ? parseFloat(demandMatch[1].replace(/,/g, "")) : undefined;
   const orderingCostK = orderCostMatch ? parseFloat(orderCostMatch[1].replace(/,/g, "")) : undefined;
   const holdingCostH = holdCostMatch ? parseFloat(holdCostMatch[1].replace(/,/g, "")) : undefined;
-  const unitPriceC = unitPriceMatch ? parseFloat(unitPriceMatch[1].replace(/,/g, "")) : 50;
+  const unitPriceC = unitPriceMatch ? parseFloat(unitPriceMatch[1].replace(/,/g, "")) : 10;
   const shortageCostP = shortageCostMatch ? parseFloat(shortageCostMatch[1].replace(/,/g, "")) : undefined;
+  const productionRateP = prodRateMatch ? parseFloat(prodRateMatch[1].replace(/,/g, "")) : undefined;
+
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l.includes("|") && !l.includes("---"));
+  if (lines.length >= 3 && annualDemandD !== undefined && orderingCostK !== undefined) {
+    const tiers: { tierIndex: number; minQty: number; maxQty?: number; unitPrice: number }[] = [];
+    const dataRows = lines.slice(1);
+    for (let i = 0; i < dataRows.length; i++) {
+      const cols = dataRows[i].split("|").map((c) => c.trim()).filter(Boolean);
+      if (cols.length >= 2) {
+        const qtyStr = cols[0];
+        const priceStr = cols[cols.length - 1].replace(/[^0-9.]/g, "");
+        const price = parseFloat(priceStr);
+        const qtyMatch = qtyStr.match(/(\d+)\s*(?:to|-)?\s*(\d+)?/i);
+        if (qtyMatch && !isNaN(price)) {
+          const minQ = parseInt(qtyMatch[1], 10);
+          const maxQ = qtyMatch[2] ? parseInt(qtyMatch[2], 10) : undefined;
+          tiers.push({ tierIndex: i + 1, minQty: minQ, maxQty: maxQ, unitPrice: price });
+        }
+      }
+    }
+    if (tiers.length >= 2) {
+      return {
+        model: "quantity-discounts",
+        annualDemandD,
+        orderingCostK,
+        holdingCostH: holdingCostH ?? 2,
+        unitPriceC: tiers[0].unitPrice,
+        priceBreaks: tiers,
+      };
+    }
+  }
 
   if (annualDemandD !== undefined && orderingCostK !== undefined) {
+    let model: InventoryProblem["model"] = "classic-eoq";
+    if (productionRateP) model = "epq-production";
+    else if (shortageCostP) model = "eoq-with-backorders";
+
     return {
-      model: shortageCostP ? "eoq-with-backorders" : "classic-eoq",
+      model,
       annualDemandD,
       orderingCostK,
       holdingCostH: holdingCostH ?? 2,
       unitPriceC,
       shortageCostP,
+      productionRateP,
     };
   }
+
   return null;
 }
 
@@ -296,15 +540,36 @@ export function extractInventoryProblem(text: string): InventoryProblem | null {
 // 4. QUEUING ANALYSIS EXTRACTOR
 // ============================================================================
 export function extractQueuingProblem(text: string): QueuingProblem | null {
-  const lambdaMatch = text.match(/(?:arrival\s+rate|arrivals\s+per|lambda|λ|\b\lambda\b)[:\s=]*([0-9.]+)/i);
-  const muMatch = text.match(/(?:service\s+rate|services\s+per|mu|μ|\b\mu\b)[:\s=]*([0-9.]+)/i);
-  const serversMatch = text.match(/(?:servers|channels|windows|c\s*=)[:\s]*([0-9]+)/i);
-  const capacityMatch = text.match(/(?:system\s+capacity|buffer\s+size|K\s*=)[:\s]*([0-9]+)/i);
+  const lambdaMatch = text.match(/(?:arrival\s+rate|arrivals\s+per|arrive\s+at\s+a\s+rate\s+of|rate\s+of\s+arrivals?|lambda|λ|\b\lambda\b)(?:\s+is|\s*:|\s*=|\s+of)?\s*([0-9.]+)/i);
+  const muMatch = text.match(/(?:service\s+rate|services\s+per|rate\s+of\s+service|mu|μ|\b\mu\b)(?:\s+is|\s*:|\s*=|\s+of)?\s*([0-9.]+)/i);
+  const serversMatch = text.match(/(?:servers|channels|windows|c\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*([0-9]+)/i);
+  const capacityMatch = text.match(/(?:system\s+capacity|buffer\s+size|room\s+for|capacity\s+of|K\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*([0-9]+)/i);
+  const serverCostMatch = text.match(/(?:server\s+cost|cost\s+per\s+server|Cs\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.]+)/i);
+  const waitCostMatch = text.match(/(?:waiting\s+cost|cost\s+of\s+waiting|Cw\s*=)(?:\s+is|\s*:|\s*=|\s+of)?\s*\$?([0-9.]+)/i);
 
-  const lambda = lambdaMatch ? parseFloat(lambdaMatch[1]) : undefined;
-  const mu = muMatch ? parseFloat(muMatch[1]) : undefined;
+  let lambda = lambdaMatch ? parseFloat(lambdaMatch[1]) : undefined;
+  let mu = muMatch ? parseFloat(muMatch[1]) : undefined;
+
+  if (!lambda) {
+    const arrTimeMatch = text.match(/(?:arrive\s+every|arrival\s+time\s+of|interarrival\s+time\s+of)\s*([0-9.]+)\s*(?:minutes|mins)/i);
+    if (arrTimeMatch) {
+      const mins = parseFloat(arrTimeMatch[1]);
+      if (mins > 0) lambda = 60 / mins;
+    }
+  }
+
+  if (!mu) {
+    const servTimeMatch = text.match(/(?:service\s+time[^0-9]*|takes\s+an\s+average\s+of[^0-9]*|served\s+in[^0-9]*)\s*([0-9.]+)\s*(?:minutes|mins)/i);
+    if (servTimeMatch) {
+      const mins = parseFloat(servTimeMatch[1]);
+      if (mins > 0) mu = 60 / mins;
+    }
+  }
+
   const c = serversMatch ? parseInt(serversMatch[1], 10) : 1;
   const K = capacityMatch ? parseInt(capacityMatch[1], 10) : undefined;
+  const serverCostPerHourCs = serverCostMatch ? parseFloat(serverCostMatch[1]) : undefined;
+  const waitingCostPerHourCw = waitCostMatch ? parseFloat(waitCostMatch[1]) : undefined;
 
   if (lambda !== undefined && mu !== undefined) {
     return {
@@ -313,8 +578,11 @@ export function extractQueuingProblem(text: string): QueuingProblem | null {
       serviceRateMu: mu,
       serversCountC: c,
       systemCapacityK: K,
+      serverCostPerHourCs,
+      waitingCostPerHourCw,
     };
   }
+
   return null;
 }
 
@@ -336,7 +604,7 @@ export function extractZeroSumGame(text: string): ZeroSumGameProblem | null {
       const cols = r.split("|").map((c) => c.trim()).filter(Boolean);
       if (cols.length >= 2) {
         p1Strategies.push(cols[0]);
-        const nums = cols.slice(1).map((n) => parseFloat(n)).filter((n) => !isNaN(n));
+        const nums = cols.slice(1).map((n) => parseFloat(n.replace(/[^0-9.-]/g, ""))).filter((n) => !isNaN(n));
         payoffMatrix.push(nums);
       }
     }

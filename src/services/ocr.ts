@@ -1,5 +1,4 @@
 import { createWorker } from "tesseract.js";
-import heic2any from "heic2any";
 import {
   OrModule,
   NetworkSubtype,
@@ -53,8 +52,11 @@ export async function preprocessImageFile(file: File): Promise<File> {
     file.type.includes("heic") ||
     file.type.includes("heif");
 
-  if (isHeic) {
+  if (isHeic && typeof window !== "undefined") {
     try {
+      // Platform-specific browser HEIC decoder loaded only in browser runtime
+      const heic2anyModule = await import("heic2any");
+      const heic2any = heic2anyModule.default || heic2anyModule;
       const convertedBlob = await heic2any({
         blob: file,
         toType: "image/jpeg",
@@ -602,12 +604,14 @@ export function classifyOrProblemFromText(
     lower.includes("assign each") ||
     lower.includes("one-to-one")
   ) {
+    const assign = extractAssignmentProblem(text);
     return {
       detectedModule: "transportation-assignment",
       transSubtype: "hungarian-assignment",
       confidence: 0.92,
       reason: "Detected worker-to-job Hungarian assignment formulation.",
       transcription: text,
+      parsedData: { assign: assign || undefined },
     };
   }
 
@@ -618,13 +622,16 @@ export function classifyOrProblemFromText(
     lower.includes("pert") ||
     lower.includes("predecessor") ||
     lower.includes("earliest start") ||
-    lower.includes("slack")
+    lower.includes("slack") ||
+    lower.includes("activity network")
   ) {
+    const cpm = extractCpmActivities(text);
     return {
       detectedModule: "project-planning",
       confidence: 0.92,
       reason: "Detected project planning activity network and predecessor tables.",
       transcription: text,
+      parsedData: { cpm: cpm || undefined },
     };
   }
 
@@ -635,21 +642,17 @@ export function classifyOrProblemFromText(
     lower.includes("holding cost") ||
     lower.includes("ordering cost") ||
     lower.includes("inventory") ||
-    lower.includes("annual demand")
+    lower.includes("annual demand") ||
+    lower.includes("carrying cost") ||
+    lower.includes("setup cost")
   ) {
-    const numbers = text.match(/\d+(\.\d+)?/g)?.map(Number) || [];
+    const inv = extractInventoryProblem(text);
     return {
       detectedModule: "inventory-control",
       confidence: 0.88,
       reason: "Detected inventory parameters (demand, setup cost, holding cost).",
       transcription: text,
-      parsedData: {
-        inventory: {
-          annualDemandD: numbers[0] || 1000,
-          orderingCostK: numbers[1] || 100,
-          holdingCostH: numbers[2] || 2,
-        },
-      },
+      parsedData: { inventory: inv || undefined },
     };
   }
 
@@ -660,13 +663,17 @@ export function classifyOrProblemFromText(
     lower.includes("arrival rate") ||
     lower.includes("service rate") ||
     lower.includes("m/m/1") ||
-    lower.includes("poisson")
+    lower.includes("m/m/c") ||
+    lower.includes("poisson") ||
+    lower.includes("waiting line")
   ) {
+    const queue = extractQueuingProblem(text);
     return {
       detectedModule: "queuing-models",
       confidence: 0.88,
       reason: "Detected queue waiting line characteristics (arrival/service rates).",
       transcription: text,
+      parsedData: { queuing: queue || undefined },
     };
   }
 
@@ -680,20 +687,41 @@ export function classifyOrProblemFromText(
     lower.includes("maximin") ||
     lower.includes("saddle point")
   ) {
+    const game = extractZeroSumGame(text);
     return {
       detectedModule: "zero-sum-games",
       confidence: 0.9,
       reason: "Detected 2-player zero-sum payoff matrix and strategy game.",
       transcription: text,
+      parsedData: { game: game || undefined },
     };
   }
 
-  // 10. Linear Programming (Default)
+  // 10. Linear Equations (Ax = b)
+  if (
+    (lower.includes("system of equations") || lower.includes("simultaneous equations") || lower.includes("linear equations")) &&
+    lower.includes("=")
+  ) {
+    const eq = extractLinearEquations(text);
+    if (eq) {
+      return {
+        detectedModule: "linear-equations",
+        confidence: 0.9,
+        reason: "Detected simultaneous linear equations.",
+        transcription: text,
+        parsedData: { linearEqA: eq.matrixA, linearEqB: eq.vectorB },
+      };
+    }
+  }
+
+  // 11. Linear Programming (Default)
+  const lp = extractLinearProgramming(text);
   return {
     detectedModule: "linear-programming",
-    confidence: 0.75,
+    confidence: 0.85,
     reason: "Detected linear constraints, variables, and optimization goal.",
     transcription: text,
+    parsedData: { lp: lp || undefined },
   };
 }
 
@@ -725,22 +753,78 @@ export function extractNetworkEdges(text: string): { edges: NetworkEdge[]; start
       endNode: "5",
     };
   }
-  const edgeRegex = /(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?:->|–|—|-|to|,|\t)\s*(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|\s+)\s*([0-9,.]+)/gi;
-  let match;
 
-  while ((match = edgeRegex.exec(text)) !== null) {
-    const from = match[1];
-    const to = match[2];
-    const cost = parseFloat(match[3].replace(/,/g, ""));
-    if (from !== to && !isNaN(cost)) {
-      edges.push({ from, to, cost });
+  // 1. Check for Distance Table / Matrix in Pipe Format
+  const pipeLines = text.split("\n").map((l) => l.trim()).filter((l) => l.includes("|") && !l.includes("---"));
+  if (pipeLines.length >= 3) {
+    const header = pipeLines[0].split("|").map((c) => c.trim()).filter(Boolean);
+    const nodeCols = header.slice(1);
+    for (let r = 1; r < pipeLines.length; r++) {
+      const cols = pipeLines[r].split("|").map((c) => c.trim()).filter(Boolean);
+      if (cols.length >= header.length) {
+        const fromNode = cols[0];
+        for (let c = 0; c < nodeCols.length; c++) {
+          const toNode = nodeCols[c];
+          const valStr = cols[c + 1];
+          if (fromNode !== toNode && valStr !== "-" && valStr !== "0" && valStr !== "inf" && valStr !== "M") {
+            const costVal = parseFloat(valStr.replace(/[^0-9.]/g, ""));
+            if (!isNaN(costVal) && costVal > 0) {
+              edges.push({ from: fromNode, to: toNode, cost: costVal });
+            }
+          }
+        }
+      }
+    }
+    if (edges.length >= 2) {
+      return {
+        edges,
+        startNode: String(edges[0].from),
+        endNode: String(edges[edges.length - 1].to),
+      };
     }
   }
+
+  // 2. Check for parenthesized arcs: (1, 2, 4000) or (A, B, 10) or (1, 2): 4000
+  const tupleRegex = /\(\s*([A-Za-z0-9]+)\s*,\s*([A-Za-z0-9]+)(?:\s*,\s*([0-9.,]+))?\s*\)(?:\s*[:=]\s*([0-9.,]+))?/g;
+  let tMatch;
+  while ((tMatch = tupleRegex.exec(text)) !== null) {
+    const from = tMatch[1];
+    const to = tMatch[2];
+    const costStr = tMatch[3] || tMatch[4];
+    if (costStr && from !== to) {
+      const cost = parseFloat(costStr.replace(/,/g, ""));
+      if (!isNaN(cost)) {
+        edges.push({ from, to, cost });
+      }
+    }
+  }
+  // 3. Arrow / Colon regex: 1 -> 2: 4000 or Node 1 to Node 2 = 50
+  if (edges.length === 0) {
+    const edgeRegex = /(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?:->|–|—|-|to)\s*(?:node\s*|station\s*)?([A-Za-z0-9]+)\s*(?::|=|\$|cost|weight|capacity)\s*([0-9,.]+)/gi;
+    let match;
+    while ((match = edgeRegex.exec(text)) !== null) {
+      const from = match[1];
+      const to = match[2];
+      const cost = parseFloat(match[3].replace(/,/g, ""));
+      if (from !== to && !isNaN(cost) && !edges.some((e) => e.from === from && e.to === to)) {
+        edges.push({ from, to, cost });
+      }
+    }
+  }
+  let startNode = "1";
+  let endNode = "5";
+
+  // Check for explicit start / end nodes in text e.g. "from node 1 to node 6"
+  const startMatch = text.match(/(?:from\s+(?:node\s+|station\s+|source\s+)?([A-Za-z0-9]+))/i);
+  const endMatch = text.match(/(?:to\s+(?:node\s+|station\s+|sink\s+)?([A-Za-z0-9]+))/i);
+  if (startMatch) startNode = startMatch[1];
+  if (endMatch) endNode = endMatch[1];
+
   if (edges.length > 0) {
     return {
       edges,
-      startNode: String(edges[0].from),
-      endNode: String(edges[edges.length - 1].to),
+      startNode: startMatch ? startNode : String(edges[0].from),
+      endNode: endMatch ? endNode : String(edges[edges.length - 1].to),
     };
   }
 

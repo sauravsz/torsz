@@ -145,6 +145,11 @@ export interface CpmActivity {
   optimisticA?: number;
   mostLikelyM?: number;
   pessimisticB?: number;
+  // Crashing parameters
+  normalTime?: number;
+  crashTime?: number;
+  normalCost?: number;
+  crashCost?: number;
 }
 
 export interface CpmSolution {
@@ -156,9 +161,11 @@ export interface CpmSolution {
     lateStart: number;
     lateFinish: number;
     slack: number;
+    freeSlack?: number;
     isCritical: boolean;
     expectedTime?: number;
     variance?: number;
+    crashCostPerUnit?: number;
   }[];
   criticalPath: string[];
   projectDuration: number;
@@ -173,15 +180,19 @@ export interface CpmSolution {
     lateStart: number;
     lateFinish: number;
     slack: number;
+    freeSlack?: number;
     isCritical: boolean;
   }[];
 }
+
 export interface QueuingProblem {
   model: "M/M/1" | "M/M/c";
   arrivalRateLambda: number;
   serviceRateMu: number;
   serversCountC?: number;
   systemCapacityK?: number;
+  serverCostPerHourCs?: number;
+  waitingCostPerHourCw?: number;
 }
 
 export interface QueuingSolution {
@@ -193,6 +204,7 @@ export interface QueuingSolution {
   avgWaitSystemWs: number;
   blockingProbabilityPk?: number;
   effectiveArrivalRate?: number;
+  totalHourlyCost?: number;
 }
 
 export interface ZeroSumGameProblem {
@@ -210,6 +222,8 @@ export interface ZeroSumGameSolution {
   gameValue: number;
   player1Probabilities?: number[];
   player2Probabilities?: number[];
+  dominanceSteps?: string[];
+  mixedStrategyFormula?: string;
 }
 
 export interface PriceBreakTier {
@@ -224,12 +238,14 @@ export interface PriceBreakTier {
 }
 
 export interface InventoryProblem {
-  model: "classic-eoq" | "eoq-with-backorders" | "quantity-discounts";
+  model: "classic-eoq" | "eoq-with-backorders" | "quantity-discounts" | "epq-production" | "newsvendor";
   annualDemandD: number;
   orderingCostK: number;
   holdingCostH: number;
   unitPriceC: number;
   shortageCostP?: number;
+  productionRateP?: number;
+  salvageValueS?: number;
   priceBreaks?: PriceBreakTier[];
 }
 
@@ -238,6 +254,7 @@ export interface InventorySolution {
   cycleTimeT0Days?: number;
   cycleTimeMonths?: number;
   maxShortageS?: number;
+  maxInventoryLevel?: number;
   annualOrderingCost?: number;
   annualHoldingCost?: number;
   annualShortageCost?: number;
@@ -246,4 +263,5 @@ export interface InventorySolution {
   reorderPointR?: number;
   selectedPriceBreakTier?: PriceBreakTier | number;
   priceBreakAnalysis?: PriceBreakTier[];
+  criticalFractile?: number;
 }

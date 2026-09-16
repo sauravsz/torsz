@@ -58,6 +58,14 @@ import { BranchAndBoundTree } from "./BranchAndBoundTree";
 import { MultiScenarioSensitivitySweep } from "./MultiScenarioSensitivitySweep";
 import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
 import { extractTransportationProblem, extractAssignmentProblem } from "../services/ocrMatrixParser";
+import {
+  extractLinearProgramming,
+  extractCpmActivities,
+  extractInventoryProblem,
+  extractQueuingProblem,
+  extractZeroSumGame,
+  extractLinearEquations,
+} from "../services/orTextParsers";
 import { loadSavedSolverState, saveSolverState } from "../services/orStateManager";
 import { BENCHMARKS } from "../services/orBenchmarks";
 import {
@@ -460,8 +468,12 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
 
       if (module === "linear-programming") {
-        const nextLp = data?.lp ? { ...lpProblem, ...data.lp } : lpProblem;
+        const extractedLp = rawText ? extractLinearProgramming(rawText) : null;
+        const nextLp: LpProblem = (data?.lp as LpProblem) || extractedLp || lpProblem;
         setLpProblem(nextLp);
+        if (nextLp.objectiveCoefficients.length > 2) {
+          setLpMode("simplex-tableau");
+        }
         try {
           const sol = solveLinearProgramming(nextLp);
           setLpSol(sol);
@@ -469,7 +481,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
 
       if (module === "project-planning") {
-        const nextCpm = data?.cpm && data.cpm.length > 0 ? data.cpm : cpmActivities;
+        const extractedCpm = rawText ? extractCpmActivities(rawText) : null;
+        const nextCpm = (data?.cpm && data.cpm.length > 0) ? data.cpm : (extractedCpm || cpmActivities);
         setCpmActivities(nextCpm);
         try {
           const sol = solveCpmPert(nextCpm);
@@ -478,7 +491,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
 
       if (module === "inventory-control") {
-        const nextInv = data?.inventory ? { ...inventoryProblem, ...data.inventory } : inventoryProblem;
+        const extractedInv = rawText ? extractInventoryProblem(rawText) : null;
+        const nextInv: InventoryProblem = (data?.inventory as InventoryProblem) || extractedInv || inventoryProblem;
         setInventoryProblem(nextInv);
         try {
           const sol = solveInventoryControl(nextInv);
@@ -487,7 +501,8 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
 
       if (module === "queuing-models") {
-        const nextQ = data?.queuing ? { ...queuingProblem, ...data.queuing } : queuingProblem;
+        const extractedQ = rawText ? extractQueuingProblem(rawText) : null;
+        const nextQ: QueuingProblem = (data?.queuing as QueuingProblem) || extractedQ || queuingProblem;
         setQueuingProblem(nextQ);
         try {
           const sol = solveQueuing(nextQ);
@@ -496,11 +511,24 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       }
 
       if (module === "zero-sum-games") {
-        const nextG = data?.game ? { ...gameProblem, ...data.game } : gameProblem;
+        const extractedG = rawText ? extractZeroSumGame(rawText) : null;
+        const nextG: ZeroSumGameProblem = (data?.game as ZeroSumGameProblem) || extractedG || gameProblem;
         setGameProblem(nextG);
         try {
           const sol = solveZeroSumGame(nextG);
           setGameSol(sol);
+        } catch {}
+      }
+
+      if (module === "linear-equations") {
+        const extractedEq = rawText ? extractLinearEquations(rawText) : null;
+        const nextA = data?.linearEqA || extractedEq?.matrixA || linearEqA;
+        const nextB = data?.linearEqB || extractedEq?.vectorB || linearEqB;
+        setLinearEqA(nextA);
+        setLinearEqB(nextB);
+        try {
+          const sol = solveLinearEquations(nextA, nextB);
+          setLinearEqSol(sol);
         } catch {}
       }
     }
