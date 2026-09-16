@@ -4,16 +4,17 @@ import {
   CheckCircle2,
   Plus,
   Trash2,
-
   Sparkles,
   Camera,
-  ArrowUp,
   Download,
   Printer,
   Database,
   FileCode,
   X,
   ChevronDown,
+  ChevronUp,
+  Upload,
+  Terminal,
 } from "lucide-react";
 import {
   OrModule,
@@ -110,6 +111,30 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const fileUploadRef = useRef<HTMLInputElement | null>(null);
+
+  const problemSuggestions = [
+    "Maximize Z = 3x1 + 5x2 subject to x1 <= 4, 2x2 <= 12, 3x1 + 2x2 <= 18 (Simplex LP)",
+    "Meridian Manufacturing 4-plant to 5-warehouse transportation cost minimization (VAM)",
+    "Shortest route from node 1 to node 7 in Smart Commute road network (Dijkstra)",
+    "Three-Jug puzzle: 8-gallon jug full, 5- and 3-gallon empty, divide into (4,4,0)",
+    "Single-server queuing system with arrival rate 10/hr and service rate 15/hr (M/M/1)",
+    "Economic Order Quantity (EOQ) with annual demand 12000, order cost $50, holding cost $3",
+    "General Foundry project critical path schedule for activities A through H (CPM/PERT)",
+    "Two-person zero-sum 3x4 payoff matrix game theory with saddle point detection",
+  ];
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setQuickQuestionText(text);
+    } catch (err) {
+      console.error("Failed to read file:", err);
+    }
+  };
 
   useEffect(() => {
     if (controlledModule) {
@@ -2455,68 +2480,107 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           )}
         </main>
 
-        {/* Light Mode Bottom Chat & Problem Input Bar */}
-        <div className="p-2 sm:p-4 bg-gradient-to-t from-canvas via-canvas/95 to-transparent border-t border-hairline/60 shrink-0 select-none">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleQuickQuestionSubmit(e);
-            }}
-            className="max-w-3xl mx-auto w-full bg-surface-card text-ink rounded-2xl border border-hairline shadow-md p-1.5 sm:p-2 px-2.5 sm:px-3 flex items-center gap-1.5 sm:gap-2.5 transition-all focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20"
-          >
-            {/* Plus / Category Option Button */}
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenOcr) onOpenOcr(quickQuestionText, "text");
-              }}
-              className="p-1.5 text-muted hover:text-ink hover:bg-surface-cream rounded-lg transition-colors shrink-0"
-              title="Choose Problem Category & Solvers"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+        {/* Natural Language Problem Formulation & Solver Card */}
+        <div className="bg-surface-card border border-hairline/70 rounded-3xl p-5 shadow-sm space-y-3 mt-6 animate-keyframe-fade-up">
+          <div className="flex items-center justify-between text-xs text-muted">
+            <div className="flex items-center gap-1.5 font-semibold text-ink">
+              <Terminal className="w-3.5 h-3.5 text-primary" />
+              <span>Ask Problem or Question in Natural Language</span>
+            </div>
 
+            <div className="flex items-center gap-2">
+              {onOpenOcr && (
+                <button
+                  type="button"
+                  onClick={() => onOpenOcr("", "image")}
+                  className="flex items-center gap-1 text-[11px] text-muted hover:text-ink hover:underline transition-colors"
+                  title="OCR Scan / Photo"
+                >
+                  <Camera className="w-3.5 h-3.5 text-primary" />
+                  <span>Scan Image</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => fileUploadRef.current?.click()}
+                className="flex items-center gap-1 text-[11px] text-muted hover:text-ink hover:underline transition-colors"
+                title="Upload problem text or table file"
+              >
+                <Upload className="w-3.5 h-3.5 text-primary" />
+                <span>Import File</span>
+              </button>
+              <input
+                ref={fileUploadRef}
+                type="file"
+                accept=".sql,.txt,.csv,.md"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <div className="relative">
             <textarea
               ref={textareaRef}
-              rows={1}
+              rows={3}
               value={quickQuestionText}
-              onChange={(e) => {
-                setQuickQuestionText(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-              }}
+              onChange={(e) => setQuickQuestionText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
                   e.preventDefault();
                   handleQuickQuestionSubmit();
                 }
               }}
-              placeholder="Write a message, paste problem text, or markdown table..."
-              className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none resize-none py-1.5 font-sans leading-relaxed max-h-32"
+              placeholder="e.g. Maximize Z = 3x1 + 5x2 subject to x1 <= 4, 2x2 <= 12, or paste a transportation cost matrix / network arc list..."
+              className="w-full bg-canvas border border-hairline rounded-2xl p-3.5 text-sm text-ink placeholder:text-muted-soft focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all resize-none leading-relaxed"
             />
+          </div>
 
-            {/* Camera Icon Button (replaces voice icon) */}
-            {onOpenOcr && (
-              <button
-                type="button"
-                onClick={() => onOpenOcr("", "image")}
-                className="p-1.5 text-muted hover:text-primary hover:bg-surface-cream rounded-lg transition-colors shrink-0"
-                title="OCR Scan Question Image (Camera)"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-            )}
+          {/* Collapsible Example Suggestions */}
+          {showSuggestions && (
+            <div className="p-3 bg-surface-soft/60 border border-hairline/60 rounded-2xl space-y-1.5 animate-keyframe-fade-up">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted px-1">
+                Textbook Problem Examples:
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {problemSuggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setQuickQuestionText(s);
+                      setShowSuggestions(false);
+                    }}
+                    className="text-left p-2 rounded-xl text-xs text-ink hover:bg-surface-cream hover:text-primary transition-colors line-clamp-1 border border-hairline/40 bg-surface-card/60"
+                  >
+                    ✦ {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* Send Button */}
+          <div className="flex items-center justify-between pt-1">
             <button
-              type="submit"
-              disabled={!quickQuestionText.trim()}
-              className="p-1.5 bg-primary hover:bg-primary-active disabled:bg-surface-soft disabled:text-muted-soft text-on-primary rounded-xl transition-colors shrink-0 shadow-2xs"
-              title="Confirm Problem Type & Solve"
+              type="button"
+              onClick={() => setShowSuggestions(!showSuggestions)}
+              className="flex items-center gap-1 text-xs text-primary font-medium hover:underline select-none"
             >
-              <ArrowUp className="w-4 h-4" />
+              <span>✦ Example Problems</span>
+              {showSuggestions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
-          </form>
+
+            <button
+              type="button"
+              onClick={(e) => handleQuickQuestionSubmit(e)}
+              disabled={!quickQuestionText.trim()}
+              className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-surface-soft disabled:text-muted text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-2xs cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Solve Problem (⌘↵)</span>
+            </button>
+          </div>
         </div>
         {/* Database Table Importer Modal */}
         {isDbImportOpen && (
