@@ -334,6 +334,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="flex-1" />
       )}
 
+      {/* 2.5 BOTTOM OF SIDEBAR: AI Assistant & Solver Mode Selector */}
+      <div className="p-2 border-t border-hairline/60 bg-surface-card/40 shrink-0">
+        <div className="flex items-center justify-between text-[11px] font-semibold text-muted mb-1 px-1">
+          <span className="flex items-center gap-1 text-ink">
+            <Sparkles className="w-3 h-3 text-primary" />
+            <span>AI Assistant</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onSelectView("ai")}
+            className="text-[10px] text-primary font-medium hover:underline"
+          >
+            Open ↗
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-1 bg-surface-soft p-0.5 rounded-lg border border-hairline/60">
+          <button
+            type="button"
+            onClick={() => onSelectView("editor")}
+            className={`flex items-center justify-center gap-1 py-1 rounded text-[11px] font-medium transition-all ${
+              activeView === "editor"
+                ? "bg-surface-card text-ink shadow-2xs font-semibold"
+                : "text-muted hover:text-ink hover:bg-surface-cream/50"
+            }`}
+            title="SQL Query Assistant"
+          >
+            <Terminal className="w-3 h-3 text-primary" />
+            <span>SQL</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onSelectView("or")}
+            className={`flex items-center justify-center gap-1 py-1 rounded text-[11px] font-medium transition-all ${
+              activeView === "or"
+                ? "bg-surface-card text-ink shadow-2xs font-semibold"
+                : "text-muted hover:text-ink hover:bg-surface-cream/50"
+            }`}
+            title="TORA Operations Research Solvers"
+          >
+            <TrendingUp className="w-3 h-3 text-primary" />
+            <span>TORA OR</span>
+          </button>
+        </div>
+      </div>
+
       {/* 3. BOTTOM: Compact Icon-Only Theme Switcher */}
       <div className="p-2 border-t border-hairline bg-surface-soft shrink-0 select-none">
         <div className="grid grid-cols-3 gap-1 bg-canvas p-0.5 rounded-lg border border-hairline">

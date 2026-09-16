@@ -6,6 +6,8 @@ import {
   Trash2,
   Sparkles,
   Camera,
+  ArrowUp,
+  TrendingUp,
   Download,
   Printer,
   Database,
@@ -13,7 +15,6 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Upload,
   Terminal,
 } from "lucide-react";
 import {
@@ -111,6 +112,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
   const [lpMode, setLpMode] = useState<LpSolveMode>("graphical-2d");
   const [networkSubtype, setNetworkSubtype] = useState<NetworkSubtype>("shortest-route");
   const [transSubtype, setTransSubtype] = useState<TransSubtype>("transportation");
+  const [assistantMode, setAssistantMode] = useState<"or" | "sql">("or");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const fileUploadRef = useRef<HTMLInputElement | null>(null);
 
@@ -124,6 +126,30 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
     "General Foundry project critical path schedule for activities A through H (CPM/PERT)",
     "Two-person zero-sum 3x4 payoff matrix game theory with saddle point detection",
   ];
+
+  const sqlSuggestions = [
+    "Find top 5 customers with highest total spending in orders table",
+    "Calculate average monthly revenue grouped by product category",
+    "List active products that have inventory below reorder point",
+    "Show customer retention rate and purchase frequency over time",
+  ];
+
+  const handleDockSubmit = (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const text = quickQuestionText.trim();
+    if (!text) return;
+
+    if (assistantMode === "sql") {
+      if (onAskAi) {
+        onAskAi(text);
+      }
+    } else {
+      handleQuickQuestionSubmit();
+    }
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2534,71 +2560,23 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
           )}
         </main>
 
-        {/* Natural Language Problem Formulation & Solver Card */}
-        <div className="bg-surface-card border border-hairline/70 rounded-3xl p-5 shadow-sm space-y-3 mt-6 animate-keyframe-fade-up">
-          <div className="flex items-center justify-between text-xs text-muted">
-            <div className="flex items-center gap-1.5 font-semibold text-ink">
-              <Terminal className="w-3.5 h-3.5 text-primary" />
-              <span>Ask Problem or Question in Natural Language</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {onOpenOcr && (
+        {/* Sleek Floating Dock (Exact thickness of Image #2 + Full capabilities of Image #1) */}
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[92%] max-w-3xl z-40 select-none">
+          {/* Collapsible Example Suggestions Dropdown */}
+          {showSuggestions && (
+            <div className="mb-2 p-3 bg-surface-card/95 backdrop-blur-md border border-hairline/80 rounded-2xl shadow-xl space-y-1.5 animate-keyframe-fade-up">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted px-1 flex items-center justify-between">
+                <span>✦ Example {assistantMode === "sql" ? "SQL Queries" : "OR Problems"}</span>
                 <button
                   type="button"
-                  onClick={() => onOpenOcr("", "image")}
-                  className="flex items-center gap-1 text-[11px] text-muted hover:text-ink hover:underline transition-colors"
-                  title="OCR Scan / Photo"
+                  onClick={() => setShowSuggestions(false)}
+                  className="text-muted hover:text-ink p-0.5 rounded-md hover:bg-surface-cream"
                 >
-                  <Camera className="w-3.5 h-3.5 text-primary" />
-                  <span>Scan Image</span>
+                  <X className="w-3.5 h-3.5" />
                 </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => fileUploadRef.current?.click()}
-                className="flex items-center gap-1 text-[11px] text-muted hover:text-ink hover:underline transition-colors"
-                title="Upload problem text or table file"
-              >
-                <Upload className="w-3.5 h-3.5 text-primary" />
-                <span>Import File</span>
-              </button>
-              <input
-                ref={fileUploadRef}
-                type="file"
-                accept=".sql,.txt,.csv,.md"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              rows={3}
-              value={quickQuestionText}
-              onChange={(e) => setQuickQuestionText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
-                  e.preventDefault();
-                  handleQuickQuestionSubmit();
-                }
-              }}
-              placeholder="e.g. Maximize Z = 3x1 + 5x2 subject to x1 <= 4, 2x2 <= 12, or paste a transportation cost matrix / network arc list..."
-              className="w-full bg-canvas border border-hairline rounded-2xl p-3.5 text-sm text-ink placeholder:text-muted-soft focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all resize-none leading-relaxed"
-            />
-          </div>
-
-          {/* Collapsible Example Suggestions */}
-          {showSuggestions && (
-            <div className="p-3 bg-surface-soft/60 border border-hairline/60 rounded-2xl space-y-1.5 animate-keyframe-fade-up">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted px-1">
-                Textbook Problem Examples:
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {problemSuggestions.map((s, idx) => (
+                {(assistantMode === "sql" ? sqlSuggestions : problemSuggestions).map((s, idx) => (
                   <button
                     key={idx}
                     type="button"
@@ -2606,7 +2584,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                       setQuickQuestionText(s);
                       setShowSuggestions(false);
                     }}
-                    className="text-left p-2 rounded-xl text-xs text-ink hover:bg-surface-cream hover:text-primary transition-colors line-clamp-1 border border-hairline/40 bg-surface-card/60"
+                    className="text-left p-2 rounded-xl text-xs text-ink hover:bg-surface-cream hover:text-primary transition-colors line-clamp-1 border border-hairline/40 bg-canvas"
                   >
                     ✦ {s}
                   </button>
@@ -2615,26 +2593,110 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-between pt-1">
+          <form
+            onSubmit={handleDockSubmit}
+            className="h-11 sm:h-12 bg-surface-card/95 backdrop-blur-md border border-hairline shadow-lg rounded-full p-1 pl-2.5 sm:pl-3 flex items-center gap-1.5 sm:gap-2 transition-all hover:border-hairline focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20"
+          >
+            {/* Mode Switcher Segmented Pill Inside the Bar */}
+            <div className="flex items-center bg-surface-soft p-0.5 rounded-full border border-hairline/60 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAssistantMode("sql")}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
+                  assistantMode === "sql"
+                    ? "bg-surface-card text-primary shadow-2xs font-bold"
+                    : "text-muted hover:text-ink"
+                }`}
+                title="SQL Query Assistant Mode"
+              >
+                <Terminal className="w-3 h-3" />
+                <span className="hidden sm:inline">SQL</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAssistantMode("or")}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-full transition-all ${
+                  assistantMode === "or"
+                    ? "bg-surface-card text-primary shadow-2xs font-bold"
+                    : "text-muted hover:text-ink"
+                }`}
+                title="TORA Operations Research Solver Mode"
+              >
+                <TrendingUp className="w-3 h-3" />
+                <span className="hidden sm:inline">OR Solver</span>
+              </button>
+            </div>
+
+            {/* Import File Button */}
+            <button
+              type="button"
+              onClick={() => fileUploadRef.current?.click()}
+              className="p-1.5 text-muted hover:text-ink hover:bg-surface-cream rounded-full transition-colors shrink-0"
+              title="Import Text, Table or SQL File"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            <input
+              ref={fileUploadRef}
+              type="file"
+              accept=".sql,.txt,.csv,.md"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+
+            {/* Input field */}
+            <input
+              type="text"
+              value={quickQuestionText}
+              onChange={(e) => setQuickQuestionText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleDockSubmit();
+                }
+              }}
+              placeholder={
+                assistantMode === "sql"
+                  ? "Ask database question, e.g. Find top 5 customers with highest total spending..."
+                  : "Write a message, paste problem text, or markdown table..."
+              }
+              className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none px-1 font-sans"
+            />
+
+            {/* Examples Button */}
             <button
               type="button"
               onClick={() => setShowSuggestions(!showSuggestions)}
-              className="flex items-center gap-1 text-xs text-primary font-medium hover:underline select-none"
+              className="hidden md:flex items-center gap-1 text-[11px] text-primary hover:underline px-2 shrink-0 font-medium select-none"
+              title="View example prompts"
             >
-              <span>✦ Example Problems</span>
+              <span>✦ Examples</span>
               {showSuggestions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
 
+            {/* Camera / OCR Button */}
+            {onOpenOcr && (
+              <button
+                type="button"
+                onClick={() => onOpenOcr("", "image")}
+                className="p-1.5 text-muted hover:text-primary hover:bg-surface-cream rounded-full transition-colors shrink-0"
+                title="OCR Scan Image (Camera)"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Submit Button */}
             <button
-              type="button"
-              onClick={(e) => handleQuickQuestionSubmit(e)}
+              type="submit"
               disabled={!quickQuestionText.trim()}
-              className="flex items-center gap-1.5 bg-primary hover:bg-primary-active disabled:bg-surface-soft disabled:text-muted text-on-primary text-xs font-semibold px-4 py-2 rounded-xl transition-all shadow-2xs cursor-pointer"
+              className="p-2 bg-primary hover:bg-primary-active disabled:bg-surface-soft disabled:text-muted text-on-primary rounded-full transition-all shadow-2xs shrink-0 flex items-center justify-center cursor-pointer"
+              title={assistantMode === "sql" ? "Generate SQL (⌘↵)" : "Solve Problem (⌘↵)"}
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Solve Problem (⌘↵)</span>
+              <ArrowUp className="w-3.5 h-3.5" />
             </button>
-          </div>
+          </form>
         </div>
         {/* Database Table Importer Modal */}
         {isDbImportOpen && (
