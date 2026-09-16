@@ -1173,164 +1173,172 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               
 
               {transSubtype === "transportation" ? (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  <div className="lg:col-span-6 bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                      Shipping Cost Matrix
-                    </h4>
-                    <div className="flex items-center gap-2">
-                      {onAskAi && (
+                <div className="space-y-6">
+                  {/* Full-Width Horizontally Extended Shipping Cost Matrix Card */}
+                  <div className="w-full bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-hairline-soft">
+                      <div>
+                        <h4 className="text-sm font-semibold uppercase tracking-wider text-ink">
+                          Shipping Cost Matrix
+                        </h4>
+                        <p className="text-xs text-muted">
+                          Define unit shipping costs, plant supplies, and market demands across the supply chain.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {onAskAi && (
+                          <button
+                            onClick={() =>
+                              onAskAi(
+                                `Analyze this Transportation Shipping Matrix: 3 Plants with supply [${transProblem.supply.join(
+                                  ", "
+                                )}] and 4 Markets with demand [${transProblem.demand.join(
+                                  ", "
+                                )}]. Total optimal shipping cost is $${
+                                  transSol?.totalCost || 455
+                                }. How can we reduce bottleneck lane costs or improve throughput?`
+                              )
+                            }
+                            className="flex items-center gap-1 bg-surface-card hover:bg-surface-cream text-primary text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Ask AI Advisor</span>
+                          </button>
+                        )}
+
                         <button
-                          onClick={() =>
-                            onAskAi(
-                              `Analyze this Transportation Shipping Matrix: 3 Plants with supply [${transProblem.supply.join(
-                                ", "
-                              )}] and 4 Markets with demand [${transProblem.demand.join(
-                                ", "
-                              )}]. Total optimal shipping cost is $${
-                                transSol?.totalCost || 455
-                              }. How can we reduce bottleneck lane costs or improve throughput?`
-                            )
-                          }
-                          className="flex items-center gap-1 bg-surface-card hover:bg-surface-cream text-primary text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
+                          onClick={addTransSource}
+                          className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>Ask AI Advisor</span>
+                          <Plus className="w-3.5 h-3.5 text-primary" />
+                          <span>Add Source</span>
                         </button>
-                      )}
-
-                      <button
-                        onClick={addTransSource}
-                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-primary" />
-                        <span>Add Source</span>
-                      </button>
-                      <button
-                        onClick={addTransDestination}
-                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-primary" />
-                        <span>Add Dest</span>
-                      </button>
-                      <button
-                        onClick={handleSolveTransportation}
-                        className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-2xs"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                        <span>Solve Transportation</span>
-                      </button>
+                        <button
+                          onClick={addTransDestination}
+                          className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-primary" />
+                          <span>Add Dest</span>
+                        </button>
+                        <button
+                          onClick={handleSolveTransportation}
+                          className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-2xs"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Solve Transportation</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Editable Transportation Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse font-sans text-xs">
-                      <thead>
-                        <tr className="border-b border-hairline">
-                          <th className="p-2 font-semibold text-muted w-36">Source \ Dest</th>
-                          {transProblem.destinations.map((d, c) => (
-                            <th key={c} className="p-2 font-semibold text-ink">
-                              <div className="flex items-center gap-1">
+                    {/* Full Width Table */}
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full text-left border-collapse font-sans text-xs">
+                        <thead>
+                          <tr className="border-b border-hairline bg-surface-soft/40">
+                            <th className="p-2.5 font-semibold text-muted min-w-[140px] w-48">Source \ Dest</th>
+                            {transProblem.destinations.map((d, c) => (
+                              <th key={c} className="p-2.5 font-semibold text-ink min-w-[110px]">
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    value={d}
+                                    onChange={(e) => updateTransDestName(c, e.target.value)}
+                                    className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-semibold text-ink w-full text-center focus:outline-none focus:border-primary"
+                                  />
+                                  {transProblem.destinations.length > 1 && (
+                                    <button
+                                      onClick={() => removeTransDestination(c)}
+                                      title="Remove Destination"
+                                      className="text-muted hover:text-error p-0.5 rounded transition-colors shrink-0"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              </th>
+                            ))}
+                            <th className="p-2.5 font-semibold text-primary min-w-[110px] w-32 text-center">Supply</th>
+                            <th className="w-8"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {transProblem.sources.map((s, r) => (
+                            <tr key={r} className="border-b border-hairline-soft hover:bg-surface-soft/20 transition-colors">
+                              <td className="p-2.5 font-medium text-ink">
                                 <input
                                   type="text"
-                                  value={d}
-                                  onChange={(e) => updateTransDestName(c, e.target.value)}
-                                  className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-semibold text-ink w-24 text-center focus:outline-none focus:border-primary"
+                                  value={s}
+                                  onChange={(e) => updateTransSourceName(r, e.target.value)}
+                                  className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-medium text-ink w-full focus:outline-none focus:border-primary"
                                 />
-                                {transProblem.destinations.length > 1 && (
-                                  <button
-                                    onClick={() => removeTransDestination(c)}
-                                    title="Remove Destination"
-                                    className="text-muted hover:text-error p-0.5 rounded transition-colors"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            </th>
-                          ))}
-                          <th className="p-2 font-semibold text-primary w-28">Supply</th>
-                          <th className="w-8"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {transProblem.sources.map((s, r) => (
-                          <tr key={r} className="border-b border-hairline-soft">
-                            <td className="p-2 font-medium text-ink">
-                              <input
-                                type="text"
-                                value={s}
-                                onChange={(e) => updateTransSourceName(r, e.target.value)}
-                                className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-medium text-ink w-32 focus:outline-none focus:border-primary"
-                              />
-                            </td>
-                            {transProblem.destinations.map((_, c) => (
-                              <td key={c} className="p-2">
+                              </td>
+                              {transProblem.destinations.map((_, c) => (
+                                <td key={c} className="p-2.5">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={transProblem.costs[r][c]}
+                                    onChange={(e) =>
+                                      updateTransCost(r, c, parseFloat(e.target.value) || 0)
+                                    }
+                                    className="px-2 py-1 w-full min-w-[80px] bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-center"
+                                  />
+                                </td>
+                              ))}
+                              <td className="p-2.5">
                                 <input
                                   type="number"
-                                  value={transProblem.costs[r][c]}
+                                  step="any"
+                                  value={transProblem.supply[r]}
                                   onChange={(e) =>
-                                    updateTransCost(r, c, parseFloat(e.target.value) || 0)
+                                    updateTransSupply(r, parseFloat(e.target.value) || 0)
                                   }
-                                  className="px-2 py-1 w-20 bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-right"
+                                  className="px-2 py-1 w-full min-w-[80px] bg-primary/5 border border-primary/30 font-bold text-primary rounded-md text-xs font-mono focus:outline-none focus:border-primary text-center"
+                                />
+                              </td>
+                              <td className="p-2.5 text-center">
+                                {transProblem.sources.length > 1 && (
+                                  <button
+                                    onClick={() => removeTransSource(r)}
+                                    title="Remove Source Row"
+                                    className="text-muted hover:text-error p-1 rounded transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* Demand Footer Row */}
+                          <tr className="bg-surface-soft/60 font-semibold border-t-2 border-hairline">
+                            <td className="p-2.5 text-primary">Demand</td>
+                            {transProblem.destinations.map((_, c) => (
+                              <td key={c} className="p-2.5">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={transProblem.demand[c]}
+                                  onChange={(e) =>
+                                    updateTransDemand(c, parseFloat(e.target.value) || 0)
+                                  }
+                                  className="px-2 py-1 w-full min-w-[80px] bg-accent-teal/5 border border-accent-teal/30 font-bold text-accent-teal rounded-md text-xs font-mono focus:outline-none focus:border-primary text-center"
                                 />
                               </td>
                             ))}
-                            <td className="p-2">
-                              <input
-                                type="number"
-                                value={transProblem.supply[r]}
-                                onChange={(e) =>
-                                  updateTransSupply(r, parseFloat(e.target.value) || 0)
-                                }
-                                className="px-2 py-1 w-20 bg-primary/5 border border-primary/30 font-bold text-primary rounded-md text-xs font-mono focus:outline-none focus:border-primary text-right"
-                              />
+                            <td className="p-2.5 font-mono text-xs text-muted text-center">
+                              Total: {transProblem.supply.reduce((a, b) => a + b, 0)} / {transProblem.demand.reduce((a, b) => a + b, 0)}
                             </td>
-                            <td className="p-2">
-                              {transProblem.sources.length > 1 && (
-                                <button
-                                  onClick={() => removeTransSource(r)}
-                                  title="Remove Source Row"
-                                  className="text-muted hover:text-error p-1 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </td>
+                            <td></td>
                           </tr>
-                        ))}
-
-                        {/* Demand Footer Row */}
-                        <tr className="bg-surface-soft/60 font-semibold border-t-2 border-hairline">
-                          <td className="p-2 text-primary">Demand</td>
-                          {transProblem.destinations.map((_, c) => (
-                            <td key={c} className="p-2">
-                              <input
-                                type="number"
-                                value={transProblem.demand[c]}
-                                onChange={(e) =>
-                                  updateTransDemand(c, parseFloat(e.target.value) || 0)
-                                }
-                                className="px-2 py-1 w-20 bg-accent-teal/5 border border-accent-teal/30 font-bold text-accent-teal rounded-md text-xs font-mono focus:outline-none focus:border-primary text-right"
-                              />
-                            </td>
-                          ))}
-                          <td className="p-2 font-mono text-xs text-muted">
-                            Total: {transProblem.supply.reduce((a, b) => a + b, 0)} / {transProblem.demand.reduce((a, b) => a + b, 0)}
-                          </td>
-                          <td></td>
-                        </tr>
-                      </tbody>
-                    </table>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  </div>
-
-                  {/* Solution Output */}
+                  {/* Full-Width Solution Output Card */}
                   {transSol && (
-                    <div className="lg:col-span-6 bg-surface-card text-ink p-5 rounded-2xl border border-hairline/70 space-y-3 animate-keyframe-fade-up shadow-2xs">
+                    <div className="w-full bg-surface-card text-ink p-5 rounded-2xl border border-hairline/70 space-y-3 animate-keyframe-fade-up shadow-2xs">
                       <div className="flex items-center justify-between border-b border-hairline pb-2">
                         <span className="font-semibold text-base">Optimal Distribution Plan</span>
                         <span className="text-lg font-mono font-bold text-primary">
@@ -1385,90 +1393,96 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                  <div className="lg:col-span-6 bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-ink">
-                      Assignment Cost Matrix
-                    </h4>
+                <div className="space-y-6">
+                  {/* Full-Width Horizontally Extended Assignment Cost Matrix */}
+                  <div className="w-full bg-surface-card border border-hairline/70 rounded-2xl p-5 shadow-2xs space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-hairline-soft">
+                      <div>
+                        <h4 className="text-sm font-semibold uppercase tracking-wider text-ink">
+                          Assignment Cost Matrix
+                        </h4>
+                        <p className="text-xs text-muted">
+                          Assign workers to tasks or jobs at minimum total assignment cost.
+                        </p>
+                      </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={addAssignRowCol}
-                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
-                      >
-                        <Plus className="w-3.5 h-3.5 text-primary" />
-                        <span>Add Worker/Job</span>
-                      </button>
-                      <button
-                        onClick={removeAssignRowCol}
-                        className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-hairline transition-colors shadow-2xs"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-error" />
-                        <span>Remove Size</span>
-                      </button>
-                      <button
-                        onClick={handleSolveAssignment}
-                        className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-2xs"
-                      >
-                        <Play className="w-3.5 h-3.5 fill-current" />
-                        <span>Solve Hungarian Assignment</span>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={addAssignRowCol}
+                          className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-primary" />
+                          <span>Add Worker/Job</span>
+                        </button>
+                        <button
+                          onClick={removeAssignRowCol}
+                          className="flex items-center gap-1 bg-canvas hover:bg-surface-cream text-ink text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-hairline transition-colors shadow-2xs"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-error" />
+                          <span>Remove Size</span>
+                        </button>
+                        <button
+                          onClick={handleSolveAssignment}
+                          className="flex items-center gap-1.5 bg-primary hover:bg-primary-active text-on-primary text-xs font-semibold px-4 py-1.5 rounded-xl transition-colors shadow-2xs"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Solve Hungarian Assignment</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Editable Hungarian Table */}
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full text-left border-collapse font-sans text-xs">
+                        <thead>
+                          <tr className="border-b border-hairline bg-surface-soft/40">
+                            <th className="p-2.5 font-semibold text-muted min-w-[140px] w-48">Worker \ Job</th>
+                            {assignProblem.jobs.map((j, c) => (
+                              <th key={c} className="p-2.5 font-semibold text-ink min-w-[110px]">
+                                <input
+                                  type="text"
+                                  value={j}
+                                  onChange={(e) => updateAssignJob(c, e.target.value)}
+                                  className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-semibold text-ink w-full text-center focus:outline-none focus:border-primary"
+                                />
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {assignProblem.workers.map((w, r) => (
+                            <tr key={r} className="border-b border-hairline-soft hover:bg-surface-soft/20 transition-colors">
+                              <td className="p-2.5 font-medium text-ink">
+                                <input
+                                  type="text"
+                                  value={w}
+                                  onChange={(e) => updateAssignWorker(r, e.target.value)}
+                                  className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-medium text-ink w-full focus:outline-none focus:border-primary"
+                                />
+                              </td>
+                              {assignProblem.jobs.map((_, c) => (
+                                <td key={c} className="p-2.5">
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={assignProblem.costs[r][c]}
+                                    onChange={(e) =>
+                                      updateAssignCost(r, c, parseFloat(e.target.value) || 0)
+                                    }
+                                    className="px-2 py-1 w-full min-w-[80px] bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-center"
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 
-                  {/* Editable Hungarian Table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse font-sans text-xs">
-                      <thead>
-                        <tr className="border-b border-hairline">
-                          <th className="p-2 font-semibold text-muted w-36">Worker \ Job</th>
-                          {assignProblem.jobs.map((j, c) => (
-                            <th key={c} className="p-2 font-semibold text-ink">
-                              <input
-                                type="text"
-                                value={j}
-                                onChange={(e) => updateAssignJob(c, e.target.value)}
-                                className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-semibold text-ink w-24 text-center focus:outline-none focus:border-primary"
-                              />
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {assignProblem.workers.map((w, r) => (
-                          <tr key={r} className="border-b border-hairline-soft">
-                            <td className="p-2 font-medium text-ink">
-                              <input
-                                type="text"
-                                value={w}
-                                onChange={(e) => updateAssignWorker(r, e.target.value)}
-                                className="bg-canvas border border-hairline rounded-md px-2 py-1 text-xs font-medium text-ink w-32 focus:outline-none focus:border-primary"
-                              />
-                            </td>
-                            {assignProblem.jobs.map((_, c) => (
-                              <td key={c} className="p-2">
-                                <input
-                                  type="number"
-                                  value={assignProblem.costs[r][c]}
-                                  onChange={(e) =>
-                                    updateAssignCost(r, c, parseFloat(e.target.value) || 0)
-                                  }
-                                  className="px-2 py-1 w-20 bg-canvas border border-hairline rounded-md text-xs font-mono text-ink focus:outline-none focus:border-primary text-right"
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  </div>
-
-                  {/* Hungarian Reduction & Solution Matrix Viewer */}
+                  {/* Full-Width Hungarian Reduction & Solution Matrix Viewer */}
                   {assignSol && (
-                    <div className="lg:col-span-6">
+                    <div className="w-full">
                       <HungarianMatrixViewer
                         workers={assignProblem.workers}
                         jobs={assignProblem.jobs}
