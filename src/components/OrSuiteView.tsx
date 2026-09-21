@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Play,
   CheckCircle2,
@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   Terminal,
+  AlertTriangle,
 } from "lucide-react";
 import {
   OrModule,
@@ -58,6 +59,8 @@ import { NetworkGraphCanvas } from "./NetworkGraphCanvas";
 import { HungarianMatrixViewer } from "./HungarianMatrixViewer";
 import { BranchAndBoundTree } from "./BranchAndBoundTree";
 import { MultiScenarioSensitivitySweep } from "./MultiScenarioSensitivitySweep";
+import { ConstraintVerificationPanel } from "./ConstraintVerificationPanel";
+import { CpmGanttChart } from "./CpmGanttChart";
 import { extractNetworkEdges, OcrProblemClassification } from "../services/ocr";
 import { extractTransportationProblem, extractAssignmentProblem } from "../services/ocrMatrixParser";
 import {
@@ -187,16 +190,58 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
       e.preventDefault();
       e.stopPropagation();
     }
-    const text = quickQuestionText.trim();
-    if (!text) return;
+    const raw = quickQuestionText.trim();
+    if (!raw) return;
 
     if (assistantMode === "sql") {
       if (onAskAi) {
-        onAskAi(text);
+        onAskAi(raw);
       }
-    } else {
-      handleQuickQuestionSubmit();
+      return;
     }
+
+    // Slash-command routing: /lp, /trans, /assign, /net, /cpm, /queue, /game, /inv, /eq
+    const slashMatch = raw.match(/^\/([a-z]+)(?:\s+(.*))?$/is);
+    if (slashMatch) {
+      const cmd = slashMatch[1].toLowerCase();
+      const body = (slashMatch[2] || "").trim();
+
+      const routeMap: Record<string, { module: OrModule; sub?: () => void }> = {
+        lp: { module: "linear-programming" },
+        simplex: { module: "linear-programming" },
+        trans: { module: "transportation-assignment", sub: () => setTransSubtype("transportation") },
+        transport: { module: "transportation-assignment", sub: () => setTransSubtype("transportation") },
+        assign: { module: "transportation-assignment", sub: () => setTransSubtype("hungarian-assignment") },
+        hungarian: { module: "transportation-assignment", sub: () => setTransSubtype("hungarian-assignment") },
+        net: { module: "network-models" },
+        network: { module: "network-models" },
+        dijkstra: { module: "network-models", sub: () => setNetworkSubtype("shortest-route") },
+        mst: { module: "network-models", sub: () => setNetworkSubtype("minimum-spanning-tree") },
+        maxflow: { module: "network-models", sub: () => setNetworkSubtype("maximal-flow") },
+        cpm: { module: "project-planning" },
+        pert: { module: "project-planning" },
+        queue: { module: "queuing-models" },
+        queuing: { module: "queuing-models" },
+        game: { module: "zero-sum-games" },
+        inv: { module: "inventory-control" },
+        eoq: { module: "inventory-control" },
+        eq: { module: "linear-equations" },
+      };
+
+      const target = routeMap[cmd];
+      if (target) {
+        setInternalModule(target.module);
+        if (onSelectModule) onSelectModule(target.module);
+        if (target.sub) target.sub();
+        setQuickQuestionText(body);
+        if (body && onOpenOcr) {
+          onOpenOcr(body, "text");
+        }
+        return;
+      }
+    }
+
+    handleQuickQuestionSubmit();
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -965,6 +1010,236 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
     }
   };
 
+  // ==========================================================================
+  // Input Validation Rules Engine
+  // ==========================================================================
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  const getActiveValidationErrors = useCallback((): string[] => {
+    const errors: string[] = [];
+
+    if (activeModule === "transportation-assignment") {
+      if (transSubtype === "transportation") {
+        if (transProblem.costs.length !== transProblem.supply.length) {
+          errors.push(`Cost matrix has ${transProblem.costs.length} rows, but supply has ${transProblem.supply.length} entries`);
+        }
+        if (transProblem.costs[0]?.length !== transProblem.demand.length) {
+          errors.push(`Cost matrix has ${transProblem.costs[0]?.length || 0} columns, but demand has ${transProblem.demand.length} entries`);
+        }
+        if (transProblem.supply.some((s) => s < 0)) errors.push("Supply quantities must be non-negative");
+        if (transProblem.demand.some((d) => d < 0)) errors.push("Demand quantities must be non-negative");
+      } else {
+        if (assignProblem.workers.length === 0 || assignProblem.jobs.length === 0) {
+          errors.push("At least one worker and one job are required for Hungarian Assignment");
+        }
+      }
+    }
+
+    if (activeModule === "linear-programming") {
+      if (lpProblem.objectiveCoefficients.length === 0) {
+        errors.push("At least one decision variable is required");
+      }
+      if (lpProblem.constraints.length === 0) {
+        errors.push("At least one constraint equation is required");
+      }
+    }
+
+    if (activeModule === "network-models") {
+      if (networkEdges.length === 0) {
+        errors.push("At least one network arc is required");
+      }
+      if (networkSubtype !== "minimum-spanning-tree") {
+        if (!netStartNode.trim() || !netEndNode.trim()) {
+          errors.push("Source and destination nodes must be specified");
+        }
+      }
+    }
+
+    if (activeModule === "project-planning") {
+      const ids = new Set(cpmActivities.map((a) => a.id));
+      for (const a of cpmActivities) {
+        for (const p of a.predecessors || []) {
+          if (p && !ids.has(p)) {
+            errors.push(`Activity ${a.id}: predecessor "${p}" does not exist in the activity list`);
+          }
+        }
+        if (a.duration < 0) {
+          errors.push(`Activity ${a.id}: duration cannot be negative`);
+        }
+      }
+      if (new Set(cpmActivities.map((a) => a.id)).size !== cpmActivities.length) {
+        errors.push("Duplicate activity IDs found. Each activity must have a unique identifier");
+      }
+    }
+
+    if (activeModule === "queuing-models") {
+      const { arrivalRateLambda: l, serviceRateMu: m, serversCountC: c = 1, systemCapacityK: k } = queuingProblem;
+      if (l <= 0) errors.push("Arrival rate (λ) must be strictly positive (> 0)");
+      if (m <= 0) errors.push("Service rate (μ) must be strictly positive (> 0)");
+      if (c < 1) errors.push("Server count (c) must be at least 1");
+      if (l / m >= c && !k) {
+        errors.push(`System is unstable: utilization ρ = ${(l / (m * c)).toFixed(2)} ≥ 1. Add buffer capacity (K) or increase service rate`);
+      }
+    }
+
+    if (activeModule === "inventory-control") {
+      if (inventoryProblem.annualDemandD <= 0) errors.push("Annual demand (D) must be strictly positive (> 0)");
+      if (inventoryProblem.orderingCostK <= 0) errors.push("Ordering setup cost (K) must be strictly positive (> 0)");
+      if (inventoryProblem.holdingCostH <= 0) errors.push("Holding carrying cost (h) must be strictly positive (> 0)");
+    }
+
+    if (activeModule === "zero-sum-games") {
+      if (gameProblem.player1Strategies.length === 0 || gameProblem.player2Strategies.length === 0) {
+        errors.push("Both players must have at least one strategy");
+      }
+    }
+
+    if (activeModule === "linear-equations") {
+      if (linearEqA.length !== linearEqB.length) {
+        errors.push(`Matrix A has ${linearEqA.length} rows but Vector b has ${linearEqB.length} entries`);
+      }
+    }
+
+    return errors;
+  }, [
+    activeModule,
+    transSubtype,
+    transProblem,
+    assignProblem,
+    lpProblem,
+    networkEdges,
+    netStartNode,
+    netEndNode,
+    networkSubtype,
+    cpmActivities,
+    queuingProblem,
+    inventoryProblem,
+    gameProblem,
+    linearEqA,
+    linearEqB,
+  ]);
+
+  useEffect(() => {
+    setValidationErrors(getActiveValidationErrors());
+  }, [getActiveValidationErrors]);
+
+  // ==========================================================================
+  // Reactive Auto-Solve Engine (Debounced 250ms on Input Mutation)
+  // ==========================================================================
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setTransSol(solveTransportation(transProblem));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [transProblem, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setAssignSol(solveHungarianAssignment(assignProblem));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [assignProblem, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setLpSol(solveLinearProgramming(lpProblem));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [lpProblem, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          if (networkSubtype === "shortest-route") {
+            setNetworkSol(solveNetworkShortestRoute(networkEdges, netStartNode, netEndNode));
+          } else if (networkSubtype === "minimum-spanning-tree") {
+            setNetworkSol(solveNetworkMst(networkEdges));
+          } else {
+            setNetworkSol(solveNetworkMaxFlow(networkEdges, netStartNode, netEndNode));
+          }
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [networkEdges, netStartNode, netEndNode, networkSubtype, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setCpmSol(solveCpmPert(cpmActivities));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [cpmActivities, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setQueuingSol(solveQueuing(queuingProblem));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [queuingProblem, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setGameSol(solveZeroSumGame(gameProblem));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [gameProblem, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setInventorySol(solveInventoryControl(inventoryProblem));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [inventoryProblem, getActiveValidationErrors]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const errors = getActiveValidationErrors();
+        if (errors.length === 0) {
+          setLinearEqSol(solveLinearEquations(linearEqA, linearEqB));
+        }
+      } catch {}
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [linearEqA, linearEqB, getActiveValidationErrors]);
+
   return (
     <div className="flex-1 bg-canvas flex flex-col h-full overflow-hidden select-text">
       {/* Main Module Solver Content */}
@@ -1213,6 +1488,24 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Active Module Validation Error Notice */}
+        {validationErrors.length > 0 && (
+          <div className="bg-error/10 border border-error/30 rounded-2xl p-4 space-y-2 animate-keyframe-fade-up select-none">
+            <div className="flex items-center gap-2 text-xs font-bold text-error uppercase tracking-wider">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>Input Validation Warnings ({validationErrors.length})</span>
+            </div>
+            <div className="space-y-1">
+              {validationErrors.map((err, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs text-error font-medium pl-6">
+                  <span className="w-1.5 h-1.5 rounded-full bg-error shrink-0" />
+                  <span>{err}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 1. TRANSPORTATION & ASSIGNMENT             */}
           {/* ========================================== */}
@@ -1804,6 +2097,9 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
                     </div>
                   )}
 
+                  {/* Feasibility & Constraint Verification Panel */}
+                  <ConstraintVerificationPanel problem={lpProblem} solution={lpSol} />
+
                   {/* Multi-Scenario Sensitivity Sweep (2-variable models) */}
                   {lpProblem.objectiveCoefficients.length === 2 && (
                     <MultiScenarioSensitivitySweep baseProblem={lpProblem} />
@@ -2189,51 +2485,60 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               </div>
 
               {cpmSol && (
-                <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
-                  <div className="flex items-center justify-between border-b border-hairline pb-3">
-                    <span className="font-semibold text-lg">
-                      Critical Path: {cpmSol.criticalPath.join(" → ")}
-                    </span>
-                    <span className="text-lg font-mono font-bold text-primary">
-                      Duration: {cpmSol.projectDuration} Weeks (σ = {cpmSol.projectStdDev})
-                    </span>
+                <div className="space-y-4">
+                  <div className="bg-surface-card text-ink border border-hairline rounded-2xl p-6 shadow-sm space-y-4 animate-keyframe-fade-up">
+                    <div className="flex items-center justify-between border-b border-hairline pb-3">
+                      <span className="font-semibold text-lg">
+                        Critical Path: {cpmSol.criticalPath.join(" → ")}
+                      </span>
+                      <span className="text-lg font-mono font-bold text-primary">
+                        Duration: {cpmSol.projectDuration} Weeks (σ = {cpmSol.projectStdDev})
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-1">
+                      <table className="w-full text-left font-mono text-xs">
+                        <thead>
+                          <tr className="border-b border-hairline text-muted bg-surface-soft">
+                            <th className="p-2">Activity</th>
+                            <th className="p-2">Duration</th>
+                            <th className="p-2">ES</th>
+                            <th className="p-2">EF</th>
+                            <th className="p-2">LS</th>
+                            <th className="p-2">LF</th>
+                            <th className="p-2">Slack</th>
+                            <th className="p-2">Critical?</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {cpmSol.activities.map((a) => (
+                            <tr
+                              key={a.id}
+                              className={`border-b border-hairline-soft ${
+                                a.isCritical ? "bg-primary/10 text-primary font-bold" : "text-body"
+                              }`}
+                            >
+                              <td className="p-2">{a.id}</td>
+                              <td className="p-2">{a.duration}</td>
+                              <td className="p-2">{a.earlyStart}</td>
+                              <td className="p-2">{a.earlyFinish}</td>
+                              <td className="p-2">{a.lateStart}</td>
+                              <td className="p-2">{a.lateFinish}</td>
+                              <td className="p-2">{a.slack}</td>
+                              <td className="p-2">{a.isCritical ? "YES ★" : "No"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
-                  <div className="overflow-x-auto bg-canvas rounded-xl border border-hairline p-1">
-                    <table className="w-full text-left font-mono text-xs">
-                      <thead>
-                        <tr className="border-b border-hairline text-muted bg-surface-soft">
-                          <th className="p-2">Activity</th>
-                          <th className="p-2">Duration</th>
-                          <th className="p-2">ES</th>
-                          <th className="p-2">EF</th>
-                          <th className="p-2">LS</th>
-                          <th className="p-2">LF</th>
-                          <th className="p-2">Slack</th>
-                          <th className="p-2">Critical?</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cpmSol.activities.map((a) => (
-                          <tr
-                            key={a.id}
-                            className={`border-b border-hairline-soft ${
-                              a.isCritical ? "bg-primary/10 text-primary font-bold" : "text-body"
-                            }`}
-                          >
-                            <td className="p-2">{a.id}</td>
-                            <td className="p-2">{a.duration}</td>
-                            <td className="p-2">{a.earlyStart}</td>
-                            <td className="p-2">{a.earlyFinish}</td>
-                            <td className="p-2">{a.lateStart}</td>
-                            <td className="p-2">{a.lateFinish}</td>
-                            <td className="p-2">{a.slack}</td>
-                            <td className="p-2">{a.isCritical ? "YES ★" : "No"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Visual Gantt Chart Timeline */}
+                  <CpmGanttChart
+                    activities={cpmSol.activities}
+                    projectDuration={cpmSol.projectDuration}
+                    criticalPath={cpmSol.criticalPath}
+                  />
                 </div>
               )}
             </div>
@@ -2712,7 +3017,7 @@ export const OrSuiteView: React.FC<OrSuiteViewProps> = ({
               placeholder={
                 assistantMode === "sql"
                   ? "Ask database question, e.g. Find top 5 customers with highest total spending..."
-                  : "Write a message, paste problem text, or markdown table..."
+                  : "Type /lp, /trans, /cpm, /queue, /inv, /game... or paste problem text"
               }
               className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none px-1 font-sans"
             />

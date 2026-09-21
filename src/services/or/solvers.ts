@@ -215,6 +215,40 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   }
 
   // --------------------------------------------------------------------------
+  // Phase 1 cleanup: pivot out any artificial variables still in the basis
+  // (degenerate case — artificial is basic at zero level after Phase 1 optimal = 0)
+  // --------------------------------------------------------------------------
+  for (let i = 0; i < numConstraints; i++) {
+    if (cols[basicIndices[i]].isArtificial) {
+      // Find a non-artificial column with a non-zero entry in this row to pivot on
+      let pivotCol = -1;
+      for (let j = 0; j < cols.length; j++) {
+        if (!cols[j].isArtificial && Math.abs(A_rows[i][j]) > 1e-10) {
+          pivotCol = j;
+          break;
+        }
+      }
+      if (pivotCol !== -1) {
+        // Perform pivot on A_rows/b_vec to make this column the basic variable for row i
+        const pivotVal = A_rows[i][pivotCol];
+        for (let j = 0; j < cols.length; j++) A_rows[i][j] /= pivotVal;
+        b_vec[i] /= pivotVal;
+        for (let r = 0; r < numConstraints; r++) {
+          if (r !== i && Math.abs(A_rows[r][pivotCol]) > 1e-12) {
+            const factor = A_rows[r][pivotCol];
+            for (let j = 0; j < cols.length; j++) A_rows[r][j] -= factor * A_rows[i][j];
+            b_vec[r] -= factor * b_vec[i];
+          }
+        }
+        basicIndices[i] = pivotCol;
+      }
+      // If pivotCol === -1, the row is all zeros for non-artificial columns,
+      // meaning the constraint is redundant. The row will map to a zero row
+      // in Phase 2 and won't affect the solution.
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // PHASE 2 (Solve with user objective function)
   // --------------------------------------------------------------------------
   const nonArtIndices = cols.map((_, i) => i).filter((i) => !cols[i].isArtificial);
@@ -232,7 +266,9 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 
   const p2BasicIndices = basicIndices.map((bi) => {
     const idx = nonArtIndices.indexOf(bi);
-    return idx !== -1 ? idx : 0;
+    // -1 means artificial var still basic (redundant constraint row).
+    // Use -1 so it won't be confused with a real column during extraction.
+    return idx !== -1 ? idx : -1;
   });
 
   // Calculate Phase 2 reduced costs: c_j - sum(c_B * A_ij)
@@ -1189,12 +1225,36 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
     }
   });
 
-  // Forward Pass
+  // Topological sort (Kahn's algorithm) — ensures predecessors are processed first
+  const inDegree: Record<string, number> = {};
+  const successorsMap: Record<string, string[]> = {};
   activities.forEach((a) => {
-    const dur = effectiveDurations[a.id];
+    inDegree[a.id] = (a.predecessors || []).length;
+    successorsMap[a.id] = [];
+  });
+  activities.forEach((a) => {
+    (a.predecessors || []).forEach((p) => {
+      if (successorsMap[p]) successorsMap[p].push(a.id);
+    });
+  });
+  const topoOrder: string[] = [];
+  const queue: string[] = activities.filter((a) => inDegree[a.id] === 0).map((a) => a.id);
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    topoOrder.push(current);
+    (successorsMap[current] || []).forEach((succ) => {
+      inDegree[succ]--;
+      if (inDegree[succ] === 0) queue.push(succ);
+    });
+  }
+
+  // Forward Pass (topological order)
+  topoOrder.forEach((id) => {
+    const a = actMap.get(id)!;
+    const dur = effectiveDurations[id];
     if (!a.predecessors || a.predecessors.length === 0) {
-      earlyStart[a.id] = 0;
-      earlyFinish[a.id] = dur;
+      earlyStart[id] = 0;
+      earlyFinish[id] = dur;
     } else {
       let maxEF = 0;
       a.predecessors.forEach((p) => {
@@ -1202,40 +1262,40 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
           maxEF = earlyFinish[p];
         }
       });
-      earlyStart[a.id] = maxEF;
-      earlyFinish[a.id] = maxEF + dur;
+      earlyStart[id] = maxEF;
+      earlyFinish[id] = maxEF + dur;
     }
   });
 
   const projectDuration = Math.max(...Object.values(earlyFinish), 0);
 
-  // Backward Pass
-  [...activities].reverse().forEach((a) => {
-    const dur = effectiveDurations[a.id];
-    const successors = activities.filter((succ) => succ.predecessors?.includes(a.id));
+  // Backward Pass (reverse topological order)
+  [...topoOrder].reverse().forEach((id) => {
+    const dur = effectiveDurations[id];
+    const succs = activities.filter((succ) => succ.predecessors?.includes(id));
 
-    if (successors.length === 0) {
-      lateFinish[a.id] = projectDuration;
-      lateStart[a.id] = projectDuration - dur;
+    if (succs.length === 0) {
+      lateFinish[id] = projectDuration;
+      lateStart[id] = projectDuration - dur;
     } else {
       let minLS = Infinity;
-      successors.forEach((succ) => {
+      succs.forEach((succ) => {
         if (lateStart[succ.id] !== undefined && lateStart[succ.id] < minLS) {
           minLS = lateStart[succ.id];
         }
       });
-      lateFinish[a.id] = minLS;
-      lateStart[a.id] = minLS - dur;
+      lateFinish[id] = minLS;
+      lateStart[id] = minLS - dur;
     }
 
-    slack[a.id] = Math.round((lateStart[a.id] - earlyStart[a.id]) * 100) / 100;
+    slack[id] = Math.round((lateStart[id] - earlyStart[id]) * 100) / 100;
 
     // Free Slack = min(ES_succ) - EF
-    if (successors.length === 0) {
-      freeSlack[a.id] = Math.round((projectDuration - earlyFinish[a.id]) * 100) / 100;
+    if (succs.length === 0) {
+      freeSlack[id] = Math.round((projectDuration - earlyFinish[id]) * 100) / 100;
     } else {
-      const minSuccES = Math.min(...successors.map((s) => earlyStart[s.id] || 0));
-      freeSlack[a.id] = Math.round((minSuccES - earlyFinish[a.id]) * 100) / 100;
+      const minSuccES = Math.min(...succs.map((s) => earlyStart[s.id] || 0));
+      freeSlack[id] = Math.round((minSuccES - earlyFinish[id]) * 100) / 100;
     }
   });
 
@@ -1556,10 +1616,11 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
 
   // 3. Economic Production Quantity (EPQ / POQ)
   if (problem.productionRateP && problem.productionRateP > 0) {
-    const dailyDemand = D / 365;
     const prodRate = problem.productionRateP;
-    const Q_star = Math.sqrt((2 * K * D) / (H * (1 - dailyDemand / prodRate)));
-    const I_max = Q_star * (1 - dailyDemand / prodRate);
+    // d/p ratio: both D and prodRate are annual, so D/prodRate is unit-consistent
+    const dpRatio = D / prodRate;
+    const Q_star = Math.sqrt((2 * K * D) / (H * (1 - dpRatio)));
+    const I_max = Q_star * (1 - dpRatio);
 
     const annualOrdering = (D / Q_star) * K;
     const annualHolding = (I_max / 2) * H;
