@@ -45,8 +45,8 @@ export const MultiScenarioSensitivitySweep: React.FC<MultiScenarioSensitivitySwe
             ? modified.constraints[0]?.rhs
             : modified.constraints[1]?.rhs,
         zValue: sol.objectiveValue,
-        x1: sol.variableValues.find((v) => v.name === "x1")?.value || 0,
-        x2: sol.variableValues.find((v) => v.name === "x2")?.value || 0,
+        x1: sol.variableValues.find((v: { name: string; value: number }) => v.name === "x1")?.value || 0,
+        x2: sol.variableValues.find((v: { name: string; value: number }) => v.name === "x2")?.value || 0,
       };
     } catch {
       return {

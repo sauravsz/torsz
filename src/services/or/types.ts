@@ -108,6 +108,7 @@ export interface AssignmentProblem {
   workers: string[];
   jobs: string[];
   costs: number[][];
+  maximize?: boolean;
 }
 
 export interface AssignmentSolution {
@@ -245,6 +246,7 @@ export interface InventoryProblem {
   unitPriceC: number;
   shortageCostP?: number;
   productionRateP?: number;
+  leadTimeDaysL?: number;
   salvageValueS?: number;
   priceBreaks?: PriceBreakTier[];
 }

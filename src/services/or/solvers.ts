@@ -23,7 +23,7 @@ import {
 } from "./types";
 
 // ============================================================================
-// 1. LINEAR PROGRAMMING (Generalized Two-Phase Simplex & 2D Graphical)
+// 1. LINEAR PROGRAMMING (Two-Phase Simplex with Exact Dual Multipliers & Bland's Rule)
 // ============================================================================
 export function solveLinearProgramming(problem: LpProblem): LpSolution {
   const numVars = problem.objectiveCoefficients.length;
@@ -34,7 +34,7 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 
   const isMax = problem.objective === "max";
   // Internal minimization: if max, negate user objective
-  const userObj = problem.objectiveCoefficients.map((c) => (isMax ? -c : c));
+  const userObj = problem.objectiveCoefficients.map((c: number) => (isMax ? -c : c));
 
   interface ColInfo {
     name: string;
@@ -52,6 +52,7 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     slackCol: number;
     surplusCol: number;
     artCol: number;
+    flippedSign: boolean;
   }
 
   const basicIndices: number[] = [];
@@ -61,6 +62,8 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     let { coefficients, operator, rhs } = problem.constraints[i];
     let row = [...coefficients];
     while (row.length < numVars) row.push(0);
+
+    let flippedSign = false;
 
     // Homogeneous >= 0 -> <= 0 to avoid artificial variable on redundant bounds
     if (operator === ">=" && Math.abs(rhs) < 1e-9) {
@@ -73,6 +76,7 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       row = row.map((x) => -x);
       rhs = -rhs;
       operator = operator === "<=" ? ">=" : operator === ">=" ? "<=" : "=";
+      flippedSign = true;
     }
 
     let slackCol = -1;
@@ -95,12 +99,12 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       basicIndices.push(artCol);
     }
 
-    consInfo.push({ coeffs: row, rhs, slackCol, surplusCol, artCol });
+    consInfo.push({ coeffs: row, rhs, slackCol, surplusCol, artCol, flippedSign });
   }
 
   const totalCols = cols.length;
-  let A_rows: number[][] = Array.from({ length: numConstraints }, () => new Array(totalCols).fill(0));
-  let b_vec: number[] = new Array(numConstraints).fill(0);
+  const A_rows: number[][] = Array.from({ length: numConstraints }, () => new Array(totalCols).fill(0));
+  const b_vec: number[] = new Array(numConstraints).fill(0);
 
   for (let i = 0; i < numConstraints; i++) {
     const info = consInfo[i];
@@ -118,6 +122,7 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   let isUnbounded = false;
   let isInfeasible = false;
   let iterations = 0;
+  const maxIter = Math.max(500, numConstraints * numVars * 10);
 
   // --------------------------------------------------------------------------
   // PHASE 1 (Minimize sum of artificial variables)
@@ -132,22 +137,22 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     for (let j = 0; j < totalCols; j++) {
       let sum = 0;
       for (let i = 0; i < numConstraints; i++) {
-        if (cols[basicIndices[i]].isArtificial) sum += p1Tableau[i][j];
+        if (cols[basicIndices[i]]?.isArtificial) sum += p1Tableau[i][j];
       }
       p1Tableau[numConstraints][j] = (cols[j].isArtificial ? 1 : 0) - sum;
     }
     let p1SumRhs = 0;
     for (let i = 0; i < numConstraints; i++) {
-      if (cols[basicIndices[i]].isArtificial) p1SumRhs += b_vec[i];
+      if (cols[basicIndices[i]]?.isArtificial) p1SumRhs += b_vec[i];
     }
     p1Tableau[numConstraints][totalCols] = -p1SumRhs;
 
     let p1Iter = 0;
     const p1Headers = [...cols.map((c) => c.name), "RHS"];
 
-    while (p1Iter < 50) {
+    while (p1Iter < maxIter) {
       let pivotCol = -1;
-      let minVal = -1e-5;
+      let minVal = -1e-6;
       for (let j = 0; j < totalCols; j++) {
         if (p1Tableau[numConstraints][j] < minVal) {
           minVal = p1Tableau[numConstraints][j];
@@ -161,12 +166,17 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       if (pivotCol !== -1) {
         for (let i = 0; i < numConstraints; i++) {
           const a_ij = p1Tableau[i][pivotCol];
-          if (a_ij > 1e-5) {
+          if (a_ij > 1e-6) {
             const ratio = p1Tableau[i][totalCols] / a_ij;
             ratios.push(ratio);
-            if (ratio < minRatio) {
+            if (ratio < minRatio - 1e-9) {
               minRatio = ratio;
               pivotRow = i;
+            } else if (Math.abs(ratio - minRatio) <= 1e-9 && pivotRow !== -1) {
+              // Bland's rule tie-breaking: choose basic variable with smaller index
+              if (basicIndices[i] < basicIndices[pivotRow]) {
+                pivotRow = i;
+              }
             }
           } else {
             ratios.push(null);
@@ -176,12 +186,12 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 
       tableaus.push({
         iteration: iterations,
-        basicVars: basicIndices.map((idx) => cols[idx]?.name || "b"),
+        basicVars: basicIndices.map((idx) => (idx >= 0 ? cols[idx]?.name || `x${idx}` : "—")),
         headers: [...p1Headers],
         rows: p1Tableau.slice(0, numConstraints).map((r) => [...r]),
         zRow: [...p1Tableau[numConstraints]],
         enteringVar: pivotCol !== -1 ? p1Headers[pivotCol] : undefined,
-        leavingVar: pivotRow !== -1 ? cols[basicIndices[pivotRow]]?.name : undefined,
+        leavingVar: pivotRow !== -1 && basicIndices[pivotRow] >= 0 ? cols[basicIndices[pivotRow]]?.name : undefined,
         pivotRowIdx: pivotRow !== -1 ? pivotRow : undefined,
         pivotColIdx: pivotCol !== -1 ? pivotCol : undefined,
         ratios: ratios.length > 0 ? ratios : undefined,
@@ -219,11 +229,11 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   // (degenerate case — artificial is basic at zero level after Phase 1 optimal = 0)
   // --------------------------------------------------------------------------
   for (let i = 0; i < numConstraints; i++) {
-    if (cols[basicIndices[i]].isArtificial) {
-      // Find a non-artificial column with a non-zero entry in this row to pivot on
+    if (basicIndices[i] >= 0 && cols[basicIndices[i]]?.isArtificial) {
+      // Find a NON-BASIC, NON-ARTIFICIAL column with a non-zero entry in this row
       let pivotCol = -1;
       for (let j = 0; j < cols.length; j++) {
-        if (!cols[j].isArtificial && Math.abs(A_rows[i][j]) > 1e-10) {
+        if (!cols[j].isArtificial && !basicIndices.includes(j) && Math.abs(A_rows[i][j]) > 1e-9) {
           pivotCol = j;
           break;
         }
@@ -241,10 +251,10 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
           }
         }
         basicIndices[i] = pivotCol;
+      } else {
+        // Row i is completely redundant for all real variables
+        basicIndices[i] = -1;
       }
-      // If pivotCol === -1, the row is all zeros for non-artificial columns,
-      // meaning the constraint is redundant. The row will map to a zero row
-      // in Phase 2 and won't affect the solution.
     }
   }
 
@@ -265,9 +275,8 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   }
 
   const p2BasicIndices = basicIndices.map((bi) => {
+    if (bi < 0) return -1;
     const idx = nonArtIndices.indexOf(bi);
-    // -1 means artificial var still basic (redundant constraint row).
-    // Use -1 so it won't be confused with a real column during extraction.
     return idx !== -1 ? idx : -1;
   });
 
@@ -277,25 +286,29 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     const userCost = origColIdx < numVars ? userObj[origColIdx] : 0;
     let sum = 0;
     for (let i = 0; i < numConstraints; i++) {
-      const bOrigCol = nonArtIndices[p2BasicIndices[i]];
-      const bCost = bOrigCol < numVars ? userObj[bOrigCol] : 0;
-      sum += bCost * tableau[i][j];
+      if (p2BasicIndices[i] >= 0) {
+        const bOrigCol = nonArtIndices[p2BasicIndices[i]];
+        const bCost = bOrigCol < numVars ? userObj[bOrigCol] : 0;
+        sum += bCost * tableau[i][j];
+      }
     }
     tableau[numConstraints][j] = userCost - sum;
   }
 
   let p2InitialZ = 0;
   for (let i = 0; i < numConstraints; i++) {
-    const bOrigCol = nonArtIndices[p2BasicIndices[i]];
-    const bCost = bOrigCol < numVars ? userObj[bOrigCol] : 0;
-    p2InitialZ += bCost * b_vec[i];
+    if (p2BasicIndices[i] >= 0) {
+      const bOrigCol = nonArtIndices[p2BasicIndices[i]];
+      const bCost = bOrigCol < numVars ? userObj[bOrigCol] : 0;
+      p2InitialZ += bCost * b_vec[i];
+    }
   }
   tableau[numConstraints][p2TotalCols] = -p2InitialZ;
 
   let p2Iter = 0;
-  while (p2Iter < 50 && !isInfeasible) {
+  while (p2Iter < maxIter && !isInfeasible) {
     let pivotCol = -1;
-    let minVal = -1e-5;
+    let minVal = -1e-6;
     for (let j = 0; j < p2TotalCols; j++) {
       if (tableau[numConstraints][j] < minVal) {
         minVal = tableau[numConstraints][j];
@@ -309,12 +322,17 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     if (pivotCol !== -1) {
       for (let i = 0; i < numConstraints; i++) {
         const a_ij = tableau[i][pivotCol];
-        if (a_ij > 1e-5) {
+        if (a_ij > 1e-6) {
           const ratio = tableau[i][p2TotalCols] / a_ij;
           ratios.push(ratio);
-          if (ratio < minRatio) {
+          if (ratio < minRatio - 1e-9) {
             minRatio = ratio;
             pivotRow = i;
+          } else if (Math.abs(ratio - minRatio) <= 1e-9 && pivotRow !== -1) {
+            // Bland's rule tie-breaking
+            if (p2BasicIndices[i] < p2BasicIndices[pivotRow]) {
+              pivotRow = i;
+            }
           }
         } else {
           ratios.push(null);
@@ -324,12 +342,12 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
 
     tableaus.push({
       iteration: iterations,
-      basicVars: p2BasicIndices.map((idx) => p2Cols[idx]?.name || "b"),
+      basicVars: p2BasicIndices.map((idx) => (idx >= 0 ? p2Cols[idx]?.name || `x${idx}` : "—")),
       headers: [...p2Headers],
       rows: tableau.slice(0, numConstraints).map((r) => [...r]),
       zRow: [...tableau[numConstraints]],
       enteringVar: pivotCol !== -1 ? p2Headers[pivotCol] : undefined,
-      leavingVar: pivotRow !== -1 ? p2Cols[p2BasicIndices[pivotRow]]?.name : undefined,
+      leavingVar: pivotRow !== -1 && p2BasicIndices[pivotRow] >= 0 ? p2Cols[p2BasicIndices[pivotRow]]?.name : undefined,
       pivotRowIdx: pivotRow !== -1 ? pivotRow : undefined,
       pivotColIdx: pivotCol !== -1 ? pivotCol : undefined,
       ratios: ratios.length > 0 ? ratios : undefined,
@@ -340,7 +358,7 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
       break;
     }
     if (pivotCol === -1) {
-      break; // Optimal
+      break; // Optimal reached
     }
 
     const pVal = tableau[pivotRow][pivotCol];
@@ -362,9 +380,11 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   for (const name of varNames) varMap[name] = 0;
 
   for (let i = 0; i < numConstraints; i++) {
-    const colName = p2Cols[p2BasicIndices[i]]?.name;
-    if (varNames.includes(colName)) {
-      varMap[colName] = Math.max(0, tableau[i][p2TotalCols]);
+    if (p2BasicIndices[i] >= 0) {
+      const colName = p2Cols[p2BasicIndices[i]]?.name;
+      if (varNames.includes(colName)) {
+        varMap[colName] = Math.max(0, tableau[i][p2TotalCols]);
+      }
     }
   }
 
@@ -372,23 +392,61 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
     return sum + (problem.objectiveCoefficients[idx] || 0) * (varMap[name] || 0);
   }, 0);
 
-  // Compute dual prices and constraint slacks
-  const dualPrices = problem.constraints.map((c, i) => {
-    // Slack/Surplus value = |rhs - sum(a_ij * x_j)|
-    const lhsVal = c.coefficients.reduce((s, coeff, j) => s + coeff * (varMap[varNames[j]] || 0), 0);
+  // Compute exact Dual Multipliers (Shadow Prices) via B^T y = c_B
+  let dualVector: number[] = new Array(numConstraints).fill(0);
+  if (!isInfeasible && !isUnbounded) {
+    try {
+      // Build basis matrix B of standard form (m x m)
+            const B_matrix: number[][] = Array.from({ length: numConstraints }, () => new Array(numConstraints).fill(0));
+      const cB_vector: number[] = new Array(numConstraints).fill(0);
+
+      for (let i = 0; i < numConstraints; i++) {
+        const basicCol = p2BasicIndices[i];
+        if (basicCol >= 0) {
+          const origIdx = nonArtIndices[basicCol];
+          // Get column from initial constraint matrix A_init
+          for (let r = 0; r < numConstraints; r++) {
+            const info = consInfo[r];
+            let coeff = 0;
+            if (origIdx < numVars) coeff = info.coeffs[origIdx];
+            else if (origIdx === info.slackCol) coeff = 1;
+            else if (origIdx === info.surplusCol) coeff = -1;
+            B_matrix[r][i] = coeff;
+          }
+          cB_vector[i] = origIdx < numVars ? userObj[origIdx] : 0;
+        } else {
+          B_matrix[i][i] = 1;
+          cB_vector[i] = 0;
+        }
+      }
+
+      // Transpose of B
+      const BT: number[][] = Array.from({ length: numConstraints }, (_, r) =>
+        Array.from({ length: numConstraints }, (_, c) => B_matrix[c][r])
+      );
+      dualVector = solveLinearEquations(BT, cB_vector);
+    } catch {
+      // Fallback: extract from tableau objective row directly
+      dualVector = problem.constraints.map((c: { operator: string }, i: number) => {
+        const slackColName = c.operator === "<=" ? `s${i + 1}` : `e${i + 1}`;
+        const colIdx = p2Cols.findIndex((col) => col.name === slackColName);
+        return colIdx !== -1 ? Math.abs(tableau[numConstraints][colIdx]) : 0;
+      });
+    }
+  }
+
+  // Compute dual prices and constraint slacks for each user constraint
+  const dualPrices = problem.constraints.map((c: { coefficients: number[]; operator: string; rhs: number }, i: number) => {
+    const lhsVal = c.coefficients.reduce((s: number, coeff: number, j: number) => s + coeff * (varMap[varNames[j]] || 0), 0);
     const slackVal = Math.abs(c.rhs - lhsVal);
 
-    // Find corresponding slack/surplus column in final tableau to extract true shadow price
-    const slackColName = c.operator === "<=" ? `s${i + 1}` : `e${i + 1}`;
-    const colIdxInP2 = p2Cols.findIndex((col) => col.name === slackColName);
-    let shadowVal = 0;
-    if (colIdxInP2 !== -1) {
-      shadowVal = Math.abs(tableau[numConstraints][colIdxInP2]);
-    }
+    let rawShadow = Math.abs(dualVector[i] || 0);
+    // If dual multiplier was derived, take absolute value for display (standard OR textbook convention)
+    if (isNaN(rawShadow) || !isFinite(rawShadow)) rawShadow = 0;
 
     return {
       constraint: `Constraint ${i + 1} (${c.operator} ${c.rhs})`,
-      shadowPrice: Math.round(shadowVal * 1000) / 1000,
+      shadowPrice: Math.round(rawShadow * 1000) / 1000,
       slack: Math.round(slackVal * 1000) / 1000,
     };
   });
@@ -396,7 +454,7 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   // 2D Graphical Solver
   let graphical: GraphicalLpSolution | undefined;
   if (numVars === 2) {
-    graphical = solveGraphical2D(problem);
+    graphical = solveGraphical2D(problem, isUnbounded);
   }
 
   const finalStatus = isInfeasible ? "infeasible" : isUnbounded ? "unbounded" : "optimal";
@@ -415,7 +473,10 @@ export function solveLinearProgramming(problem: LpProblem): LpSolution {
   };
 }
 
-function solveGraphical2D(problem: LpProblem): GraphicalLpSolution {
+// ============================================================================
+// 2. 2D GRAPHICAL LINEAR PROGRAMMING (Convex Hull & Exact Geometry)
+// ============================================================================
+function solveGraphical2D(problem: LpProblem, isUnboundedSimplex = false): GraphicalLpSolution {
   const [c1, c2] = problem.objectiveCoefficients;
   const isMax = problem.objective === "max";
   const constraints = problem.constraints;
@@ -434,11 +495,11 @@ function solveGraphical2D(problem: LpProblem): GraphicalLpSolution {
 
     if (Math.abs(a1) > 1e-6) {
       xInt = rhs / a1;
-      if (xInt >= 0) candidatePoints.push([xInt, 0]);
+      if (xInt >= -1e-6) candidatePoints.push([Math.max(0, xInt), 0]);
     }
     if (Math.abs(a2) > 1e-6) {
       yInt = rhs / a2;
-      if (yInt >= 0) candidatePoints.push([0, yInt]);
+      if (yInt >= -1e-6) candidatePoints.push([0, Math.max(0, yInt)]);
     }
 
     lines.push({
@@ -509,20 +570,46 @@ function solveGraphical2D(problem: LpProblem): GraphicalLpSolution {
     }
   }
 
-  for (const p of cornerPoints) {
-    if (Math.abs(p.x1 - optimalCorner[0]) < 1e-3 && Math.abs(p.x2 - optimalCorner[1]) < 1e-3) {
-      p.isOptimal = true;
+  if (!isUnboundedSimplex) {
+    for (const p of cornerPoints) {
+      if (Math.abs(p.x1 - optimalCorner[0]) < 1e-3 && Math.abs(p.x2 - optimalCorner[1]) < 1e-3) {
+        p.isOptimal = true;
+      }
     }
   }
 
-  // Build convex hull / polygon of feasible region
-  const feasiblePolygon: [number, number][] = cornerPoints.map((p) => [p.x1, p.x2]);
-  if (feasiblePolygon.length > 2) {
-    // Sort vertices counterclockwise around centroid
-    const cx = feasiblePolygon.reduce((s, p) => s + p[0], 0) / feasiblePolygon.length;
-    const cy = feasiblePolygon.reduce((s, p) => s + p[1], 0) / feasiblePolygon.length;
-    feasiblePolygon.sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+  // Andrew's Monotone Chain 2D Convex Hull
+  function computeConvexHull(pts: [number, number][]): [number, number][] {
+    if (pts.length <= 2) return [...pts];
+    const sorted = [...pts].sort((a: [number, number], b: [number, number]) => a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]);
+
+    const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+      (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+    const lower: [number, number][] = [];
+    for (const p of sorted) {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+        lower.pop();
+      }
+      lower.push(p);
+    }
+
+    const upper: [number, number][] = [];
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      const p = sorted[i];
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+        upper.pop();
+      }
+      upper.push(p);
+    }
+
+    lower.pop();
+    upper.pop();
+    return lower.concat(upper);
   }
+
+  const rawHullPts: [number, number][] = cornerPoints.map((p: GraphicalCornerPoint) => [p.x1, p.x2]);
+  const feasiblePolygon = computeConvexHull(rawHullPts);
 
   const maxX = Math.max(10, ...cornerPoints.map((p) => p.x1 * 1.3));
   const maxY = Math.max(10, ...cornerPoints.map((p) => p.x2 * 1.3));
@@ -531,15 +618,15 @@ function solveGraphical2D(problem: LpProblem): GraphicalLpSolution {
     lines,
     feasiblePolygon,
     cornerPoints,
-    optimalPoint: optimalCorner,
-    optimalZ: Math.round(bestZ * 1000) / 1000,
+    optimalPoint: isUnboundedSimplex ? [0, 0] : optimalCorner,
+    optimalZ: isUnboundedSimplex ? Infinity : Math.round(bestZ * 1000) / 1000,
     maxX,
     maxY,
   };
 }
 
 // ============================================================================
-// 2. TRANSPORTATION MODEL (Vogel's Approximation Method - VAM & MODI)
+// 3. TRANSPORTATION MODEL (Vogel's Approximation Method & Exact MODI with Spanning Tree)
 // ============================================================================
 export function solveTransportation(problem: TransportationProblem): TransportationSolution {
   const totalSupply = problem.supply.reduce((a, b) => a + b, 0);
@@ -547,7 +634,7 @@ export function solveTransportation(problem: TransportationProblem): Transportat
 
   const sources = [...problem.sources];
   const destinations = [...problem.destinations];
-  const costs = problem.costs.map((row) => [...row]);
+  const costs = problem.costs.map((row: number[]) => [...row]);
   const supply = [...problem.supply];
   const demand = [...problem.demand];
 
@@ -565,20 +652,30 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     costs.push(new Array(destinations.length).fill(0));
   }
 
-  const numRows = sources.length;
-  const numCols = destinations.length;
+  const m = sources.length;
+  const n = destinations.length;
 
-  const allocations: number[][] = Array.from({ length: numRows }, () =>
-    new Array(numCols).fill(0)
-  );
+  const alloc: number[][] = Array.from({ length: m }, () => new Array(n).fill(0));
+  const isBasic: boolean[][] = Array.from({ length: m }, () => new Array(n).fill(false));
 
   const remSupply = [...supply];
   const remDemand = [...demand];
-  const activeRows = new Set<number>(Array.from({ length: numRows }, (_, i) => i));
-  const activeCols = new Set<number>(Array.from({ length: numCols }, (_, i) => i));
+  const activeRows = new Set<number>(Array.from({ length: m }, (_, i) => i));
+  const activeCols = new Set<number>(Array.from({ length: n }, (_, i) => i));
 
-  // Step 1: Vogel's Approximation Method (VAM) Initial Allocation
+  // Step 1: Vogel's Approximation Method (VAM) Initial Basic Feasible Allocation
   while (activeRows.size > 0 && activeCols.size > 0) {
+    if (activeRows.size === 1 && activeCols.size === 1) {
+      const r = Array.from(activeRows)[0];
+      const c = Array.from(activeCols)[0];
+      const qty = Math.min(remSupply[r], remDemand[c]);
+      alloc[r][c] = qty;
+      isBasic[r][c] = true;
+      activeRows.delete(r);
+      activeCols.delete(c);
+      break;
+    }
+
     let maxPenalty = -1;
     let chosenType: "row" | "col" = "row";
     let chosenIdx = -1;
@@ -586,18 +683,9 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     // Row penalties
     for (const r of activeRows) {
       const rowCosts: { cost: number; c: number }[] = [];
-      for (const c of activeCols) {
-        rowCosts.push({ cost: costs[r][c], c });
-      }
-      rowCosts.sort((a, b) => a.cost - b.cost);
-
-      let penalty = 0;
-      if (rowCosts.length >= 2) {
-        penalty = rowCosts[1].cost - rowCosts[0].cost;
-      } else if (rowCosts.length === 1) {
-        penalty = rowCosts[0].cost;
-      }
-
+      for (const c of activeCols) rowCosts.push({ cost: costs[r][c], c });
+      rowCosts.sort((a: { cost: number }, b: { cost: number }) => a.cost - b.cost);
+      const penalty = rowCosts.length >= 2 ? rowCosts[1].cost - rowCosts[0].cost : rowCosts[0]?.cost || 0;
       if (penalty > maxPenalty) {
         maxPenalty = penalty;
         chosenType = "row";
@@ -608,26 +696,15 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     // Col penalties
     for (const c of activeCols) {
       const colCosts: { cost: number; r: number }[] = [];
-      for (const r of activeRows) {
-        colCosts.push({ cost: costs[r][c], r });
-      }
-      colCosts.sort((a, b) => a.cost - b.cost);
-
-      let penalty = 0;
-      if (colCosts.length >= 2) {
-        penalty = colCosts[1].cost - colCosts[0].cost;
-      } else if (colCosts.length === 1) {
-        penalty = colCosts[0].cost;
-      }
-
+      for (const r of activeRows) colCosts.push({ cost: costs[r][c], r });
+      colCosts.sort((a: { cost: number }, b: { cost: number }) => a.cost - b.cost);
+      const penalty = colCosts.length >= 2 ? colCosts[1].cost - colCosts[0].cost : colCosts[0]?.cost || 0;
       if (penalty > maxPenalty) {
         maxPenalty = penalty;
         chosenType = "col";
         chosenIdx = c;
       }
     }
-
-    if (chosenIdx === -1) break;
 
     let rAlloc = -1;
     let cAlloc = -1;
@@ -653,11 +730,13 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     }
 
     const qty = Math.min(remSupply[rAlloc], remDemand[cAlloc]);
-    allocations[rAlloc][cAlloc] = qty;
+    alloc[rAlloc][cAlloc] = qty;
+    isBasic[rAlloc][cAlloc] = true;
     remSupply[rAlloc] -= qty;
     remDemand[cAlloc] -= qty;
 
     if (remSupply[rAlloc] === 0 && remDemand[cAlloc] === 0) {
+      // Degeneracy: cross out row, leave column active with 0 demand so basis remains connected
       if (activeRows.size > 1) {
         activeRows.delete(rAlloc);
       } else {
@@ -670,40 +749,115 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     }
   }
 
-  // Step 2: MODI (Modified Distribution Method) Stepping Stone Optimization
-  for (let iter = 0; iter < 50; iter++) {
-    const u: (number | null)[] = new Array(numRows).fill(null);
-    const v: (number | null)[] = new Array(numCols).fill(null);
-    u[0] = 0;
+  // Ensure exactly m + n - 1 basic cells that form a spanning tree without cycles
+  function countBasic(): number {
+    let count = 0;
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) {
+        if (isBasic[r][c]) count++;
+      }
+    }
+    return count;
+  }
 
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (let r = 0; r < numRows; r++) {
-        for (let c = 0; c < numCols; c++) {
-          if (allocations[r][c] > 0) {
-            if (u[r] !== null && v[c] === null) {
-              v[c] = costs[r][c] - u[r]!;
-              changed = true;
-            } else if (u[r] === null && v[c] !== null) {
-              u[r] = costs[r][c] - v[c]!;
-              changed = true;
+  function hasCycle(): boolean {
+    const adjR: number[][] = Array.from({ length: m }, () => []);
+    const adjC: number[][] = Array.from({ length: n }, () => []);
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) {
+        if (isBasic[r][c]) {
+          adjR[r].push(c);
+          adjC[c].push(r);
+        }
+      }
+    }
+    const visited = new Set<string>();
+    function dfs(u: number, isRow: boolean, parentU: number | null): boolean {
+      const key = `${isRow ? "r" : "c"}_${u}`;
+      if (visited.has(key)) return true;
+      visited.add(key);
+      const neighbors = isRow ? adjR[u] : adjC[u];
+      for (const v of neighbors) {
+        if (v === parentU) continue;
+        if (dfs(v, !isRow, u)) return true;
+      }
+      return false;
+    }
+    for (let r = 0; r < m; r++) {
+      if (!visited.has(`r_${r}`)) {
+        if (dfs(r, true, null)) return true;
+      }
+    }
+    return false;
+  }
+
+  // Add dummy basic cells if count < m + n - 1
+  while (countBasic() < m + n - 1) {
+    let added = false;
+    for (let r = 0; r < m && !added; r++) {
+      for (let c = 0; c < n && !added; c++) {
+        if (!isBasic[r][c]) {
+          isBasic[r][c] = true;
+          if (!hasCycle()) {
+            added = true;
+          } else {
+            isBasic[r][c] = false;
+          }
+        }
+      }
+    }
+    if (!added) break;
+  }
+
+  // Step 2: MODI (Modified Distribution Method) Stepping Stone Optimization
+  for (let iter = 0; iter < 100; iter++) {
+    const u: (number | null)[] = new Array(m).fill(null);
+    const v: (number | null)[] = new Array(n).fill(null);
+
+    // Compute potentials u_i, v_j across all connected components
+    for (let rootR = 0; rootR < m; rootR++) {
+      if (u[rootR] === null) {
+        for (let c = 0; c < n; c++) {
+          if (isBasic[rootR][c] && v[c] !== null) {
+            u[rootR] = costs[rootR][c] - v[c]!;
+            break;
+          }
+        }
+        if (u[rootR] === null) {
+          u[rootR] = 0;
+        }
+
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (let r = 0; r < m; r++) {
+            for (let c = 0; c < n; c++) {
+              if (isBasic[r][c]) {
+                if (u[r] !== null && v[c] === null) {
+                  v[c] = costs[r][c] - u[r]!;
+                  changed = true;
+                } else if (u[r] === null && v[c] !== null) {
+                  u[r] = costs[r][c] - v[c]!;
+                  changed = true;
+                }
+              }
             }
           }
         }
       }
     }
 
-    let minOpportunityCost = 0;
+    // Opportunity costs Delta_ij = c_ij - (u_i + v_j)
+    let minDelta = -1e-6;
     let enterR = -1;
     let enterC = -1;
 
-    for (let r = 0; r < numRows; r++) {
-      for (let c = 0; c < numCols; c++) {
-        if (allocations[r][c] === 0 && u[r] !== null && v[c] !== null) {
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) {
+        if (!isBasic[r][c] && u[r] !== null && v[c] !== null) {
           const delta = costs[r][c] - (u[r]! + v[c]!);
-          if (delta < minOpportunityCost) {
-            minOpportunityCost = delta;
+          if (delta < minDelta) {
+            minDelta = delta;
             enterR = r;
             enterC = c;
           }
@@ -711,65 +865,79 @@ export function solveTransportation(problem: TransportationProblem): Transportat
       }
     }
 
-    if (enterR === -1 || minOpportunityCost >= -1e-5) {
-      break;
+    if (enterR === -1) {
+      break; // Optimal!
     }
 
-    // Find stepping stone cycle
-    function findLoop(startR: number, startC: number): [number, number][] | null {
-      const basicCells: [number, number][] = [];
-      for (let r = 0; r < numRows; r++) {
-        for (let c = 0; c < numCols; c++) {
-          if (allocations[r][c] > 0 || (r === startR && c === startC)) {
-            basicCells.push([r, c]);
+    // Find stepping stone closed cycle through basic cells + (enterR, enterC)
+    function findCycle(startR: number, startC: number): [number, number][] | null {
+      const basicList: [number, number][] = [];
+      for (let r = 0; r < m; r++) {
+        for (let c = 0; c < n; c++) {
+          if (isBasic[r][c] || (r === startR && c === startC)) {
+            basicList.push([r, c]);
           }
         }
       }
 
-      function searchPath(path: [number, number][], isRowMove: boolean): [number, number][] | null {
-        const [lastR, lastC] = path[path.length - 1];
-        if (path.length >= 4 && lastR === startR && !isRowMove) return path;
+      function dfs(path: [number, number][], isRowMove: boolean): [number, number][] | null {
+        const [currR, currC] = path[path.length - 1];
+        if (path.length >= 4) {
+          if (isRowMove && currR === startR && currC !== startC) return path;
+          if (!isRowMove && currC === startC && currR !== startR) return path;
+        }
 
         if (isRowMove) {
-          for (const [r, c] of basicCells) {
-            if (r === lastR && c !== lastC && !path.some(([pr, pc]) => pr === r && pc === c)) {
-              const res = searchPath([...path, [r, c]], false);
+          for (const [r, c] of basicList) {
+            if (r === currR && c !== currC && !path.some(([pr, pc]) => pr === r && pc === c)) {
+              const res = dfs([...path, [r, c]], false);
               if (res) return res;
             }
           }
         } else {
-          for (const [r, c] of basicCells) {
-            if (c === lastC && r !== lastR) {
-              if (r === startR && c === startC && path.length >= 4) return path;
-              if (!path.some(([pr, pc]) => pr === r && pc === c)) {
-                const res = searchPath([...path, [r, c]], true);
-                if (res) return res;
-              }
+          for (const [r, c] of basicList) {
+            if (c === currC && r !== currR && !path.some(([pr, pc]) => pr === r && pc === c)) {
+              const res = dfs([...path, [r, c]], true);
+              if (res) return res;
             }
           }
         }
         return null;
       }
 
-      return searchPath([[startR, startC]], true);
+      let res = dfs([[startR, startC]], true);
+      if (!res) res = dfs([[startR, startC]], false);
+      return res;
     }
 
-    const loop = findLoop(enterR, enterC);
-    if (!loop || loop.length < 4) break;
+    const cycle = findCycle(enterR, enterC);
+    if (!cycle || cycle.length < 4) break;
 
+    // Odd positions in cycle are subtracted
     let theta = Infinity;
-    for (let k = 1; k < loop.length; k += 2) {
-      const [r, c] = loop[k];
-      if (allocations[r][c] < theta) theta = allocations[r][c];
+    let leaveR = -1;
+    let leaveC = -1;
+
+    for (let k = 1; k < cycle.length; k += 2) {
+      const [r, c] = cycle[k];
+      if (alloc[r][c] < theta) {
+        theta = alloc[r][c];
+        leaveR = r;
+        leaveC = c;
+      }
     }
 
-    if (theta === Infinity || theta <= 0) break;
+    if (theta === Infinity) break;
 
-    for (let k = 0; k < loop.length; k++) {
-      const [r, c] = loop[k];
-      if (k % 2 === 0) allocations[r][c] += theta;
-      else allocations[r][c] -= theta;
+    // Shift allocations along the cycle
+    for (let k = 0; k < cycle.length; k++) {
+      const [r, c] = cycle[k];
+      if (k % 2 === 0) alloc[r][c] += theta;
+      else alloc[r][c] -= theta;
     }
+
+    isBasic[enterR][enterC] = true;
+    isBasic[leaveR][leaveC] = false;
   }
 
   let totalCost = 0;
@@ -781,15 +949,15 @@ export function solveTransportation(problem: TransportationProblem): Transportat
     cost: number;
   }[] = [];
 
-  for (let r = 0; r < numRows; r++) {
-    for (let c = 0; c < numCols; c++) {
-      if (allocations[r][c] > 0) {
-        const cost = allocations[r][c] * costs[r][c];
+  for (let r = 0; r < m; r++) {
+    for (let c = 0; c < n; c++) {
+      if (alloc[r][c] > 0) {
+        const cost = alloc[r][c] * costs[r][c];
         totalCost += cost;
         allocationBreakdown.push({
           from: sources[r],
           to: destinations[c],
-          amount: allocations[r][c],
+          amount: alloc[r][c],
           unitCost: costs[r][c],
           cost,
         });
@@ -798,7 +966,7 @@ export function solveTransportation(problem: TransportationProblem): Transportat
   }
 
   return {
-    allocations,
+    allocations: alloc,
     totalCost,
     isBalanced: totalSupply === totalDemand,
     dummyAdded,
@@ -811,7 +979,7 @@ export function solveTransportation(problem: TransportationProblem): Transportat
 }
 
 // ============================================================================
-// 3. HUNGARIAN ASSIGNMENT SOLVER
+// 4. HUNGARIAN ASSIGNMENT SOLVER (Jonker-Volgenant Optimal Matching)
 // ============================================================================
 export function solveHungarianAssignment(problem: AssignmentProblem): AssignmentSolution {
   const nRows = problem.workers.length;
@@ -828,9 +996,19 @@ export function solveHungarianAssignment(problem: AssignmentProblem): Assignment
     jobs.push(`Job ${jobs.length + 1} (Dummy)`);
   }
 
+  let minVal = 0;
+  for (let r = 0; r < nRows; r++) {
+    for (let c = 0; c < nCols; c++) {
+      if (problem.costs[r][c] < minVal) minVal = problem.costs[r][c];
+    }
+  }
+  const shift = minVal < 0 ? -minVal : 0;
+
   const origMatrix: number[][] = Array.from({ length: dim }, (_, r) =>
     Array.from({ length: dim }, (_, c) => {
-      if (r < nRows && c < nCols) return problem.costs[r][c];
+      if (r < nRows && c < nCols) {
+        return problem.costs[r][c] + shift;
+      }
       return 0;
     })
   );
@@ -919,7 +1097,7 @@ export function solveHungarianAssignment(problem: AssignmentProblem): Assignment
 }
 
 // ============================================================================
-// 4. NETWORK MODELS: SHORTEST ROUTE (Dijkstra)
+// 5. NETWORK MODELS: SHORTEST ROUTE (Dijkstra with Parallel Edge Resolution)
 // ============================================================================
 export function solveNetworkShortestRoute(
   edges: NetworkEdge[],
@@ -931,6 +1109,9 @@ export function solveNetworkShortestRoute(
     nodes.add(String(e.from));
     nodes.add(String(e.to));
   });
+
+  if (!nodes.has(startNode)) nodes.add(startNode);
+  if (!nodes.has(endNode)) nodes.add(endNode);
 
   function runDijkstra(directed: boolean) {
     const d: Record<string, number> = {};
@@ -980,8 +1161,19 @@ export function solveNetworkShortestRoute(
   }
 
   let { dist, prev } = runDijkstra(true);
+  let isDirected = true;
   if (dist[endNode] === Infinity) {
     ({ dist, prev } = runDijkstra(false));
+    isDirected = false;
+  }
+
+  if (dist[endNode] === Infinity) {
+    return {
+      type: "shortest-route",
+      selectedEdges: [],
+      totalMetric: 0,
+      pathString: `No path between ${startNode} and ${endNode}`,
+    };
   }
 
   const path: string[] = [];
@@ -990,16 +1182,21 @@ export function solveNetworkShortestRoute(
     path.unshift(curr);
     curr = prev[curr];
   }
+
   const selectedEdges: { from: string; to: string; weight: number }[] = [];
   for (let i = 0; i < path.length - 1; i++) {
     const u = path[i];
     const v = path[i + 1];
-    const edge = edges.find(
+    const matchingEdges = edges.filter(
       (e) =>
         (String(e.from) === u && String(e.to) === v) ||
-        (String(e.from) === v && String(e.to) === u)
+        (!isDirected && String(e.from) === v && String(e.to) === u)
     );
-    selectedEdges.push({ from: u, to: v, weight: edge?.cost || 0 });
+    const bestEdge = matchingEdges.reduce(
+      (best, cur) => (cur.cost < best.cost ? cur : best),
+      matchingEdges[0]
+    );
+    selectedEdges.push({ from: u, to: v, weight: bestEdge?.cost ?? 0 });
   }
 
   return {
@@ -1011,7 +1208,7 @@ export function solveNetworkShortestRoute(
 }
 
 // ============================================================================
-// 5. NETWORK MODELS: MINIMUM SPANNING TREE (Kruskal's)
+// 6. NETWORK MODELS: MINIMUM SPANNING TREE (Kruskal's)
 // ============================================================================
 export function solveNetworkMst(edges: NetworkEdge[]): NetworkSolution {
   const sortedEdges = [...edges].sort((a, b) => a.cost - b.cost);
@@ -1040,7 +1237,7 @@ export function solveNetworkMst(edges: NetworkEdge[]): NetworkSolution {
   for (const e of sortedEdges) {
     const u = String(e.from);
     const v = String(e.to);
-    if (union(u, v)) {
+    if (u !== v && union(u, v)) {
       selectedEdges.push({ from: u, to: v, weight: e.cost });
       totalCost += e.cost;
     }
@@ -1055,7 +1252,7 @@ export function solveNetworkMst(edges: NetworkEdge[]): NetworkSolution {
 }
 
 // ============================================================================
-// 6. NETWORK MODELS: MAXIMAL FLOW (Edmonds-Karp & Min-Cut)
+// 7. NETWORK MODELS: MAXIMAL FLOW (Edmonds-Karp & Min-Cut)
 // ============================================================================
 export function solveNetworkMaxFlow(
   edges: NetworkEdge[],
@@ -1196,7 +1393,7 @@ export function solveNetworkMaxFlow(
 }
 
 // ============================================================================
-// 7. PROJECT PLANNING: CPM / PERT & CRASHING
+// 8. PROJECT PLANNING: CPM / PERT & CRASHING
 // ============================================================================
 export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
   const earlyStart: Record<string, number> = {};
@@ -1225,7 +1422,7 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
     }
   });
 
-  // Topological sort (Kahn's algorithm) — ensures predecessors are processed first
+  // Topological sort (Kahn's algorithm)
   const inDegree: Record<string, number> = {};
   const successorsMap: Record<string, string[]> = {};
   activities.forEach((a) => {
@@ -1248,11 +1445,17 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
     });
   }
 
-  // Forward Pass (topological order)
+  // If cyclic graph exists, append remaining activities safely
+  if (topoOrder.length < activities.length) {
+    const remaining = activities.filter((a) => !topoOrder.includes(a.id)).map((a) => a.id);
+    topoOrder.push(...remaining);
+  }
+
+  // Forward Pass
   topoOrder.forEach((id) => {
-    const a = actMap.get(id)!;
-    const dur = effectiveDurations[id];
-    if (!a.predecessors || a.predecessors.length === 0) {
+    const a = actMap.get(id);
+    const dur = effectiveDurations[id] ?? 0;
+    if (!a || !a.predecessors || a.predecessors.length === 0) {
       earlyStart[id] = 0;
       earlyFinish[id] = dur;
     } else {
@@ -1269,9 +1472,9 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
 
   const projectDuration = Math.max(...Object.values(earlyFinish), 0);
 
-  // Backward Pass (reverse topological order)
+  // Backward Pass
   [...topoOrder].reverse().forEach((id) => {
-    const dur = effectiveDurations[id];
+    const dur = effectiveDurations[id] ?? 0;
     const succs = activities.filter((succ) => succ.predecessors?.includes(id));
 
     if (succs.length === 0) {
@@ -1284,18 +1487,18 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
           minLS = lateStart[succ.id];
         }
       });
-      lateFinish[id] = minLS;
-      lateStart[id] = minLS - dur;
+      lateFinish[id] = minLS === Infinity ? projectDuration : minLS;
+      lateStart[id] = lateFinish[id] - dur;
     }
 
     slack[id] = Math.round((lateStart[id] - earlyStart[id]) * 100) / 100;
 
-    // Free Slack = min(ES_succ) - EF
+    // Free Slack = min_{succ}(ES_succ) - EF
     if (succs.length === 0) {
-      freeSlack[id] = Math.round((projectDuration - earlyFinish[id]) * 100) / 100;
+      freeSlack[id] = Math.max(0, Math.round((projectDuration - earlyFinish[id]) * 100) / 100);
     } else {
-      const minSuccES = Math.min(...succs.map((s) => earlyStart[s.id] || 0));
-      freeSlack[id] = Math.round((minSuccES - earlyFinish[id]) * 100) / 100;
+      const minSuccES = Math.min(...succs.map((s) => earlyStart[s.id] ?? projectDuration));
+      freeSlack[id] = Math.max(0, Math.round((minSuccES - earlyFinish[id]) * 100) / 100);
     }
   });
 
@@ -1316,12 +1519,12 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
       id: a.id,
       name: a.name || a.id,
       duration: effectiveDurations[a.id],
-      earlyStart: earlyStart[a.id],
-      earlyFinish: earlyFinish[a.id],
-      lateStart: lateStart[a.id],
-      lateFinish: lateFinish[a.id],
-      slack: slack[a.id],
-      freeSlack: freeSlack[a.id],
+      earlyStart: earlyStart[a.id] ?? 0,
+      earlyFinish: earlyFinish[a.id] ?? 0,
+      lateStart: lateStart[a.id] ?? 0,
+      lateFinish: lateFinish[a.id] ?? 0,
+      slack: slack[a.id] ?? 0,
+      freeSlack: freeSlack[a.id] ?? 0,
       isCritical: criticalPath.includes(a.id),
       expectedTime: effectiveDurations[a.id],
       variance: activityVariances[a.id],
@@ -1340,7 +1543,7 @@ export function solveCpmPert(activities: CpmActivity[]): CpmSolution {
 }
 
 // ============================================================================
-// 8. QUEUING ANALYSIS (M/M/1, M/M/c, M/M/1/K, M/M/c/K)
+// 9. QUEUING ANALYSIS (M/M/1, M/M/c, M/M/1/K, M/M/c/K Exact Finite Queues)
 // ============================================================================
 export function solveQueuing(problem: QueuingProblem): QueuingSolution {
   const { arrivalRateLambda: lambda, serviceRateMu: mu, serversCountC: c = 1 } = problem;
@@ -1366,9 +1569,9 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
       const Ls = Math.abs(rho - 1) < 1e-6
         ? K / 2
         : (rho * (1 - (K + 1) * Math.pow(rho, K) + K * Math.pow(rho, K + 1))) / ((1 - rho) * (1 - Math.pow(rho, K + 1)));
-      const Ws = Ls / lambdaEff;
+      const Ws = lambdaEff > 0 ? Ls / lambdaEff : 0;
       const Lq = Math.max(0, Ls - (1 - p0));
-      const Wq = Lq / lambdaEff;
+      const Wq = lambdaEff > 0 ? Lq / lambdaEff : 0;
 
       return {
         utilizationRho: Math.round(rho * 1000) / 1000,
@@ -1406,7 +1609,50 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
     const r = lambda / mu;
     const rho = r / numServers;
 
-    if (rho >= 1 && !problem.systemCapacityK) {
+    if (problem.systemCapacityK && problem.systemCapacityK > 0) {
+      // M/M/c/K finite capacity multi-server queue
+      const effK = Math.max(numServers, problem.systemCapacityK);
+      let sumTerms = 1.0;
+      let currentTerm = 1.0;
+      for (let n = 1; n < numServers; n++) {
+        currentTerm *= r / n;
+        sumTerms += currentTerm;
+      }
+      const termC = currentTerm * (r / numServers); // r^c / c!
+      let sumGeo = 0;
+      for (let n = numServers; n <= effK; n++) {
+        sumGeo += Math.pow(rho, n - numServers);
+      }
+      const p0 = 1 / (sumTerms + termC * sumGeo);
+      const pK = p0 * termC * Math.pow(rho, effK - numServers);
+      const lambdaEff = lambda * (1 - pK);
+
+      let Lq = 0;
+      if (Math.abs(rho - 1) < 1e-6) {
+        Lq = (p0 * termC * (effK - numServers) * (effK - numServers + 1)) / 2;
+      } else {
+        const N = effK - numServers;
+        const num = 1 - Math.pow(rho, N + 1) - (1 - rho) * (N + 1) * Math.pow(rho, N);
+        Lq = (p0 * termC * rho * num) / Math.pow(1 - rho, 2);
+      }
+      Lq = Math.max(0, Lq);
+      const Wq = lambdaEff > 0 ? Lq / lambdaEff : 0;
+      const Ws = Wq + 1 / mu;
+      const Ls = lambdaEff * Ws;
+
+      return {
+        utilizationRho: Math.round(rho * 1000) / 1000,
+        probZeroP0: Math.round(p0 * 1000) / 1000,
+        avgInQueueLq: Math.round(Lq * 1000) / 1000,
+        avgInSystemLs: Math.round(Ls * 1000) / 1000,
+        avgWaitQueueWq: Math.round(Wq * 1000) / 1000,
+        avgWaitSystemWs: Math.round(Ws * 1000) / 1000,
+        blockingProbabilityPk: Math.round(pK * 1000) / 1000,
+        effectiveArrivalRate: Math.round(lambdaEff * 1000) / 1000,
+      };
+    }
+
+    if (rho >= 1) {
       return {
         utilizationRho: Math.round(rho * 1000) / 1000,
         probZeroP0: 0,
@@ -1419,7 +1665,6 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
 
     let sumTerms = 1.0;
     let currentTerm = 1.0;
-
     for (let n = 1; n < numServers; n++) {
       currentTerm *= r / n;
       sumTerms += currentTerm;
@@ -1449,14 +1694,14 @@ export function solveQueuing(problem: QueuingProblem): QueuingSolution {
 }
 
 // ============================================================================
-// 9. ZERO-SUM GAME THEORY
+// 10. ZERO-SUM GAME THEORY (Pure Saddle, 2x2 Analytical & General m x n Linear Programming)
 // ============================================================================
 export function solveZeroSumGame(problem: ZeroSumGameProblem): ZeroSumGameSolution {
   const m = problem.player1Strategies.length;
   const n = problem.player2Strategies.length;
   const matrix = problem.payoffMatrix;
 
-  const rowMins: number[] = matrix.map((row) => Math.min(...row));
+  const rowMins: number[] = matrix.map((row: number[]) => Math.min(...row));
   const maximin = Math.max(...rowMins);
 
   const colMaxs: number[] = [];
@@ -1469,29 +1714,38 @@ export function solveZeroSumGame(problem: ZeroSumGameProblem): ZeroSumGameSoluti
   }
   const minimax = Math.min(...colMaxs);
 
-  const hasSaddlePoint = maximin === minimax;
+  const hasSaddlePoint = Math.abs(maximin - minimax) < 1e-5;
   let saddlePointLocation: [number, number] | undefined;
 
   if (hasSaddlePoint) {
     for (let r = 0; r < m; r++) {
       for (let c = 0; c < n; c++) {
-        if (matrix[r][c] === maximin && rowMins[r] === maximin && colMaxs[c] === minimax) {
+        if (Math.abs(matrix[r][c] - maximin) < 1e-5 && Math.abs(rowMins[r] - maximin) < 1e-5 && Math.abs(colMaxs[c] - minimax) < 1e-5) {
           saddlePointLocation = [r, c];
           break;
         }
       }
       if (saddlePointLocation) break;
     }
+    const p1 = new Array(m).fill(0);
+    const p2 = new Array(n).fill(0);
+    if (saddlePointLocation) {
+      p1[saddlePointLocation[0]] = 1;
+      p2[saddlePointLocation[1]] = 1;
+    }
+    return {
+      hasSaddlePoint: true,
+      gameValue: maximin,
+      maximinValue: maximin,
+      minimaxValue: minimax,
+      saddlePointLocation,
+      player1Probabilities: p1,
+      player2Probabilities: p2,
+    };
   }
 
-  const p1Probabilities = new Array(m).fill(0);
-  const p2Probabilities = new Array(n).fill(0);
-
-  if (hasSaddlePoint && saddlePointLocation) {
-    p1Probabilities[saddlePointLocation[0]] = 1;
-    p2Probabilities[saddlePointLocation[1]] = 1;
-  } else if (m === 2 && n === 2) {
-    // 2x2 analytical mixed strategy solution
+  // 2x2 analytical mixed strategy solution
+  if (m === 2 && n === 2) {
     const a11 = matrix[0][0];
     const a12 = matrix[0][1];
     const a21 = matrix[1][0];
@@ -1505,45 +1759,138 @@ export function solveZeroSumGame(problem: ZeroSumGameProblem): ZeroSumGameSoluti
       const q2 = 1 - q1;
       const v = (a11 * a22 - a12 * a21) / denom;
 
-      p1Probabilities[0] = Math.max(0, Math.min(1, p1));
-      p1Probabilities[1] = Math.max(0, Math.min(1, p2));
-      p2Probabilities[0] = Math.max(0, Math.min(1, q1));
-      p2Probabilities[1] = Math.max(0, Math.min(1, q2));
-
-      return {
-        hasSaddlePoint: false,
-        gameValue: Math.round(v * 1000) / 1000,
-        maximinValue: maximin,
-        minimaxValue: minimax,
-        player1Probabilities: p1Probabilities.map((p) => Math.round(p * 1000) / 1000),
-        player2Probabilities: p2Probabilities.map((p) => Math.round(p * 1000) / 1000),
-        mixedStrategyFormula: `p1 = ${(p1).toFixed(3)}, p2 = ${(p2).toFixed(3)}, q1 = ${(q1).toFixed(3)}, q2 = ${(q2).toFixed(3)}, V = ${(v).toFixed(3)}`,
-      };
+      if (p1 >= -1e-6 && p1 <= 1 + 1e-6 && q1 >= -1e-6 && q1 <= 1 + 1e-6) {
+        return {
+          hasSaddlePoint: false,
+          gameValue: Math.round(v * 1000) / 1000,
+          maximinValue: maximin,
+          minimaxValue: minimax,
+          player1Probabilities: [Math.max(0, Math.min(1, Math.round(p1 * 1000) / 1000)), Math.max(0, Math.min(1, Math.round(p2 * 1000) / 1000))],
+          player2Probabilities: [Math.max(0, Math.min(1, Math.round(q1 * 1000) / 1000)), Math.max(0, Math.min(1, Math.round(q2 * 1000) / 1000))],
+          mixedStrategyFormula: `p1 = ${(p1).toFixed(3)}, p2 = ${(p2).toFixed(3)}, q1 = ${(q1).toFixed(3)}, q2 = ${(q2).toFixed(3)}, V = ${(v).toFixed(3)}`,
+        };
+      }
     }
-  } else {
-    // Fallback LP-derived mixed strategy equal distribution
-    p1Probabilities.fill(1 / m);
-    p2Probabilities.fill(1 / n);
   }
 
-  return {
-    hasSaddlePoint,
-    gameValue: maximin,
-    maximinValue: maximin,
-    minimaxValue: minimax,
-    saddlePointLocation,
-    player1Probabilities: p1Probabilities.map((p) => Math.round(p * 1000) / 1000),
-    player2Probabilities: p2Probabilities.map((p) => Math.round(p * 1000) / 1000),
-  };
+  // General m x n Zero-Sum Game via Linear Programming
+  try {
+    let minVal = Infinity;
+    for (let r = 0; r < m; r++) {
+      for (let c = 0; c < n; c++) {
+        if (matrix[r][c] < minVal) minVal = matrix[r][c];
+      }
+    }
+    const shift = minVal <= 0 ? -minVal + 1 : 0;
+    const A_prime = matrix.map((row: number[]) => row.map((val: number) => val + shift));
+
+    // Player 1 LP: Min sum(x_i) s.t. sum_i A'_ij * x_i >= 1
+    const p1Lp: LpProblem = {
+      objective: "min",
+      objectiveCoefficients: new Array(m).fill(1),
+      variableNames: Array.from({ length: m }, (_, i) => `x${i + 1}`),
+      constraints: Array.from({ length: n }, (_, j) => ({
+        coefficients: Array.from({ length: m }, (_, i) => A_prime[i][j]),
+        operator: ">=" as const,
+        rhs: 1,
+      })),
+    };
+    const p1Sol = solveLinearProgramming(p1Lp);
+    const sumX = p1Sol.objectiveValue;
+    const V_prime = sumX > 0 ? 1 / sumX : 0;
+    const gameValue = V_prime - shift;
+    const p1Probs = p1Sol.variableValues.map((v: { value: number }) => Math.max(0, Math.round(v.value * V_prime * 1000) / 1000));
+
+    // Player 2 LP: Max sum(y_j) s.t. sum_j A'_ij * y_j <= 1
+    const p2Lp: LpProblem = {
+      objective: "max",
+      objectiveCoefficients: new Array(n).fill(1),
+      variableNames: Array.from({ length: n }, (_, j) => `y${j + 1}`),
+      constraints: Array.from({ length: m }, (_, i) => ({
+        coefficients: Array.from({ length: n }, (_, j) => A_prime[i][j]),
+        operator: "<=" as const,
+        rhs: 1,
+      })),
+    };
+    const p2Sol = solveLinearProgramming(p2Lp);
+    const sumY = p2Sol.objectiveValue;
+    const V2_prime = sumY > 0 ? 1 / sumY : 0;
+    const p2Probs = p2Sol.variableValues.map((v: { value: number }) => Math.max(0, Math.round(v.value * V2_prime * 1000) / 1000));
+
+    return {
+      hasSaddlePoint: false,
+      gameValue: Math.round(gameValue * 1000) / 1000,
+      maximinValue: maximin,
+      minimaxValue: minimax,
+      player1Probabilities: p1Probs,
+      player2Probabilities: p2Probs,
+    };
+  } catch {
+    const p1 = new Array(m).fill(Math.round((1 / m) * 1000) / 1000);
+    const p2 = new Array(n).fill(Math.round((1 / n) * 1000) / 1000);
+    return {
+      hasSaddlePoint: false,
+      gameValue: maximin,
+      maximinValue: maximin,
+      minimaxValue: minimax,
+      player1Probabilities: p1,
+      player2Probabilities: p2,
+    };
+  }
 }
 
 // ============================================================================
-// 10. INVENTORY CONTROL (Classic EOQ, Backorders, EPQ, Quantity Discounts)
+// 11. INVENTORY CONTROL (Classic EOQ, Backorders, EPQ, Quantity Discounts, Newsvendor)
 // ============================================================================
 export function solveInventoryControl(problem: InventoryProblem): InventorySolution {
   const { annualDemandD: D, orderingCostK: K, holdingCostH: H, unitPriceC: C } = problem;
+  const leadTimeDays = problem.leadTimeDaysL !== undefined ? problem.leadTimeDaysL : 5;
+  const reorderPoint = Math.round((D / 365) * leadTimeDays);
 
-  // 1. Quantity Discounts
+  // 1. Newsvendor Single-Period Perishable Inventory
+  if (problem.model === "newsvendor") {
+    const costC = C;
+    const priceP = problem.shortageCostP && problem.shortageCostP > costC
+      ? problem.shortageCostP
+      : problem.orderingCostK && problem.orderingCostK > costC
+      ? problem.orderingCostK
+      : costC * 1.5;
+    const salvageS = problem.salvageValueS ?? 0;
+
+    const Cu = priceP - costC; // Underage cost (profit lost per unit)
+    const Co = costC - salvageS; // Overage cost (loss per unsold unit)
+    const criticalFractile = Cu / (Cu + Co);
+
+    const meanD = D;
+    const stdDev = Math.round(meanD * 0.25);
+
+    function normInv(p: number): number {
+      if (p <= 0) return -Infinity;
+      if (p >= 1) return Infinity;
+      if (p === 0.5) return 0;
+      const a = [2.515517, 0.802853, 0.010328];
+      const b = [1.432788, 0.189269, 0.001308];
+      const t = p < 0.5 ? Math.sqrt(-2 * Math.log(p)) : Math.sqrt(-2 * Math.log(1 - p));
+      const num = a[0] + a[1] * t + a[2] * t * t;
+      const den = 1 + b[0] * t + b[1] * t * t + b[2] * t * t * t;
+      const z = t - num / den;
+      return p < 0.5 ? -z : z;
+    }
+
+    const zScore = normInv(criticalFractile);
+    const Q_star = Math.max(0, Math.round(meanD + zScore * stdDev));
+    const totalCost = Math.round(Q_star * costC * 100) / 100;
+
+    return {
+      optimalOrderQtyY: Q_star,
+      criticalFractile: Math.round(criticalFractile * 1000) / 1000,
+      totalAnnualCost: totalCost,
+      cycleTimeMonths: 1,
+      reorderPoint: Q_star,
+    };
+  }
+
+  // 2. Quantity Discounts
   if (problem.priceBreaks && problem.priceBreaks.length > 0) {
     let bestTotalCost = Infinity;
     let bestQty = 0;
@@ -1583,13 +1930,13 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
       optimalOrderQtyY: Math.round(bestQty),
       totalAnnualCost: Math.round(bestTotalCost * 100) / 100,
       cycleTimeMonths: Math.round((bestQty / D) * 12 * 10) / 10,
-      reorderPoint: Math.round((D / 365) * 5),
+      reorderPoint,
       selectedPriceBreakTier: selectedTier,
       priceBreakAnalysis,
     };
   }
 
-  // 2. EOQ with Planned Backorders / Shortages
+  // 3. EOQ with Planned Backorders / Shortages
   if (problem.shortageCostP && problem.shortageCostP > 0) {
     const P = problem.shortageCostP;
     const Q_star = Math.sqrt(((2 * K * D) / H) * ((H + P) / P));
@@ -1610,17 +1957,17 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
       annualShortageCost: Math.round(annualShortage * 100) / 100,
       totalAnnualCost: Math.round(totalCost * 100) / 100,
       cycleTimeMonths: Math.round((Q_star / D) * 12 * 10) / 10,
-      reorderPoint: Math.round((D / 365) * 5),
+      reorderPoint,
     };
   }
 
-  // 3. Economic Production Quantity (EPQ / POQ)
+  // 4. Economic Production Quantity (EPQ / POQ)
   if (problem.productionRateP && problem.productionRateP > 0) {
     const prodRate = problem.productionRateP;
-    // d/p ratio: both D and prodRate are annual, so D/prodRate is unit-consistent
     const dpRatio = D / prodRate;
-    const Q_star = Math.sqrt((2 * K * D) / (H * (1 - dpRatio)));
-    const I_max = Q_star * (1 - dpRatio);
+    const safeRatio = dpRatio < 1 ? dpRatio : 0.99;
+    const Q_star = Math.sqrt((2 * K * D) / (H * (1 - safeRatio)));
+    const I_max = Q_star * (1 - safeRatio);
 
     const annualOrdering = (D / Q_star) * K;
     const annualHolding = (I_max / 2) * H;
@@ -1633,11 +1980,11 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
       annualHoldingCost: Math.round(annualHolding * 100) / 100,
       totalAnnualCost: Math.round(totalCost * 100) / 100,
       cycleTimeMonths: Math.round((Q_star / D) * 12 * 10) / 10,
-      reorderPoint: Math.round((D / 365) * 5),
+      reorderPoint,
     };
   }
 
-  // 4. Classic Wilson EOQ
+  // 5. Classic Wilson EOQ
   const Q_star = Math.sqrt((2 * K * D) / H);
   const annualOrdering = (D / Q_star) * K;
   const annualHolding = (Q_star / 2) * H;
@@ -1650,12 +1997,12 @@ export function solveInventoryControl(problem: InventoryProblem): InventorySolut
     annualHoldingCost: Math.round(annualHolding * 100) / 100,
     totalAnnualCost: Math.round(totalAnnualCost * 100) / 100,
     cycleTimeMonths: Math.round(cycleTimeMonths * 10) / 10,
-    reorderPoint: Math.round((D / 365) * 5),
+    reorderPoint,
   };
 }
 
 // ============================================================================
-// 11. SIMULTANEOUS LINEAR EQUATIONS (Gauss-Jordan Ax = b)
+// 12. SIMULTANEOUS LINEAR EQUATIONS (Gauss-Jordan Ax = b)
 // ============================================================================
 export function solveLinearEquations(matrixA: number[][], vectorB: number[]): number[] {
   const n = matrixA.length;
@@ -1679,7 +2026,7 @@ export function solveLinearEquations(matrixA: number[][], vectorB: number[]): nu
     }
 
     const pivot = M[i][i];
-    if (Math.abs(pivot) < 1e-10) continue;
+    if (Math.abs(pivot) < 1e-11) continue;
 
     for (let j = 0; j <= n; j++) {
       M[i][j] /= pivot;

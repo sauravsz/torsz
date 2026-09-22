@@ -147,11 +147,11 @@ describe("TORA Operations Research Multi-Scenario & Textbook Benchmark Suite", (
   // 2. TRANSPORTATION MODEL (Vogel's VAM & Balanced/Unbalanced)
   // ==========================================================================
   describe("Transportation Models", () => {
-    it("solves MG Auto 3x4 balanced transportation with VAM (Taha)", () => {
+    it("solves MG Auto 3x4 balanced transportation with VAM and MODI (Taha)", () => {
       const benchmark = BENCHMARKS.trans.find((b) => b.id === "taha-mg-auto")!;
       const sol = solveTransportation(benchmark.data);
       expect(sol.isBalanced).toBe(true);
-      expect(sol.totalCost).toBeLessThanOrEqual(475);
+      expect(sol.totalCost).toBe(435);
       expect(sol.allocations.length).toBe(3);
       expect(sol.allocations[0].length).toBe(4);
     });
@@ -380,6 +380,20 @@ Smart drives daily to work. Having just completed a course in network analysis, 
       const sol = solveInventoryControl(inv!);
       expect(sol.optimalOrderQtyY).toBe(632);
     });
+
+    it("solves Single-Period Newsvendor inventory model", () => {
+      const nv: InventoryProblem = {
+        model: "newsvendor",
+        annualDemandD: 100,
+        orderingCostK: 15,
+        holdingCostH: 0,
+        unitPriceC: 10,
+        salvageValueS: 5,
+      };
+      const sol = solveInventoryControl(nv);
+      expect(sol.criticalFractile).toBe(0.5);
+      expect(sol.optimalOrderQtyY).toBe(100);
+    });
   });
 
   // ==========================================================================
@@ -409,6 +423,21 @@ Smart drives daily to work. Having just completed a course in network analysis, 
       expect(sol.blockingProbabilityPk).toBeDefined();
       expect(sol.effectiveArrivalRate).toBeDefined();
       expect(sol.effectiveArrivalRate!).toBeLessThan(12);
+    });
+
+    it("solves multi-server finite capacity M/M/c/K queue exactly", () => {
+      const mmck: QueuingProblem = {
+        model: "M/M/c",
+        arrivalRateLambda: 4,
+        serviceRateMu: 3,
+        serversCountC: 2,
+        systemCapacityK: 3,
+      };
+      const sol = solveQueuing(mmck);
+      expect(sol.probZeroP0).toBeCloseTo(0.262, 2);
+      expect(sol.blockingProbabilityPk).toBeCloseTo(0.155, 2);
+      expect(sol.avgInQueueLq).toBeCloseTo(0.155, 2);
+      expect(sol.avgInSystemLs).toBeCloseTo(1.282, 2);
     });
 
     it("extracts queuing problem from natural language statements", () => {
@@ -441,6 +470,24 @@ Smart drives daily to work. Having just completed a course in network analysis, 
       expect(sol.player2Probabilities).toBeDefined();
       expect(sol.player1Probabilities![0]).toBeCloseTo(0.5, 1);
       expect(sol.player2Probabilities![0]).toBeCloseTo(0.6, 1);
+    });
+
+    it("solves general 3x3 zero-sum game via Linear Programming (Rock-Paper-Scissors)", () => {
+      const rps: ZeroSumGameProblem = {
+        player1Strategies: ["Rock", "Paper", "Scissors"],
+        player2Strategies: ["Rock", "Paper", "Scissors"],
+        payoffMatrix: [
+          [0, -1, 1],
+          [1, 0, -1],
+          [-1, 1, 0],
+        ],
+      };
+      const sol = solveZeroSumGame(rps);
+      expect(sol.hasSaddlePoint).toBe(false);
+      expect(sol.gameValue).toBe(0);
+      expect(sol.player1Probabilities![0]).toBeCloseTo(0.333, 2);
+      expect(sol.player1Probabilities![1]).toBeCloseTo(0.333, 2);
+      expect(sol.player1Probabilities![2]).toBeCloseTo(0.333, 2);
     });
 
     it("extracts zero-sum game payoff matrices from markdown tables", () => {
