@@ -104,27 +104,37 @@ bun run build
 
 ---
 
-## Tech Stack
+## Built With
 
-* **Frontend**: React 18, TypeScript, Vite 6, Tailwind CSS
-* **Code Editor**: `@monaco-editor/react`
-* **Database Engine**: `sql.js` (SQLite WASM via Emscripten)
-* **Mathematical Solvers**: Pure TypeScript algorithms with zero external math dependencies
+### Core Technologies & Libraries
+* **[React 18](https://react.dev/)** & **[TypeScript 5](https://www.typescriptlang.org/)**: Type-safe reactive component architecture.
+* **[Vite 6](https://vite.dev/)**: Next-generation frontend build tooling and HMR dev server.
+* **[sql.js](https://github.com/sql-js/sql.js)**: SQLite relational database engine compiled to WebAssembly via Emscripten for zero-install, in-browser SQL execution.
+* **[Monaco Editor](https://github.com/microsoft/monaco-editor)** (`@monaco-editor/react`): The code editor powering VS Code with custom syntax highlighting, SQL intellisense, and query execution.
+* **[Tesseract.js](https://github.com/naptha/tesseract.js)**: Client-side WebAssembly OCR engine for multi-language question transcription directly in the browser.
+* **[SheetJS / xlsx](https://github.com/SheetJS/sheetjs)**: Spreadsheet parser and generator for `.xlsx`, `.xls`, `.csv`, and `.tsv` data import/export.
+* **[PapaParse](https://www.papaparse.com/)**: Fast, in-browser CSV streaming and parsing with delimiter auto-detection.
+* **[heic2any](https://github.com/alexcorvi/heic2any)**: Client-side Apple HEIC/HEIF image decoder for mobile photo uploads.
+* **[Tailwind CSS](https://tailwindcss.com/)**: Utility-first styling with custom dark warm-editorial design tokens (`clsx`, `tailwind-merge`).
+* **[Lucide Icons](https://lucide.dev/)**: Clean icon system for UI controls and navigation.
 
 ---
 
 ## Acknowledgements & Foundations
 
-`torsz` builds upon several open-source libraries and foundations:
+`torsz` is deeply inspired by and builds upon the foundational work of several landmark open-source projects and Operations Research texts:
 
-* **[tora-tool/tora](https://github.com/tora-tool/tora)**: The original open-source multi-database C++/Qt SQL IDE.
-* **[sql-js/sql.js](https://github.com/sql-js/sql.js)**: SQLite compiled to WebAssembly for browser-native relational queries.
-* **[RouteIQ](https://github.com/sauravsz/RouteIQ)**: Mathematical models and supply chain optimization algorithms.
-* **[Operations Research: An Introduction (Hamdy A. Taha)](https://www.pearson.com/)**: Algorithmic formulations for the TORA optimization suite.
-* **[microsoft/monaco-editor](https://github.com/microsoft/monaco-editor)**: The code editor powering VS Code.
-* **[tesseract.js](https://github.com/naptha/tesseract.js)**: Pure JavaScript OCR engine for client-side transcription.
+### Open-Source Foundations
+* **[tora-tool/tora](https://github.com/tora-tool/tora)**: The pioneering open-source C++/Qt multi-database SQL IDE that established desktop database management workflows.
+* **[sql-js/sql.js](https://github.com/sql-js/sql.js)**: Bringing full ACID relational database capabilities to the browser via WebAssembly.
+* **[RouteIQ](https://github.com/sauravsz/RouteIQ)**: Supply chain optimization and multi-scenario transportation network modeling foundations.
 
----
+### Operations Research & Mathematical Formulations
+* **[Hamdy A. Taha — *Operations Research: An Introduction* (Pearson)](https://www.pearson.com/)**: Algorithmic foundations for the TORA optimization suite (Two-Phase Simplex, Vogel's Approximation Method, MODI stepping-stone method, Dijkstra's algorithm, and queuing theory).
+* **[Frederick S. Hillier & Gerald J. Lieberman — *Introduction to Operations Research* (McGraw-Hill)](https://www.mheducation.com/)**: Mathematical formulations for network models, 2D graphical LP convex geometry, and game-theoretic dual linear programming.
+* **[Nagraj Balakrishnan, Barry Render, Ralph M. Stair — *Managerial Decision Modeling* (Pearson)](https://www.pearson.com/)**: Practical business benchmarks for CPM/PERT project crashing, inventory control (Planned Backorders, EPQ, Quantity Discounts), and goal programming.
+* **[Roy Jonker & Ton Volgenant (1987)](https://doi.org/10.1007/BF02278710)**: The $O(N^3)$ shortest augmenting path algorithm for linear assignment problems.
+* **[Jack Edmonds & Richard M. Karp (1972)](https://doi.org/10.1145/321694.321699)**: The BFS augmenting path algorithm for network maximal flow and Min-Cut partitioning.
 
 ## License
 
